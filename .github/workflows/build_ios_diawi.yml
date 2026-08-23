@@ -1,0 +1,68 @@
+name: Build iOS IPA & Upload to Diawi
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Cho phép bấm nút "Run workflow" thủ công trên web GitHub
+
+jobs:
+  build-ios:
+    name: Build & Upload to Diawi
+    runs-on: macos-14
+
+    steps:
+      - name: 📥 Checkout Mã Nguồn
+        uses: actions/checkout@v4
+
+      - name: 🐦 Cài đặt Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: 📦 Cài đặt thư viện (Dependencies)
+        run: flutter pub get
+
+      - name: 🛠️ Biên dịch iOS Runner
+        run: flutter build ios --release --no-codesign
+
+      - name: 📦 Đóng gói thành file .ipa (Payload)
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r -q app.ipa Payload
+          echo "✅ Đã đóng gói thành công app.ipa"
+
+      - name: 🚀 Tải lên Diawi và tạo Link cài đặt iPhone
+        id: diawi_upload
+        env:
+          DIAWI_TOKEN: ${{ secrets.DIAWI_TOKEN }}
+        run: |
+          if [ -z "$DIAWI_TOKEN" ]; then
+            echo "⚠️ Chưa tìm thấy DIAWI_TOKEN trong GitHub Secrets. Đang tạo artifact tải về..."
+            echo "install_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+          else
+            echo "Đang tải app.ipa lên Diawi..."
+            UPLOAD_RES=$(curl -s https://upload.diawi.com/ -F token="$DIAWI_TOKEN" -F file=@app.ipa -F find_by_udid=0 -F wall_of_apps=0)
+            JOB_ID=$(echo $UPLOAD_RES | grep -o '"job": *"[^"]*"' | grep -o '[^"]*' | tail -n 1)
+            echo "Diawi Job ID: $JOB_ID"
+            
+            # Chờ Diawi xử lý và lấy link tải
+            sleep 10
+            STATUS_RES=$(curl -s "https://upload.diawi.com/status?token=$DIAWI_TOKEN&job=$JOB_ID")
+            DIAWI_LINK=$(echo $STATUS_RES | grep -o '"link": *"[^"]*"' | grep -o '[^"]*' | tail -n 1)
+            
+            echo "=================================================="
+            echo "🎉 LINK CÀI ĐẶT TRÊN IPHONE (GỬI QUA ZALO):"
+            echo "https://install.diawi.com/$DIAWI_LINK"
+            echo "=================================================="
+            
+            echo "install_url=https://install.diawi.com/$DIAWI_LINK" >> $GITHUB_OUTPUT
+            echo "### 📱 Link Cài Đặt iPhone: [Bấm vào đây để cài đặt](https://install.diawi.com/$DIAWI_LINK)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 💾 Lưu file app.ipa vào GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RunTracker-iOS-IPA
+          path: app.ipa
