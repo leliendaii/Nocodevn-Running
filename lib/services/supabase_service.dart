@@ -79,16 +79,35 @@ class SupabaseService {
   }
 
   /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user, Username) từ bảng profiles
-  static Future<Map<String, dynamic>?> fetchProfile(String userId, [String? email]) async {
+  static Future<Map<String, dynamic>?> fetchProfile(String userId, [String? email, String? username]) async {
     final supa = client;
     if (supa == null) return null;
     try {
-      if (email != null && email.isNotEmpty) {
-        final byEmail = await supa.from('profiles').select().ilike('email', email.trim()).maybeSingle();
-        if (byEmail != null) return byEmail;
+      // 1. Tìm theo UUID ID
+      if (userId.isNotEmpty) {
+        try {
+          final byId = await supa.from('profiles').select().eq('id', userId).maybeSingle();
+          if (byId != null) return byId;
+        } catch (_) {}
       }
-      final byId = await supa.from('profiles').select().eq('id', userId).maybeSingle();
-      return byId;
+
+      // 2. Tìm theo Email
+      if (email != null && email.isNotEmpty) {
+        try {
+          final byEmail = await supa.from('profiles').select().ilike('email', email.trim()).maybeSingle();
+          if (byEmail != null) return byEmail;
+        } catch (_) {}
+      }
+
+      // 3. Tìm theo Username
+      if (username != null && username.isNotEmpty) {
+        try {
+          final byUsername = await supa.from('profiles').select().ilike('username', username.trim()).maybeSingle();
+          if (byUsername != null) return byUsername;
+        } catch (_) {}
+      }
+
+      return null;
     } catch (e) {
       debugPrint('Lỗi fetch profiles: $e');
       return null;

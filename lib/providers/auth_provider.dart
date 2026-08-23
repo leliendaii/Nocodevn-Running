@@ -59,7 +59,11 @@ class AuthProvider with ChangeNotifier {
     if (_currentUser == null || !SupabaseService.isConfigured) return;
 
     try {
-      final profile = await SupabaseService.fetchProfile(_currentUser!.id, _currentUser!.email);
+      final profile = await SupabaseService.fetchProfile(
+        _currentUser!.id,
+        _currentUser!.email,
+        _currentUser!.username,
+      );
       if (profile != null) {
         final roleStr = (profile['role'] as String?)?.toLowerCase().trim() ?? 'user';
         final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
@@ -236,7 +240,7 @@ class AuthProvider with ChangeNotifier {
         final res = await SupabaseService.signIn(identifier: cleanIdentifier, password: password);
         final u = res?.user;
         if (u != null) {
-          final profile = await SupabaseService.fetchProfile(u.id, u.email);
+          final profile = await SupabaseService.fetchProfile(u.id, u.email, cleanIdentifier);
           final roleStr = SupabaseService.extractRole(u, profile);
           final displayName = profile?['name'] ?? u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
           final username = profile?['username'] ?? u.userMetadata?['username'] ?? cleanIdentifier;
