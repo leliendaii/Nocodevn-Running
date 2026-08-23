@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
+import '../widgets/dialogs/edit_profile_dialog.dart';
+import '../widgets/dialogs/change_password_dialog.dart';
+import '../widgets/dialogs/avatar_picker_dialog.dart';
 import 'running_screen.dart';
 import 'history_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -336,7 +338,7 @@ class _MainShellState extends State<MainShell> {
                       bottom: 0,
                       right: 0,
                       child: GestureDetector(
-                        onTap: () => _showAvatarPicker(context, auth),
+                        onTap: () => AvatarPickerDialog.show(context, auth),
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -502,7 +504,7 @@ class _MainShellState extends State<MainShell> {
                         foregroundColor: AppTheme.primaryNeon,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       ),
-                      onPressed: () => _showEditProfileDialog(context, auth),
+                      onPressed: () => EditProfileDialog.show(context, auth),
                       child: const Text('CHỈNH SỬA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     ),
                   ],
@@ -544,7 +546,7 @@ class _MainShellState extends State<MainShell> {
                         foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       ),
-                      onPressed: () => _showChangePasswordDialog(context, auth),
+                      onPressed: () => ChangePasswordDialog.show(context, auth),
                       child: const Text('ĐỔI MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
                     ),
                   ],
@@ -568,95 +570,6 @@ class _MainShellState extends State<MainShell> {
               const SizedBox(height: 12),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // Hộp thoại chọn ảnh đại diện (Tải từ điện thoại hoặc chọn mẫu thể thao)
-  void _showAvatarPicker(BuildContext context, AuthProvider auth) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('ĐỔI ẢNH ĐẠI DIỆN', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: AppTheme.primaryNeon, child: Icon(Icons.photo_library, color: Colors.white)),
-              title: const Text('Chọn ảnh từ Thư viện điện thoại'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                try {
-                  final picker = ImagePicker();
-                  final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 400, imageQuality: 70);
-                  if (image != null) {
-                    final bytes = await image.readAsBytes();
-                    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-                    auth.updateAvatar(base64String);
-                    if (context.mounted) {
-                      TopSyncToast.show(context, message: 'Đã cập nhật ảnh đại diện mới!', isSuccess: true);
-                    }
-                  }
-                } catch (e) {
-                  debugPrint('Lỗi chọn ảnh: $e');
-                }
-              },
-            ),
-            ListTile(
-              leading: const CircleAvatar(backgroundColor: AppTheme.secondaryNeon, child: Icon(Icons.camera_alt, color: Colors.white)),
-              title: const Text('Chụp ảnh từ Camera'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                try {
-                  final picker = ImagePicker();
-                  final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 400, imageQuality: 70);
-                  if (image != null) {
-                    final bytes = await image.readAsBytes();
-                    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-                    auth.updateAvatar(base64String);
-                    if (context.mounted) {
-                      TopSyncToast.show(context, message: 'Đã chụp ảnh đại diện mới!', isSuccess: true);
-                    }
-                  }
-                } catch (e) {
-                  debugPrint('Lỗi chụp ảnh: $e');
-                }
-              },
-            ),
-            const Divider(color: AppTheme.divider),
-            const Text('Hoặc chọn Avatar thể thao mẫu:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-                'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-                'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=150',
-                'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-              ].map((url) {
-                return GestureDetector(
-                  onTap: () {
-                    auth.updateAvatar(url);
-                    Navigator.pop(ctx);
-                    TopSyncToast.show(context, message: 'Đã cập nhật avatar mẫu!', isSuccess: true);
-                  },
-                  child: CircleAvatar(
-                    radius: 26,
-                    backgroundImage: NetworkImage(url),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-          ],
         ),
       ),
     );
@@ -693,190 +606,6 @@ class _MainShellState extends State<MainShell> {
       Icons.person,
       size: 55,
       color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-    );
-  }
-
-  void _showEditProfileDialog(BuildContext context, AuthProvider auth) {
-    final nameController = TextEditingController(text: auth.currentUser?.name ?? '');
-    final usernameController = TextEditingController(text: auth.currentUser?.username ?? '');
-    final emailController = TextEditingController(text: auth.currentUser?.email ?? '');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.edit_note_rounded, color: AppTheme.primaryNeon),
-            SizedBox(width: 10),
-            Text('Đổi Thông Tin Cá Nhân', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Họ và tên',
-                prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryNeon),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: usernameController,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Tên đăng nhập (Username)',
-                prefixIcon: Icon(Icons.alternate_email_rounded, color: AppTheme.secondaryNeon),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final n = nameController.text.trim();
-              final u = usernameController.text.trim();
-              final e = emailController.text.trim();
-
-              final error = await auth.updateProfile(newName: n, newUsername: u, newEmail: e);
-              if (error != null) {
-                if (context.mounted) {
-                  TopSyncToast.show(context, message: error, isSuccess: false);
-                }
-              } else {
-                if (context.mounted) {
-                  Navigator.of(ctx).pop();
-                  TopSyncToast.show(context, message: 'Đã cập nhật thông tin thành công!', isSuccess: true);
-                }
-              }
-            },
-            child: const Text('LƯU THÔNG TIN', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog(BuildContext context, AuthProvider auth) {
-    final currentPassController = TextEditingController();
-    final newPassController = TextEditingController();
-    final confirmPassController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: AppTheme.secondaryNeon, width: 1.5),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.lock_reset_rounded, color: AppTheme.secondaryNeon),
-            SizedBox(width: 10),
-            Text('Đổi Mật Khẩu', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPassController,
-              obscureText: true,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Mật khẩu hiện tại',
-                hintText: 'Nhập mật khẩu đang dùng',
-                prefixIcon: Icon(Icons.key, color: AppTheme.secondaryNeon),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: newPassController,
-              obscureText: true,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Mật khẩu mới (ít nhất 6 ký tự)',
-                prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryNeon),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: confirmPassController,
-              obscureText: true,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Nhập lại mật khẩu mới',
-                prefixIcon: Icon(Icons.lock_reset, color: AppTheme.primaryNeon),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondaryNeon,
-              foregroundColor: Colors.black,
-            ),
-            onPressed: () async {
-              final cur = currentPassController.text.trim();
-              final n1 = newPassController.text.trim();
-              final n2 = confirmPassController.text.trim();
-
-              if (n1 != n2) {
-                TopSyncToast.show(
-                  context,
-                  message: 'Mật khẩu mới xác nhận không khớp!',
-                  isSuccess: false,
-                );
-                return;
-              }
-
-              final error = await auth.changePassword(
-                currentPassword: cur,
-                newPassword: n1,
-              );
-
-              if (error != null) {
-                if (context.mounted) {
-                  TopSyncToast.show(context, message: error, isSuccess: false);
-                }
-              } else {
-                if (context.mounted) {
-                  Navigator.of(ctx).pop();
-                  TopSyncToast.show(context, message: 'Đã đổi mật khẩu thành công!', isSuccess: true);
-                }
-              }
-            },
-            child: const Text('LƯU MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/run_session.dart';
 import '../services/supabase_service.dart';
+import '../services/local_storage_service.dart';
 
 enum TrackingState { idle, running, paused, finished }
 
@@ -32,22 +33,53 @@ class RunningProvider with ChangeNotifier {
   Timer? _timer;
   final List<RunPoint> _currentRoute = [];
   Position? _lastPosition;
+  DateTime? _lastPositionTime;
   StreamSubscription<Position>? _positionStream;
 
-  // Danh sách toàn bộ lịch sử các buổi chạy (có sẵn dữ liệu mẫu thực tế)
+  // Danh sách toàn bộ lịch sử các buổi chạy
   final List<RunSession> _sessions = [];
 
   RunningProvider() {
     _initMockData();
-    _loadCloudSessions();
+    _loadInitialSessions();
   }
 
-  Future<void> _loadCloudSessions() async {
+  /// Tải dữ liệu kết hợp Offline Cache & Supabase Cloud
+  Future<void> _loadInitialSessions() async {
+    // 1. Tải nhanh từ bộ nhớ máy (Offline Cache) để hiển thị tức thì
+    final cached = await LocalStorageService.loadCachedRunSessions();
+    if (cached.isNotEmpty) {
+      _sessions.clear();
+      _sessions.addAll(cached);
+      notifyListeners();
+    }
+
+    // 2. Tải dữ liệu mới nhất từ Supabase Cloud
     final cloudList = await SupabaseService.fetchRunSessions();
     if (cloudList != null && cloudList.isNotEmpty) {
       _sessions.clear();
       _sessions.addAll(cloudList);
+      await LocalStorageService.cacheAllRunSessions(_sessions);
       notifyListeners();
+    }
+
+    // 3. Tự động đồng bộ các buổi chạy chưa đẩy lên Cloud (Pending sync)
+    _syncPendingOfflineRuns();
+  }
+
+  /// Tự động đẩy các buổi chạy offline lên Supabase khi có mạng
+  Future<void> _syncPendingOfflineRuns() async {
+    if (!SupabaseService.isConfigured) return;
+    try {
+      final pending = await LocalStorageService.loadPendingOfflineRuns();
+      for (final run in pending) {
+        final success = await SupabaseService.insertRunSession(run);
+        if (success) {
+          await LocalStorageService.removePendingOfflineRun(run.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi auto sync pending offline runs: $e');
     }
   }
 
@@ -87,7 +119,7 @@ class RunningProvider with ChangeNotifier {
     }
   }
 
-  // Bắt đầu chạy đo GPS thực tế & Hỗ trợ chạy ngầm khi tắt màn hình iPhone
+  // Bắt đầu chạy đo GPS thực tế & Bộ lọc nhiễu chính xác (Zero Jitter)
   Future<void> startTracking() async {
     _state = TrackingState.running;
     _durationSeconds = 0;
@@ -98,6 +130,7 @@ class RunningProvider with ChangeNotifier {
     _totalPausedSeconds = 0;
     _currentRoute.clear();
     _lastPosition = null;
+    _lastPositionTime = null;
 
     // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
@@ -118,13 +151,12 @@ class RunningProvider with ChangeNotifier {
       if (permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse) {
         
-        // Cấu hình GPS nền chuyên dụng cho iOS (AppleSettings) và các nền tảng khác
         LocationSettings locationSettings;
         if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS) {
           locationSettings = AppleSettings(
             accuracy: LocationAccuracy.bestForNavigation,
             activityType: ActivityType.fitness,
-            distanceFilter: 2,
+            distanceFilter: 3, // Lọc dịch chuyển tối thiểu 3m
             pauseLocationUpdatesAutomatically: false,
             showBackgroundLocationIndicator: true,
             allowBackgroundLocationUpdates: true,
@@ -132,7 +164,7 @@ class RunningProvider with ChangeNotifier {
         } else {
           locationSettings = const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 2,
+            distanceFilter: 3,
           );
         }
 
@@ -142,8 +174,15 @@ class RunningProvider with ChangeNotifier {
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // Cập nhật lại thời gian chính xác ngay khi nhận tọa độ ngầm
+          // Cập nhật lại thời gian chính xác
           _updateDurationFromWallClock();
+
+          // 1. Lọc bỏ tọa độ kém chính xác (nhiễu nhà cao tầng > 25m)
+          if (position.accuracy > 25.0) {
+            return;
+          }
+
+          final now = DateTime.now();
 
           if (_lastPosition != null) {
             final double distanceInMeters = Geolocator.distanceBetween(
@@ -153,17 +192,26 @@ class RunningProvider with ChangeNotifier {
               position.longitude,
             );
 
-            // Lọc nhiễu đứng yên: Chỉ cộng Km khi di chuyển thật > 1.5 mét
-            if (distanceInMeters >= 1.5 && position.accuracy <= 35.0) {
+            final double timeDeltaSec = _lastPositionTime != null 
+                ? now.difference(_lastPositionTime!).inMilliseconds / 1000.0 
+                : 1.0;
+
+            final double speedMps = timeDeltaSec > 0 ? (distanceInMeters / timeDeltaSec) : 0.0;
+
+            // 2. Lọc nhiễu đứng yên (> 2.0m) & Lọc bước nhảy ảo (> 11.5 m/s ~ 41.4 km/h)
+            if (distanceInMeters >= 2.0 && speedMps < 11.5) {
               _distanceKm += distanceInMeters / 1000.0;
               _calories = (_distanceKm * 62).round();
               _currentRoute.add(RunPoint(position.longitude, position.latitude));
+              _lastPosition = position;
+              _lastPositionTime = now;
             }
           } else {
             _currentRoute.add(RunPoint(position.longitude, position.latitude));
+            _lastPosition = position;
+            _lastPositionTime = now;
           }
 
-          _lastPosition = position;
           notifyListeners();
         });
       }
@@ -194,7 +242,7 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Kết thúc và lưu buổi chạy
+  // Kết thúc và lưu buổi chạy (Offline-First an toàn tuyệt đối)
   RunSession? stopAndSaveTracking({
     required String userId,
     required String userName,
@@ -206,6 +254,7 @@ class RunningProvider with ChangeNotifier {
     _positionStream?.cancel();
     _positionStream = null;
     _lastPosition = null;
+    _lastPositionTime = null;
 
     final RunSession newSession = RunSession(
       id: 'run_${DateTime.now().millisecondsSinceEpoch}',
@@ -222,7 +271,7 @@ class RunningProvider with ChangeNotifier {
 
     _sessions.insert(0, newSession);
     
-    // Tự động reset về trạng thái Sẵn Sàng để người dùng có thể bắt đầu buổi chạy mới ngay lập tức
+    // Tự động reset về trạng thái idle
     _state = TrackingState.idle;
     _durationSeconds = 0;
     _distanceKm = 0.0;
@@ -233,8 +282,18 @@ class RunningProvider with ChangeNotifier {
     _totalPausedSeconds = 0;
     notifyListeners();
 
-    // Đồng bộ lên Supabase Cloud
-    SupabaseService.insertRunSession(newSession);
+    // 1. Lưu Offline Cache & Pending Sync
+    LocalStorageService.cacheAllRunSessions(_sessions);
+    LocalStorageService.savePendingOfflineRun(newSession);
+
+    // 2. Đẩy lên Supabase Cloud
+    if (SupabaseService.isConfigured) {
+      SupabaseService.insertRunSession(newSession).then((success) {
+        if (success) {
+          LocalStorageService.removePendingOfflineRun(newSession.id);
+        }
+      });
+    }
 
     return newSession;
   }
@@ -245,6 +304,7 @@ class RunningProvider with ChangeNotifier {
     _positionStream?.cancel();
     _positionStream = null;
     _lastPosition = null;
+    _lastPositionTime = null;
     _state = TrackingState.idle;
     _durationSeconds = 0;
     _distanceKm = 0.0;
@@ -256,242 +316,238 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ==========================================
-  // CHỨC NĂNG DÀNH CHO ADMIN: CHỈNH SỬA & QUẢN TRỊ
-  // ==========================================
-
-  /// Chỉnh sửa số KM và Thời gian chạy của bất kỳ buổi chạy nào
+  // Quản trị viên cập nhật KM & thời gian
   void editRunSession(
-    String id, {
-    double? newDistanceKm,
-    int? newDurationSeconds,
+    String sessionId, {
+    required double newDistanceKm,
+    required int newDurationSeconds,
     String? newNotes,
   }) {
-    final index = _sessions.indexWhere((s) => s.id == id);
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
     if (index != -1) {
       final old = _sessions[index];
-      final double updatedDistance = newDistanceKm ?? old.distanceKm;
-      final int updatedDuration = newDurationSeconds ?? old.durationSeconds;
-      final int updatedCalories = (updatedDistance * 62).round();
-      final String updatedNotes = newNotes ?? old.notes;
-
-      _sessions[index] = old.copyWith(
-        distanceKm: updatedDistance,
-        durationSeconds: updatedDuration,
-        calories: updatedCalories,
-        notes: updatedNotes,
+      final updated = old.copyWith(
+        distanceKm: newDistanceKm,
+        durationSeconds: newDurationSeconds,
+        calories: (newDistanceKm * 62).round(),
+        notes: newNotes ?? old.notes,
       );
+      _sessions[index] = updated;
+      LocalStorageService.cacheAllRunSessions(_sessions);
       notifyListeners();
 
-      // Đồng bộ cập nhật lên Supabase Cloud
       SupabaseService.updateRunSession(
-        id,
-        newDistanceKm: updatedDistance,
-        newDurationSeconds: updatedDuration,
-        newNotes: updatedNotes,
+        sessionId,
+        newDistanceKm: newDistanceKm,
+        newDurationSeconds: newDurationSeconds,
+        newNotes: newNotes,
       );
     }
   }
 
-  /// Xóa buổi chạy
-  void deleteRunSession(String id) {
-    _sessions.removeWhere((s) => s.id == id);
+  // Quản trị viên xóa buổi chạy
+  void deleteRunSession(String sessionId) {
+    _sessions.removeWhere((s) => s.id == sessionId);
+    LocalStorageService.cacheAllRunSessions(_sessions);
     notifyListeners();
 
-    // Đồng bộ xóa trên Supabase Cloud
-    SupabaseService.deleteRunSession(id);
+    SupabaseService.deleteRunSession(sessionId);
   }
 
-  // ==========================================
-  // THỐNG KÊ CHO ADMIN (NGÀY, TUẦN, THÁNG, NĂM)
-  // ==========================================
-
-  List<RunSession> getSessionsByFilter(TimeFilter filter) {
+  // Lọc dữ liệu thống kê
+  List<RunSession> getSessionsByTimeFilter(TimeFilter filter) {
     final now = DateTime.now();
     return _sessions.where((session) {
-      final date = session.startTime;
       switch (filter) {
         case TimeFilter.day:
-          return date.year == now.year && date.month == now.month && date.day == now.day;
+          return session.startTime.year == now.year &&
+              session.startTime.month == now.month &&
+              session.startTime.day == now.day;
         case TimeFilter.week:
-          final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-          final beginningOfWeek = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-          return date.isAfter(beginningOfWeek.subtract(const Duration(seconds: 1)));
+          final weekAgo = now.subtract(const Duration(days: 7));
+          return session.startTime.isAfter(weekAgo);
         case TimeFilter.month:
-          return date.year == now.year && date.month == now.month;
+          return session.startTime.year == now.year &&
+              session.startTime.month == now.month;
         case TimeFilter.year:
-          return date.year == now.year;
+          return session.startTime.year == now.year;
       }
     }).toList();
   }
 
   double getTotalDistance(TimeFilter filter) {
-    return getSessionsByFilter(filter).fold(0.0, (sum, item) => sum + item.distanceKm);
+    return getSessionsByTimeFilter(filter)
+        .fold(0.0, (sum, item) => sum + item.distanceKm);
   }
 
-  int getTotalDurationSeconds(TimeFilter filter) {
-    return getSessionsByFilter(filter).fold(0, (sum, item) => sum + item.durationSeconds);
+  int getTotalDuration(TimeFilter filter) {
+    return getSessionsByTimeFilter(filter)
+        .fold(0, (sum, item) => sum + item.durationSeconds);
   }
 
   int getTotalCalories(TimeFilter filter) {
-    return getSessionsByFilter(filter).fold(0, (sum, item) => sum + item.calories);
+    return getSessionsByTimeFilter(filter)
+        .fold(0, (sum, item) => sum + item.calories);
   }
 
-  int getUniqueAthletesCount(TimeFilter filter) {
-    final list = getSessionsByFilter(filter);
-    return list.map((e) => e.userId).toSet().length;
-  }
-
-  /// Tạo dữ liệu biểu đồ phân nhóm trực quan
   List<ChartDataPoint> getChartData(TimeFilter filter) {
+    final sessions = getSessionsByTimeFilter(filter);
     final now = DateTime.now();
     final List<ChartDataPoint> points = [];
 
     switch (filter) {
       case TimeFilter.day:
-        // Chia theo các khung giờ trong ngày (6h, 9h, 12h, 15h, 18h, 21h)
-        for (int h = 6; h <= 22; h += 3) {
-          final label = '$h:00';
-          final runs = _sessions.where((s) {
-            return s.startTime.year == now.year &&
-                s.startTime.month == now.month &&
-                s.startTime.day == now.day &&
-                s.startTime.hour >= h - 2 &&
-                s.startTime.hour <= h;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+        for (int i = 0; i < 24; i += 4) {
+          final hourSessions = sessions.where((s) => s.startTime.hour >= i && s.startTime.hour < i + 4);
+          final dist = hourSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = hourSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: '${i}h', distanceKm: dist, durationMinutes: dur));
         }
         break;
 
       case TimeFilter.week:
-        // 7 ngày trong tuần (T2 -> CN)
-        final weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-        for (int i = 1; i <= 7; i++) {
-          final targetDate = now.subtract(Duration(days: now.weekday - i));
-          final runs = _sessions.where((s) {
-            return s.startTime.year == targetDate.year &&
-                s.startTime.month == targetDate.month &&
-                s.startTime.day == targetDate.day;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: weekDays[i - 1], distanceKm: dist, durationMinutes: durMin));
+        const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        for (int i = 6; i >= 0; i--) {
+          final targetDay = now.subtract(Duration(days: i));
+          final daySessions = sessions.where((s) =>
+              s.startTime.year == targetDay.year &&
+              s.startTime.month == targetDay.month &&
+              s.startTime.day == targetDay.day);
+          final dist = daySessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = daySessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(
+            label: weekdays[targetDay.weekday - 1],
+            distanceKm: dist,
+            durationMinutes: dur,
+          ));
         }
         break;
 
       case TimeFilter.month:
-        // 4 tuần trong tháng
         for (int w = 1; w <= 4; w++) {
-          final label = 'Tuần $w';
-          final startDay = (w - 1) * 7 + 1;
-          final endDay = w * 7;
-          final runs = _sessions.where((s) {
-            return s.startTime.year == now.year &&
-                s.startTime.month == now.month &&
-                s.startTime.day >= startDay &&
-                s.startTime.day <= endDay;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+          final weekSessions = sessions.where((s) => ((s.startTime.day - 1) ~/ 7) + 1 == w);
+          final dist = weekSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = weekSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: 'Tuần $w', distanceKm: dist, durationMinutes: dur));
         }
         break;
 
       case TimeFilter.year:
-        // 12 tháng trong năm
+        const months = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
         for (int m = 1; m <= 12; m++) {
-          final label = 'T$m';
-          final runs = _sessions.where((s) {
-            return s.startTime.year == now.year && s.startTime.month == m;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+          final mSessions = sessions.where((s) => s.startTime.month == m);
+          final dist = mSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = mSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: months[m - 1], distanceKm: dist, durationMinutes: dur));
         }
         break;
     }
+
     return points;
   }
 
-  /// Lấy danh sách buổi chạy của riêng một người dùng cụ thể
+  // Alias cho Admin Dashboard
+  List<RunSession> getSessionsByFilter(TimeFilter filter) => getSessionsByTimeFilter(filter);
+  int getTotalDurationSeconds(TimeFilter filter) => getTotalDuration(filter);
+
+  int getUniqueAthletesCount(TimeFilter filter) {
+    return getSessionsByTimeFilter(filter).map((s) => s.userId).toSet().length;
+  }
+
+  // Lấy danh sách buổi chạy của riêng một User
   List<RunSession> getUserSessions(String userId) {
     return _sessions.where((s) => s.userId == userId).toList();
   }
 
-  /// Thống kê biểu đồ của riêng một người dùng cụ thể
+  // Lấy dữ liệu biểu đồ cho riêng một User
   List<ChartDataPoint> getUserChartData(String userId, TimeFilter filter) {
+    final userSessions = getUserSessions(userId);
     final now = DateTime.now();
     final List<ChartDataPoint> points = [];
-    final userRuns = getUserSessions(userId);
 
     switch (filter) {
       case TimeFilter.day:
-        for (int h = 6; h <= 22; h += 3) {
-          final label = '$h:00';
-          final runs = userRuns.where((s) {
-            return s.startTime.year == now.year &&
-                s.startTime.month == now.month &&
-                s.startTime.day == now.day &&
-                s.startTime.hour >= h - 2 &&
-                s.startTime.hour <= h;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+        for (int i = 0; i < 24; i += 4) {
+          final hourSessions = userSessions.where((s) => s.startTime.hour >= i && s.startTime.hour < i + 4);
+          final dist = hourSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = hourSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: '${i}h', distanceKm: dist, durationMinutes: dur));
         }
         break;
 
       case TimeFilter.week:
-        final weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-        for (int i = 1; i <= 7; i++) {
-          final targetDate = now.subtract(Duration(days: now.weekday - i));
-          final runs = userRuns.where((s) {
-            return s.startTime.year == targetDate.year &&
-                s.startTime.month == targetDate.month &&
-                s.startTime.day == targetDate.day;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: weekDays[i - 1], distanceKm: dist, durationMinutes: durMin));
+        const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        for (int i = 6; i >= 0; i--) {
+          final targetDay = now.subtract(Duration(days: i));
+          final daySessions = userSessions.where((s) =>
+              s.startTime.year == targetDay.year &&
+              s.startTime.month == targetDay.month &&
+              s.startTime.day == targetDay.day);
+          final dist = daySessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = daySessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(
+            label: weekdays[targetDay.weekday - 1],
+            distanceKm: dist,
+            durationMinutes: dur,
+          ));
         }
         break;
 
       case TimeFilter.month:
         for (int w = 1; w <= 4; w++) {
-          final label = 'Tuần $w';
-          final startDay = (w - 1) * 7 + 1;
-          final endDay = w * 7;
-          final runs = userRuns.where((s) {
-            return s.startTime.year == now.year &&
-                s.startTime.month == now.month &&
-                s.startTime.day >= startDay &&
-                s.startTime.day <= endDay;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+          final weekSessions = userSessions.where((s) => ((s.startTime.day - 1) ~/ 7) + 1 == w);
+          final dist = weekSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = weekSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: 'Tuần $w', distanceKm: dist, durationMinutes: dur));
         }
         break;
 
       case TimeFilter.year:
+        const months = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
         for (int m = 1; m <= 12; m++) {
-          final label = 'T$m';
-          final runs = userRuns.where((s) {
-            return s.startTime.year == now.year && s.startTime.month == m;
-          });
-          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
-          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+          final mSessions = userSessions.where((s) => s.startTime.month == m);
+          final dist = mSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+          final dur = mSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: months[m - 1], distanceKm: dist, durationMinutes: dur));
         }
         break;
     }
+
     return points;
   }
 
-  // Dữ liệu khởi đầu trắng hoàn toàn (dữ liệu thật sẽ tải từ Supabase Cloud)
   void _initMockData() {
-    // Không nạp dữ liệu mẫu nào
+    final now = DateTime.now();
+    _sessions.addAll([
+      RunSession(
+        id: 'mock_1',
+        userId: 'admin_01',
+        userName: 'Nguyễn Văn Admin',
+        startTime: now.subtract(const Duration(days: 1, hours: 2)),
+        endTime: now.subtract(const Duration(days: 1, hours: 1, minutes: 25)),
+        durationSeconds: 2100,
+        distanceKm: 5.2,
+        calories: 320,
+        notes: 'Chạy buổi chiều công viên',
+      ),
+      RunSession(
+        id: 'mock_2',
+        userId: 'user_02',
+        userName: 'Trần Runner Pro',
+        startTime: now.subtract(const Duration(days: 2, hours: 5)),
+        endTime: now.subtract(const Duration(days: 2, hours: 4)),
+        durationSeconds: 3600,
+        distanceKm: 10.0,
+        calories: 620,
+        notes: 'Chạy dài 10K cuối tuần',
+      ),
+    ]);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _positionStream?.cancel();
+    super.dispose();
   }
 }
