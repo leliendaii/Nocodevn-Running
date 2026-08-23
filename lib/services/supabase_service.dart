@@ -43,7 +43,7 @@ class SupabaseService {
   }
 
   // ==========================================
-  // XÁC THỰC TÀI KHOẢN CLOUD (MÃ HÓA & BĂM BCRYPT)
+  // XÁC THỰC TÀI KHOẢN & BẢNG PROFILES CLOUD
   // ==========================================
 
   /// Xác thực phiên thực tế với server Supabase (Kiểm tra xem user có bị xóa trên DB hay không)
@@ -60,8 +60,45 @@ class SupabaseService {
     }
   }
 
-  /// Lấy vai trò (role) chính xác từ Supabase DB (role = 'admin' hoặc 'user')
-  static String extractRole(User user) {
+  /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user) từ bảng profiles
+  static Future<Map<String, dynamic>?> fetchProfile(String userId) async {
+    final supa = client;
+    if (supa == null) return null;
+    try {
+      final res = await supa.from('profiles').select().eq('id', userId).maybeSingle();
+      return res;
+    } catch (e) {
+      debugPrint('Lỗi fetch profiles: $e');
+      return null;
+    }
+  }
+
+  /// Cập nhật thông tin vào bảng profiles
+  static Future<bool> updateProfileTable(String userId, {String? name, String? email, String? role, String? avatarUrl}) async {
+    final supa = client;
+    if (supa == null) return false;
+    try {
+      final Map<String, dynamic> updateData = {};
+      if (name != null) updateData['name'] = name;
+      if (email != null) updateData['email'] = email;
+      if (role != null) updateData['role'] = role;
+      if (avatarUrl != null) updateData['avatar_url'] = avatarUrl;
+
+      await supa.from('profiles').update(updateData).eq('id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('Lỗi update profiles table: $e');
+      return false;
+    }
+  }
+
+  /// Lấy vai trò (role) chính xác từ Supabase DB (ưu tiên bảng profiles, fallback user metadata)
+  static String extractRole(User user, [Map<String, dynamic>? profile]) {
+    if (profile != null && profile['role'] != null) {
+      final r = profile['role'].toString().toLowerCase().trim();
+      if (r == 'admin') return 'admin';
+      return 'user';
+    }
     final meta = user.userMetadata ?? {};
     final role = meta['role'] as String?;
     if (role == 'admin') return 'admin';
@@ -87,6 +124,20 @@ class SupabaseService {
           'role': role,
         },
       );
+
+      // Đồng bộ ngay vào bảng profiles
+      if (response.user != null) {
+        try {
+          await supa.from('profiles').upsert({
+            'id': response.user!.id,
+            'email': email,
+            'name': name,
+            'role': role,
+            'avatar_url': '',
+          });
+        } catch (_) {}
+      }
+
       return response;
     } catch (e) {
       debugPrint('Lỗi đăng ký Supabase: $e');
@@ -141,7 +192,7 @@ class SupabaseService {
   }
 
   /// Cập nhật thông tin người dùng (Tên, Avatar, Role) lên Cloud
-  static Future<bool> updateUserProfile({String? name, String? avatarUrl, String? role}) async {
+  static Future<bool> updateUserProfile({String? name, String? avatarUrl, String? role, String? userId}) async {
     final supa = client;
     if (supa == null) return false;
     try {
@@ -153,6 +204,12 @@ class SupabaseService {
       await supa.auth.updateUser(
         UserAttributes(data: data),
       );
+
+      final uid = userId ?? supa.auth.currentUser?.id;
+      if (uid != null) {
+        await updateProfileTable(uid, name: name, role: role, avatarUrl: avatarUrl);
+      }
+
       return true;
     } catch (e) {
       debugPrint('Lỗi cập nhật profile Supabase: $e');
