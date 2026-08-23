@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/supabase_service.dart';
+import '../services/local_storage_service.dart';
 
 class RegisteredAccount {
   final AppUser user;
@@ -12,6 +13,7 @@ class RegisteredAccount {
 class AuthProvider with ChangeNotifier {
   AppUser? _currentUser;
   String _adminPassword = 'admin';
+  bool _rememberMe = true; // Mặc định ghi nhớ đăng nhập
 
   final Map<String, RegisteredAccount> _accounts = {};
 
@@ -19,13 +21,21 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
   String get adminPassword => _adminPassword;
+  bool get rememberMe => _rememberMe;
 
-  AuthProvider() {
-    _initDefaultAdmin();
-    _checkExistingSession();
+  set rememberMe(bool val) {
+    _rememberMe = val;
+    notifyListeners();
   }
 
-  void _initDefaultAdmin() {
+  AuthProvider() {
+    _initStorage();
+  }
+
+  Future<void> _initStorage() async {
+    _adminPassword = await LocalStorageService.loadAdminPassword();
+
+    // Khởi tạo tài khoản Admin mặc định
     _accounts['admin@running.app'] = RegisteredAccount(
       user: const AppUser(
         id: 'admin_01',
@@ -35,6 +45,29 @@ class AuthProvider with ChangeNotifier {
       ),
       password: _adminPassword,
     );
+
+    // Tải các tài khoản đã lưu cục bộ từ trước
+    final savedAccounts = await LocalStorageService.loadSavedAccounts();
+    savedAccounts.forEach((email, data) {
+      _accounts[email] = RegisteredAccount(
+        user: AppUser(
+          id: 'user_${email.hashCode}',
+          name: data['name'] ?? email.split('@').first,
+          email: email,
+          role: data['role'] == 'admin' ? UserRole.admin : UserRole.user,
+        ),
+        password: data['password'] ?? '',
+      );
+    });
+
+    // Tự động khôi phục phiên đăng nhập (nếu đã bật ghi nhớ và trong vòng 30 ngày)
+    final savedUser = await LocalStorageService.loadSavedUserSession();
+    if (savedUser != null) {
+      _currentUser = savedUser;
+      notifyListeners();
+    } else {
+      _checkExistingSession();
+    }
   }
 
   void _checkExistingSession() {
@@ -58,6 +91,7 @@ class AuthProvider with ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    bool remember = true,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanName = name.trim();
@@ -92,6 +126,7 @@ class AuthProvider with ChangeNotifier {
 
           _accounts[cleanEmail] = RegisteredAccount(user: newUser, password: password);
           _currentUser = newUser;
+          await LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
           notifyListeners();
           return null;
         }
@@ -114,12 +149,13 @@ class AuthProvider with ChangeNotifier {
 
     _accounts[cleanEmail] = RegisteredAccount(user: newUser, password: password);
     _currentUser = newUser;
+    await LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
     notifyListeners();
     return null;
   }
 
   /// Đăng nhập (Kiểm tra trên Supabase Cloud hoặc tài khoản hệ thống)
-  Future<String?> login(String email, String password) async {
+  Future<String?> login(String email, String password, {bool remember = true}) async {
     final cleanEmail = email.trim().toLowerCase();
 
     if (cleanEmail.isEmpty || password.isEmpty) {
@@ -135,6 +171,7 @@ class AuthProvider with ChangeNotifier {
             email: 'admin@running.app',
             role: UserRole.admin,
           );
+      await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: remember, password: password);
       notifyListeners();
       return null;
     }
@@ -154,6 +191,7 @@ class AuthProvider with ChangeNotifier {
             role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
             avatarUrl: (meta['avatar_url'] as String?) ?? '',
           );
+          await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: remember, password: password);
           notifyListeners();
           return null;
         }
@@ -173,11 +211,12 @@ class AuthProvider with ChangeNotifier {
     }
 
     _currentUser = account.user;
+    await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: remember, password: password);
     notifyListeners();
     return null;
   }
 
-  /// Đổi mật khẩu
+  /// Đổi mật khẩu bền vững (Lưu trên cả Cloud và Máy)
   Future<String?> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -198,9 +237,11 @@ class AuthProvider with ChangeNotifier {
         return 'Mật khẩu hiện tại không đúng.';
       }
       _adminPassword = newPassword;
+      await LocalStorageService.saveAdminPassword(newPassword);
       if (_accounts.containsKey('admin@running.app')) {
         _accounts['admin@running.app']!.password = newPassword;
       }
+      await LocalStorageService.saveAccountCredentials('admin@running.app', newPassword, _currentUser!.name, true);
       notifyListeners();
       return null;
     } else {
@@ -210,6 +251,7 @@ class AuthProvider with ChangeNotifier {
           return 'Mật khẩu hiện tại không đúng.';
         }
         _accounts[email]!.password = newPassword;
+        await LocalStorageService.saveAccountCredentials(email, newPassword, _currentUser!.name, false);
         notifyListeners();
         return null;
       }
@@ -217,7 +259,7 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
-  /// Cập nhật Họ tên và Email
+  /// Cập nhật Họ tên và Email bền vững
   Future<String?> updateProfile({
     required String newName,
     required String newEmail,
@@ -243,10 +285,13 @@ class AuthProvider with ChangeNotifier {
       SupabaseService.updateUserProfile(name: cleanName);
     }
 
+    await LocalStorageService.updateSavedProfile(name: cleanName, email: cleanEmail);
+
     final oldEmail = _currentUser!.email.toLowerCase();
     if (_accounts.containsKey(oldEmail)) {
       final acc = _accounts.remove(oldEmail)!;
       _accounts[cleanEmail] = RegisteredAccount(user: updatedUser, password: acc.password);
+      await LocalStorageService.saveAccountCredentials(cleanEmail, acc.password, cleanName, updatedUser.isAdmin);
     }
 
     _currentUser = updatedUser;
@@ -254,7 +299,7 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
-  /// Cập nhật ảnh đại diện
+  /// Cập nhật ảnh đại diện bền vững (Hỗ trợ Base64 từ điện thoại)
   void updateAvatar(String newAvatarUrl) {
     if (_currentUser == null) return;
 
@@ -270,6 +315,8 @@ class AuthProvider with ChangeNotifier {
       SupabaseService.updateUserProfile(avatarUrl: newAvatarUrl);
     }
 
+    LocalStorageService.updateSavedProfile(avatarUrl: newAvatarUrl);
+
     final email = _currentUser!.email.toLowerCase();
     if (_accounts.containsKey(email)) {
       _accounts[email] = RegisteredAccount(
@@ -284,6 +331,7 @@ class AuthProvider with ChangeNotifier {
 
   void logout() {
     SupabaseService.signOut();
+    LocalStorageService.clearUserSession();
     _currentUser = null;
     notifyListeners();
   }

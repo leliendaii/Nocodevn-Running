@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:image_picker/image_picker.dart';
@@ -316,21 +317,7 @@ class _MainShellState extends State<MainShell> {
                         ],
                       ),
                       child: ClipOval(
-                        child: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
-                            ? Image.network(
-                                user.avatarUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Icon(
-                                  Icons.person,
-                                  size: 55,
-                                  color: user.isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-                                ),
-                              )
-                            : Icon(
-                                Icons.person,
-                                size: 55,
-                                color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-                              ),
+                        child: _buildAvatarImage(user?.avatarUrl ?? '', user?.isAdmin == true),
                       ),
                     ),
                     Positioned(
@@ -574,12 +561,14 @@ class _MainShellState extends State<MainShell> {
                 Navigator.pop(ctx);
                 try {
                   final picker = ImagePicker();
-                  final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
+                  final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 400, imageQuality: 70);
                   if (image != null) {
-                    auth.updateAvatar(image.path);
+                    final bytes = await image.readAsBytes();
+                    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                    auth.updateAvatar(base64String);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật ảnh đại diện!')),
+                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật ảnh đại diện từ điện thoại!')),
                       );
                     }
                   }
@@ -595,12 +584,14 @@ class _MainShellState extends State<MainShell> {
                 Navigator.pop(ctx);
                 try {
                   final picker = ImagePicker();
-                  final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 600);
+                  final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 400, imageQuality: 70);
                   if (image != null) {
-                    auth.updateAvatar(image.path);
+                    final bytes = await image.readAsBytes();
+                    final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                    auth.updateAvatar(base64String);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật ảnh đại diện!')),
+                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã chụp ảnh đại diện mới!')),
                       );
                     }
                   }
@@ -639,6 +630,40 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAvatarImage(String avatarUrl, bool isAdmin) {
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        final base64Data = avatarUrl.split(',').last;
+        return Image.memory(
+          base64Decode(base64Data),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Icon(
+            Icons.person,
+            size: 55,
+            color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Lỗi decode base64 avatar: $e');
+      }
+    } else if (avatarUrl.startsWith('http')) {
+      return Image.network(
+        avatarUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Icon(
+          Icons.person,
+          size: 55,
+          color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+        ),
+      );
+    }
+    return Icon(
+      Icons.person,
+      size: 55,
+      color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
     );
   }
 

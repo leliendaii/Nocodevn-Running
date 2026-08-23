@@ -235,7 +235,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: context.watch<AuthProvider>().rememberMe,
+                        activeColor: AppTheme.primaryNeon,
+                        onChanged: (val) {
+                          context.read<AuthProvider>().rememberMe = val ?? true;
+                        },
+                      ),
+                      const Text(
+                        'Ghi nhớ đăng nhập (30 ngày không cần login lại)',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _handleLogin,
                     child: const Text('ĐĂNG NHẬP'),

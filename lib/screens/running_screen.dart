@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -167,15 +168,25 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                      backgroundImage: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
-                          ? NetworkImage(user.avatarUrl)
-                          : null,
-                      child: user?.avatarUrl == null || user!.avatarUrl.isEmpty
-                          ? const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22)
-                          : null,
+                    ClipOval(
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        color: AppTheme.primaryNeon.withValues(alpha: 0.2),
+                        child: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
+                            ? (user.avatarUrl.startsWith('data:image')
+                                ? Image.memory(
+                                    base64Decode(user.avatarUrl.split(',').last),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22),
+                                  )
+                                : Image.network(
+                                    user.avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22),
+                                  ))
+                            : const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
