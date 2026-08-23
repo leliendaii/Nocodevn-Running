@@ -239,6 +239,50 @@ class _MainShellState extends State<MainShell> {
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
+
+              // Nút Chỉnh sửa Họ tên & Email
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.person_pin_rounded, color: AppTheme.primaryNeon, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Thông tin cá nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('Đổi Tên người dùng & Email', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.surfaceLight,
+                        foregroundColor: AppTheme.primaryNeon,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      ),
+                      onPressed: () => _showEditProfileDialog(context, auth),
+                      child: const Text('SỬA TÊN/MAIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
               // Nút Đổi mật khẩu
               Container(
                 padding: const EdgeInsets.all(16),
@@ -270,7 +314,7 @@ class _MainShellState extends State<MainShell> {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.surfaceLight,
-                        foregroundColor: AppTheme.primaryNeon,
+                        foregroundColor: AppTheme.secondaryNeon,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       ),
                       onPressed: () => _showChangePasswordDialog(context, auth),
@@ -298,6 +342,80 @@ class _MainShellState extends State<MainShell> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showEditProfileDialog(BuildContext context, AuthProvider auth) {
+    final nameController = TextEditingController(text: auth.currentUser?.name ?? '');
+    final emailController = TextEditingController(text: auth.currentUser?.email ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_note_rounded, color: AppTheme.primaryNeon),
+            SizedBox(width: 10),
+            Text('Đổi Tên & Email', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Họ và tên mới',
+                prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryNeon),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Email mới',
+                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final n = nameController.text.trim();
+              final e = emailController.text.trim();
+
+              final error = auth.updateProfile(newName: n, newEmail: e);
+              if (error != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
+                );
+              } else {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: AppTheme.success,
+                    content: Text('✅ Đã cập nhật Tên và Email thành công!'),
+                  ),
+                );
+              }
+            },
+            child: const Text('LƯU THÔNG TIN', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

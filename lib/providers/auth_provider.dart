@@ -164,6 +164,40 @@ class AuthProvider with ChangeNotifier {
     return 'Lỗi không xác định.';
   }
 
+  /// Cập nhật Họ tên và Email của người dùng
+  String? updateProfile({
+    required String newName,
+    required String newEmail,
+  }) {
+    final cleanName = newName.trim();
+    final cleanEmail = newEmail.trim().toLowerCase();
+
+    if (cleanName.isEmpty || cleanEmail.isEmpty) {
+      return 'Họ tên và Email không được để trống.';
+    }
+
+    if (_currentUser == null) return 'Chưa đăng nhập.';
+
+    final oldEmail = _currentUser!.email.toLowerCase();
+
+    final updatedUser = AppUser(
+      id: _currentUser!.id,
+      name: cleanName,
+      email: cleanEmail,
+      role: _currentUser!.role,
+      avatarUrl: _currentUser!.avatarUrl,
+    );
+
+    if (_accounts.containsKey(oldEmail)) {
+      final acc = _accounts.remove(oldEmail)!;
+      _accounts[cleanEmail] = RegisteredAccount(user: updatedUser, password: acc.password);
+    }
+
+    _currentUser = updatedUser;
+    notifyListeners();
+    return null;
+  }
+
   void logout() {
     _currentUser = null;
     notifyListeners();
