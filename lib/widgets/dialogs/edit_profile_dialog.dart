@@ -21,31 +21,36 @@ class EditProfileDialog extends StatefulWidget {
 
 class _EditProfileDialogState extends State<EditProfileDialog> {
   late final TextEditingController _nameController;
-  late final TextEditingController _usernameController;
   late final TextEditingController _emailController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.auth.currentUser?.name ?? '');
-    _usernameController = TextEditingController(text: widget.auth.currentUser?.username ?? '');
     _emailController = TextEditingController(text: widget.auth.currentUser?.email ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _usernameController.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
     final n = _nameController.text.trim();
-    final u = _usernameController.text.trim();
     final e = _emailController.text.trim();
 
-    final error = await widget.auth.updateProfile(newName: n, newUsername: u, newEmail: e);
+    if (n.isEmpty) {
+      TopSyncToast.show(context, message: 'Họ và tên không được để trống!', isSuccess: false);
+      return;
+    }
+
+    final error = await widget.auth.updateProfile(
+      newName: n,
+      newUsername: widget.auth.currentUser?.username ?? '',
+      newEmail: e.isNotEmpty ? e : (widget.auth.currentUser?.email ?? ''),
+    );
     if (!mounted) return;
 
     if (error != null) {
@@ -58,6 +63,8 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUsername = widget.auth.currentUser?.username ?? '';
+
     return AlertDialog(
       backgroundColor: AppTheme.surface,
       shape: RoundedRectangleBorder(
@@ -74,7 +81,9 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Ô Họ và tên (Cho phép sửa)
             TextField(
               controller: _nameController,
               style: const TextStyle(color: AppTheme.textPrimary),
@@ -84,15 +93,41 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
               ),
             ),
             const SizedBox(height: 14),
-            TextField(
-              controller: _usernameController,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Tên đăng nhập (Username)',
-                prefixIcon: Icon(Icons.alternate_email_rounded, color: AppTheme.secondaryNeon),
+
+            // Ô Username (CỐ ĐỊNH - KHÓA KHÔNG CHO PHÉP SỬA)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.divider),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded, color: AppTheme.textMuted, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tên đăng nhập (Cố định, không thể đổi)',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@$currentUsername',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 14),
+
+            // Ô Email (Cho phép sửa)
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
