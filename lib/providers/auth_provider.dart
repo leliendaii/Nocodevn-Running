@@ -83,37 +83,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Kiểm tra liên tục xem tài khoản có bị xóa hoặc được nâng cấp Admin trên Supabase DB không
+  /// Đồng bộ thông tin quyền hạn và dữ liệu mới nhất từ Cloud một cách an toàn
   Future<bool> checkUserStillExistsOnServer() async {
     if (_currentUser == null) return false;
-    if (!SupabaseService.isConfigured) return true;
-
-    final serverUser = await SupabaseService.verifyServerSession();
-    if (serverUser == null) {
-      logout();
-      return false;
-    }
-
-    final profile = await SupabaseService.fetchProfile(serverUser.id, serverUser.email);
-    final roleStr = SupabaseService.extractRole(serverUser, profile);
-    final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
-    final displayName = profile?['name'] ?? serverUser.userMetadata?['name'] ?? _currentUser!.name;
-    final username = profile?['username'] ?? serverUser.userMetadata?['username'] ?? _currentUser!.username;
-    final avatar = profile?['avatar_url'] ?? _currentUser!.avatarUrl;
-
-    if (_currentUser!.role != newRole || _currentUser!.name != displayName || _currentUser!.username != username || _currentUser!.avatarUrl != avatar) {
-      _currentUser = AppUser(
-        id: _currentUser!.id,
-        name: displayName,
-        username: username,
-        email: _currentUser!.email,
-        role: newRole,
-        avatarUrl: avatar,
-      );
-      await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
-      notifyListeners();
-    }
-
+    await refreshProfileFromServer();
     return true;
   }
 
