@@ -221,7 +221,16 @@ class RunningProvider with ChangeNotifier {
     );
 
     _sessions.insert(0, newSession);
-    _state = TrackingState.finished;
+    
+    // Tự động reset về trạng thái Sẵn Sàng để người dùng có thể bắt đầu buổi chạy mới ngay lập tức
+    _state = TrackingState.idle;
+    _durationSeconds = 0;
+    _distanceKm = 0.0;
+    _calories = 0;
+    _currentRoute.clear();
+    _runStartTime = null;
+    _pauseStartTime = null;
+    _totalPausedSeconds = 0;
     notifyListeners();
 
     // Đồng bộ lên Supabase Cloud

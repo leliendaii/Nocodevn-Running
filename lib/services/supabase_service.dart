@@ -46,6 +46,28 @@ class SupabaseService {
   // XÁC THỰC TÀI KHOẢN CLOUD (MÃ HÓA & BĂM BCRYPT)
   // ==========================================
 
+  /// Xác thực phiên thực tế với server Supabase (Kiểm tra xem user có bị xóa trên DB hay không)
+  static Future<User?> verifyServerSession() async {
+    final supa = client;
+    if (supa == null) return null;
+
+    try {
+      final res = await supa.auth.getUser();
+      return res.user;
+    } catch (e) {
+      debugPrint('Phiên đăng nhập không tồn tại hoặc đã bị xóa trên Supabase DB: $e');
+      return null;
+    }
+  }
+
+  /// Lấy vai trò (role) chính xác từ Supabase DB (role = 'admin' hoặc 'user')
+  static String extractRole(User user) {
+    final meta = user.userMetadata ?? {};
+    final role = meta['role'] as String?;
+    if (role == 'admin') return 'admin';
+    return 'user';
+  }
+
   /// Đăng ký tài khoản mới lên Supabase Cloud (Mật khẩu được băm và mã hóa chuẩn bảo mật quốc tế)
   static Future<AuthResponse?> signUp({
     required String email,
@@ -72,7 +94,7 @@ class SupabaseService {
     }
   }
 
-  /// Đăng nhập tài khoản với Supabase Cloud
+  /// Đăng nhập tài khoản với Supabase Cloud (Kiểm tra trực tiếp trên DB)
   static Future<AuthResponse?> signIn({
     required String email,
     required String password,
@@ -118,14 +140,15 @@ class SupabaseService {
     }
   }
 
-  /// Cập nhật thông tin người dùng (Tên, Avatar) lên Cloud
-  static Future<bool> updateUserProfile({String? name, String? avatarUrl}) async {
+  /// Cập nhật thông tin người dùng (Tên, Avatar, Role) lên Cloud
+  static Future<bool> updateUserProfile({String? name, String? avatarUrl, String? role}) async {
     final supa = client;
     if (supa == null) return false;
     try {
       final Map<String, dynamic> data = {};
       if (name != null) data['name'] = name;
       if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+      if (role != null) data['role'] = role;
 
       await supa.auth.updateUser(
         UserAttributes(data: data),

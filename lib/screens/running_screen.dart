@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/top_sync_toast.dart';
 
 class RunningScreen extends StatefulWidget {
   const RunningScreen({super.key});
@@ -112,12 +113,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                 notes: notesController.text.trim().isEmpty ? 'Buổi chạy ngoài trời' : notesController.text.trim(),
               );
               Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  backgroundColor: AppTheme.success,
-                  content: Text('✅ Đã lưu buổi chạy và đồng bộ lên Cloud!'),
-                ),
-              );
+              TopSyncToast.show(context, message: 'Đã lưu & đồng bộ lên Cloud!');
             },
             child: const Text('LƯU THÀNH TÍCH'),
           ),
@@ -434,7 +430,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               const SizedBox(height: 20),
 
               // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY
-              if (running.isIdle) ...[
+              if (running.isIdle || running.state == TrackingState.finished) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 60,

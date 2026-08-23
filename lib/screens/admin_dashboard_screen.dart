@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
+import '../widgets/top_sync_toast.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -207,12 +208,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 );
 
                 Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: AppTheme.success,
-                    content: Text('✅ Đã cập nhật buổi chạy của ${session.userName} thành công!'),
-                  ),
-                );
+                TopSyncToast.show(context, message: 'Đã cập nhật lên Supabase Cloud!');
               },
               child: const Text('LƯU THAY ĐỔI', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -241,11 +237,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             onPressed: () {
               context.read<RunningProvider>().deleteRunSession(session.id);
               Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã xóa buổi chạy.')),
-              );
+              TopSyncToast.show(context, message: 'Đã xóa buổi chạy khỏi Cloud!', isSuccess: false);
             },
-            child: const Text('XÓA'),
+            child: const Text('XÓA BUỔI CHẠY'),
           ),
         ],
       ),

@@ -23,6 +23,14 @@ class _MainShellState extends State<MainShell> {
   TimeFilter _personalFilter = TimeFilter.week;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().checkUserStillExistsOnServer();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
@@ -48,7 +56,10 @@ class _MainShellState extends State<MainShell> {
           backgroundColor: Colors.transparent,
           indicatorColor: AppTheme.primaryNeon.withValues(alpha: 0.2),
           selectedIndex: _currentIndex,
-          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          onDestinationSelected: (index) {
+            setState(() => _currentIndex = index);
+            context.read<AuthProvider>().checkUserStillExistsOnServer();
+          },
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.directions_run_outlined, color: AppTheme.textSecondary),
