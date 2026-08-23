@@ -26,7 +26,7 @@ class AuthProvider with ChangeNotifier {
     // 1. Kiểm tra session trên server Supabase trước
     final serverUser = await SupabaseService.verifyServerSession();
     if (serverUser != null) {
-      final profile = await SupabaseService.fetchProfile(serverUser.id);
+      final profile = await SupabaseService.fetchProfile(serverUser.id, serverUser.email);
       final roleStr = SupabaseService.extractRole(serverUser, profile);
       final displayName = profile?['name'] ?? serverUser.userMetadata?['name'] ?? serverUser.email?.split('@').first ?? 'Người dùng';
       final username = profile?['username'] ?? serverUser.userMetadata?['username'] ?? '';
@@ -40,6 +40,7 @@ class AuthProvider with ChangeNotifier {
         role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
         avatarUrl: avatar,
       );
+      await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
       notifyListeners();
       return;
     }
@@ -47,18 +48,38 @@ class AuthProvider with ChangeNotifier {
     // 2. Nếu server không có session hoặc user đã bị xóa trên DB -> kiểm tra cache và xóa bỏ nếu không hợp lệ
     final savedUser = await LocalStorageService.loadSavedUserSession();
     if (savedUser != null) {
-      if (SupabaseService.isConfigured) {
-        final verifiedUser = await SupabaseService.verifyServerSession();
-        if (verifiedUser == null) {
-          // Tài khoản đã bị xóa trên Supabase DB -> Đăng xuất ngay lập tức
-          await LocalStorageService.clearUserSession();
-          _currentUser = null;
-          notifyListeners();
-          return;
-        }
-      }
       _currentUser = savedUser;
       notifyListeners();
+      await refreshProfileFromServer();
+    }
+  }
+
+  /// Làm mới thông tin quyền Admin và Profile trực tiếp từ Server Supabase
+  Future<void> refreshProfileFromServer() async {
+    if (_currentUser == null || !SupabaseService.isConfigured) return;
+
+    try {
+      final profile = await SupabaseService.fetchProfile(_currentUser!.id, _currentUser!.email);
+      if (profile != null) {
+        final roleStr = (profile['role'] as String?)?.toLowerCase().trim() ?? 'user';
+        final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
+        final displayName = profile['name'] as String? ?? _currentUser!.name;
+        final username = profile['username'] as String? ?? _currentUser!.username;
+        final avatar = profile['avatar_url'] as String? ?? _currentUser!.avatarUrl;
+
+        _currentUser = AppUser(
+          id: _currentUser!.id,
+          name: displayName,
+          username: username,
+          email: _currentUser!.email,
+          role: newRole,
+          avatarUrl: avatar,
+        );
+        await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Lỗi làm mới profile: $e');
     }
   }
 
@@ -75,7 +96,7 @@ class AuthProvider with ChangeNotifier {
     }
 
     // Cập nhật lại Role và Username từ bảng profiles trên web Supabase
-    final profile = await SupabaseService.fetchProfile(serverUser.id);
+    final profile = await SupabaseService.fetchProfile(serverUser.id, serverUser.email);
     final roleStr = SupabaseService.extractRole(serverUser, profile);
     final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
     final displayName = profile?['name'] ?? serverUser.userMetadata?['name'] ?? _currentUser!.name;

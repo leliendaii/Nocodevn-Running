@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/top_sync_toast.dart';
 import 'running_screen.dart';
 import 'history_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -384,7 +385,23 @@ class _MainShellState extends State<MainShell> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+
+              // Nút bấm làm mới quyền trực tiếp từ Cloud
+              TextButton.icon(
+                onPressed: () async {
+                  await auth.refreshProfileFromServer();
+                  if (context.mounted) {
+                    TopSyncToast.show(context, message: 'Đã cập nhật quyền từ Cloud!');
+                  }
+                },
+                icon: const Icon(Icons.sync_rounded, color: AppTheme.secondaryNeon, size: 16),
+                label: const Text(
+                  'Làm mới quyền & dữ liệu từ Cloud',
+                  style: TextStyle(color: AppTheme.secondaryNeon, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // NÚT MỞ TRANG QUẢN TRỊ DÀNH RIÊNG CHO ADMIN
               if (user?.isAdmin == true) ...[
@@ -475,7 +492,7 @@ class _MainShellState extends State<MainShell> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Thông tin cá nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Text('Đổi Tên người dùng & Email', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                          Text('Đổi Tên, Username & Email', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -486,7 +503,7 @@ class _MainShellState extends State<MainShell> {
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       ),
                       onPressed: () => _showEditProfileDialog(context, auth),
-                      child: const Text('SỬA TÊN/MAIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      child: const Text('CHỈNH SỬA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     ),
                   ],
                 ),
@@ -523,12 +540,12 @@ class _MainShellState extends State<MainShell> {
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.surfaceLight,
-                        foregroundColor: AppTheme.secondaryNeon,
+                        backgroundColor: AppTheme.secondaryNeon,
+                        foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       ),
                       onPressed: () => _showChangePasswordDialog(context, auth),
-                      child: const Text('ĐỔI MK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      child: const Text('ĐỔI MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
                     ),
                   ],
                 ),

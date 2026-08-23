@@ -78,13 +78,17 @@ class SupabaseService {
     }
   }
 
-  /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user, Username) từ bảng profiles
-  static Future<Map<String, dynamic>?> fetchProfile(String userId) async {
+  /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user, Username) từ bảng profiles (tìm theo ID hoặc Email)
+  static Future<Map<String, dynamic>?> fetchProfile(String userId, [String? email]) async {
     final supa = client;
     if (supa == null) return null;
     try {
-      final res = await supa.from('profiles').select().eq('id', userId).maybeSingle();
-      return res;
+      if (email != null && email.isNotEmpty) {
+        final byEmail = await supa.from('profiles').select().ilike('email', email.trim()).maybeSingle();
+        if (byEmail != null) return byEmail;
+      }
+      final byId = await supa.from('profiles').select().eq('id', userId).maybeSingle();
+      return byId;
     } catch (e) {
       debugPrint('Lỗi fetch profiles: $e');
       return null;
