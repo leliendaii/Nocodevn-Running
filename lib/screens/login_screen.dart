@@ -13,9 +13,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isRegisterMode = false;
 
-  // Controllers cho Đăng nhập
-  final _loginEmailController = TextEditingController(text: 'admin@running.app');
-  final _loginPasswordController = TextEditingController(text: 'admin');
+  // Khởi tạo ô trống sạch sẽ, không hiển thị trước tài khoản mặc định
+  final _loginEmailController = TextEditingController();
+  final _loginPasswordController = TextEditingController();
 
   // Controllers cho Đăng ký
   final _regNameController = TextEditingController();
@@ -104,15 +104,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Logo & Tiêu đề ứng dụng
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppTheme.surface,
-                      border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.3), width: 2),
+                      border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4), width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                          blurRadius: 25,
+                          color: AppTheme.primaryNeon.withValues(alpha: 0.25),
+                          blurRadius: 30,
                           spreadRadius: 4,
                         ),
                       ],
@@ -124,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 20),
                 const Text(
                   'NOCODE RUNNING',
                   textAlign: TextAlign.center,
@@ -171,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: !_isRegisterMode ? Colors.black : AppTheme.textSecondary,
+                                color: !_isRegisterMode ? Colors.white : AppTheme.textSecondary,
                               ),
                             ),
                           ),
@@ -192,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: _isRegisterMode ? Colors.black : AppTheme.textSecondary,
+                                color: _isRegisterMode ? Colors.white : AppTheme.textSecondary,
                               ),
                             ),
                           ),
@@ -203,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // FORM ĐĂNG NHẬP
+                // FORM ĐĂNG NHẬP (Sạch sẽ, không lộ pass/user)
                 if (!_isRegisterMode) ...[
                   TextField(
                     controller: _loginEmailController,
@@ -211,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Email',
-                      hintText: 'admin@running.app hoặc email của bạn',
+                      hintText: 'Nhập email của bạn',
                       prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
                     ),
                   ),
@@ -222,6 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: InputDecoration(
                       labelText: 'Mật khẩu',
+                      hintText: 'Nhập mật khẩu',
                       prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.primaryNeon),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -237,27 +238,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _handleLogin,
                     child: const Text('ĐĂNG NHẬP'),
                   ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.divider),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline, color: AppTheme.secondaryNeon, size: 18),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Tài khoản Admin mặc định: admin@running.app\nMật khẩu mặc định: admin',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ]
 
                 // FORM ĐĂNG KÝ
@@ -267,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Họ và tên người dùng',
-                      hintText: 'Nguyễn Văn A',
+                      hintText: 'Nhập họ và tên',
                       prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryNeon),
                     ),
                   ),
@@ -278,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Email đăng ký',
-                      hintText: 'user@gmail.com',
+                      hintText: 'Nhập email',
                       prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
                     ),
                   ),
@@ -289,6 +269,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: InputDecoration(
                       labelText: 'Mật khẩu (ít nhất 6 ký tự)',
+                      hintText: 'Nhập mật khẩu mới',
                       prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.primaryNeon),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -306,6 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Xác nhận lại mật khẩu',
+                      hintText: 'Nhập lại mật khẩu',
                       prefixIcon: Icon(Icons.lock_reset_rounded, color: AppTheme.primaryNeon),
                     ),
                   ),

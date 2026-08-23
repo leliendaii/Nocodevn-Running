@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
-import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 
 class RunningScreen extends StatefulWidget {
@@ -21,10 +20,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
@@ -35,109 +34,103 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  void _showFinishDialog(BuildContext context, RunSession session) {
-    final noteController = TextEditingController(text: session.notes);
+  // Hộp thoại lưu buổi chạy sau khi hoàn thành
+  void _showSaveRunDialog(BuildContext context, RunningProvider running, String userId, String userName) {
+    final notesController = TextEditingController(text: 'Buổi chạy ngoài trời');
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
-          ),
-          title: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                ),
-                child: const Icon(Icons.emoji_events_rounded, color: AppTheme.primaryNeon, size: 48),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'HOÀN THÀNH BUỔI CHẠY!',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryNeon),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildSummaryItem('Quãng đường', '${session.formattedDistance} km', Icons.straighten),
-                    _buildSummaryItem('Thời gian', session.formattedDuration, Icons.timer_outlined),
-                    _buildSummaryItem('Pace', '${session.avgPace} /km', Icons.speed),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: noteController,
-                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-                decoration: const InputDecoration(
-                  labelText: 'Ghi chú buổi chạy',
-                  hintText: 'Cảm nhận, thời tiết, địa điểm...',
-                  prefixIcon: Icon(Icons.edit_note, color: AppTheme.primaryNeon),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryNeon,
-                foregroundColor: Colors.black,
-                minimumSize: const Size.fromHeight(48),
-              ),
-              onPressed: () {
-                context.read<RunningProvider>().editRunSession(
-                  session.id,
-                  newNotes: noteController.text.trim(),
-                );
-                context.read<RunningProvider>().resetTracking();
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppTheme.success,
-                    content: Text('✅ Đã lưu buổi chạy thành công vào hệ thống!'),
-                  ),
-                );
-              },
-              child: const Text('LƯU BUỔI CHẠY', style: TextStyle(fontWeight: FontWeight.bold)),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.emoji_events_rounded, color: AppTheme.primaryNeon, size: 28),
+            SizedBox(width: 10),
+            Text(
+              'HOÀN THÀNH!',
+              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.0),
             ),
           ],
-        );
-      },
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '🎉 Chúc mừng bạn đã hoàn thành buổi chạy!',
+              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildSummaryItem('QUÃNG ĐƯỜNG', '${running.distanceKm.toStringAsFixed(2)} km', AppTheme.primaryNeon),
+                  Container(width: 1, height: 36, color: AppTheme.divider),
+                  _buildSummaryItem('THỜI GIAN', running.formattedCurrentDuration, AppTheme.textPrimary),
+                  Container(width: 1, height: 36, color: AppTheme.divider),
+                  _buildSummaryItem('CALO', '${running.calories} kcal', AppTheme.secondaryNeon),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: notesController,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Ghi chú buổi chạy',
+                hintText: 'Cảm giác chạy, thời tiết...',
+                prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.primaryNeon),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              running.resetTracking();
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('BỎ QUA', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              running.stopAndSaveTracking(
+                userId: userId,
+                userName: userName,
+                notes: notesController.text.trim().isEmpty ? 'Buổi chạy ngoài trời' : notesController.text.trim(),
+              );
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  backgroundColor: AppTheme.success,
+                  content: Text('✅ Đã lưu buổi chạy và đồng bộ lên Cloud!'),
+                ),
+              );
+            },
+            child: const Text('LƯU THÀNH TÍCH'),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, IconData icon) {
+  Widget _buildSummaryItem(String label, String value, Color color) {
     return Column(
       children: [
-        Icon(icon, color: AppTheme.primaryNeon, size: 20),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-        ),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-        ),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
       ],
     );
   }
@@ -166,18 +159,23 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
             children: [
               // Thông tin người dùng đang chạy
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppTheme.divider),
                 ),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 18,
+                      radius: 20,
                       backgroundColor: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                      child: const Icon(Icons.person, color: AppTheme.primaryNeon, size: 20),
+                      backgroundImage: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
+                          ? NetworkImage(user.avatarUrl)
+                          : null,
+                      child: user?.avatarUrl == null || user!.avatarUrl.isEmpty
+                          ? const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22)
+                          : null,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -190,18 +188,24 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                           ),
                           Text(
                             user?.isAdmin == true ? '🛡️ Quản trị viên' : '🏃‍♂️ Người chạy bộ',
-                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                           ),
                         ],
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: running.isRunning
-                            ? AppTheme.success.withValues(alpha: 0.2)
+                            ? AppTheme.primaryNeon.withValues(alpha: 0.2)
                             : (running.isPaused ? Colors.amber.withValues(alpha: 0.2) : AppTheme.surface),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: running.isRunning
+                              ? AppTheme.primaryNeon
+                              : (running.isPaused ? Colors.amber : AppTheme.divider),
+                          width: 1,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -211,7 +215,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: running.isRunning
-                                  ? AppTheme.success
+                                  ? AppTheme.primaryNeon
                                   : (running.isPaused ? Colors.amber : AppTheme.textMuted),
                             ),
                           ),
@@ -220,9 +224,9 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                             running.isRunning ? 'ĐANG CHẠY' : (running.isPaused ? 'TẠM DỪNG' : 'SẴN SÀNG'),
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w900,
                               color: running.isRunning
-                                  ? AppTheme.success
+                                  ? AppTheme.primaryNeon
                                   : (running.isPaused ? Colors.amber : AppTheme.textMuted),
                             ),
                           ),
@@ -232,205 +236,246 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Đồng hồ chính & Quãng đường lớn trung tâm
+              // BẢNG ĐỒNG HỒ TRUNG TÂM (Đẹp mắt, thoáng đãng, tách bạch từng chỉ số)
               Expanded(
                 child: Container(
                   width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(32),
                     border: Border.all(
                       color: running.isRunning
-                          ? AppTheme.primaryNeon.withValues(alpha: 0.5)
+                          ? AppTheme.primaryNeon.withValues(alpha: 0.6)
                           : AppTheme.divider,
                       width: 1.5,
                     ),
                     boxShadow: running.isRunning
                         ? [
                             BoxShadow(
-                              color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                              blurRadius: 25,
+                              color: AppTheme.primaryNeon.withValues(alpha: 0.2),
+                              blurRadius: 30,
                               spreadRadius: 2,
                             ),
                           ]
                         : [],
                   ),
-                  child: Stack(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Bản vẽ lộ trình chạy mô phỏng ngầm
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(28),
-                          child: CustomPaint(
-                            painter: RoutePainter(
-                              points: running.currentRoute,
-                              color: AppTheme.primaryNeon.withValues(alpha: 0.25),
-                            ),
-                          ),
+                      // Khung Thời gian chạy
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppTheme.divider),
                         ),
-                      ),
-
-                      // Nội dung chỉ số đo lường trung tâm
-                      Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Đồng hồ thời gian lớn
-                                Text(
-                                  running.formattedCurrentDuration,
-                                  style: const TextStyle(
-                                    fontSize: 44,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2.0,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
+                        child: Column(
+                          children: [
+                            Text(
+                              running.formattedCurrentDuration,
+                              style: const TextStyle(
+                                fontSize: 38,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.0,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
                             const Text(
                               'THỜI GIAN',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.textMuted,
                                 letterSpacing: 1.5,
                               ),
                             ),
-                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
 
-                            // Quãng đường Km lớn
-                            AnimatedBuilder(
-                              animation: _pulseAnimation,
-                              builder: (context, child) {
-                                return Transform.scale(
-                                  scale: running.isRunning ? _pulseAnimation.value : 1.0,
-                                  child: child,
-                                );
-                              },
-                              child: Column(
-                                children: [
-                                  Text(
-                                    running.distanceKm.toStringAsFixed(2),
-                                    style: const TextStyle(
-                                      fontSize: 68,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.primaryNeon,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                  const Text(
-                                    'KILOMETERS (KM)',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.textSecondary,
-                                      letterSpacing: 2.0,
-                                    ),
-                                  ),
-                                ],
+                      // Quãng đường KM nổi bật ở giữa
+                      AnimatedBuilder(
+                        animation: _pulseAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: running.isRunning ? _pulseAnimation.value : 1.0,
+                            child: child,
+                          );
+                        },
+                        child: Column(
+                          children: [
+                            Text(
+                              running.distanceKm.toStringAsFixed(2),
+                              style: const TextStyle(
+                                fontSize: 72,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.primaryNeon,
+                                height: 1.0,
+                                letterSpacing: -1.0,
                               ),
                             ),
-                            const SizedBox(height: 32),
-
-                            // Chỉ số phụ: Pace & Calories
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  _buildMetricCard(
-                                    title: 'PACE TB',
-                                    value: '${running.currentPace} /km',
-                                    icon: Icons.speed_rounded,
-                                    color: AppTheme.secondaryNeon,
-                                  ),
-                                  _buildMetricCard(
-                                    title: 'CALORIES',
-                                    value: '${running.calories} kcal',
-                                    icon: Icons.local_fire_department_rounded,
-                                    color: AppTheme.accentOrange,
-                                  ),
-                                ],
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'KILOMETERS (KM)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.primaryNeon,
+                                  letterSpacing: 2.0,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
+
+                      // 2 THẺ CHỈ SỐ: PACE VÀ CALORIES (TÁCH BIỆT RÕ RÀNG, KHÔNG DÍNH NHAU)
+                      Row(
+                        children: [
+                          // Thẻ Pace TB
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceLight,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppTheme.divider),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.speed_rounded, color: AppTheme.secondaryNeon, size: 24),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${running.currentPace} /km',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'PACE TB',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textMuted,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16), // Khoảng cách rõ ràng giữa 2 ô
+
+                          // Thẻ Calories
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceLight,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppTheme.divider),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.local_fire_department_rounded, color: AppTheme.accentOrange, size: 24),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${running.calories} kcal',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'CALORIES',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textMuted,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // BỘ NÚT ĐIỀU KHIỂN (Bắt đầu, Tạm dừng, Kết thúc)
+              // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY
               if (running.isIdle) ...[
                 SizedBox(
                   width: double.infinity,
-                  height: 64,
+                  height: 60,
                   child: ElevatedButton.icon(
                     onPressed: () => running.startTracking(),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 36, color: Colors.black),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 32, color: Colors.white),
                     label: const Text(
                       'BẮT ĐẦU CHẠY',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.0),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryNeon,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 8,
+                      shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
               ] else if (running.isRunning) ...[
                 Row(
                   children: [
-                    // Nút Tạm dừng
                     Expanded(
                       child: SizedBox(
                         height: 60,
                         child: OutlinedButton.icon(
                           onPressed: () => running.pauseTracking(),
-                          icon: const Icon(Icons.pause_rounded, color: Colors.amber),
+                          icon: const Icon(Icons.pause_rounded, color: Colors.amber, size: 28),
                           label: const Text(
                             'TẠM DỪNG',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
+                            style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w900),
                           ),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Colors.amber, width: 2),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 14),
-                    // Nút Kết thúc
                     Expanded(
                       child: SizedBox(
                         height: 60,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            final session = running.stopAndSaveTracking(
-                              userId: user?.id ?? 'runner_01',
-                              userName: user?.name ?? 'Nguyễn Văn Chạy',
-                            );
-                            if (session != null) {
-                              _showFinishDialog(context, session);
-                            }
-                          },
-                          icon: const Icon(Icons.stop_rounded, color: Colors.white),
+                          onPressed: () => _showSaveRunDialog(context, running, user?.id ?? '', user?.name ?? ''),
+                          icon: const Icon(Icons.stop_rounded, color: Colors.white, size: 28),
                           label: const Text(
                             'KẾT THÚC',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.danger,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            backgroundColor: AppTheme.primaryNeon,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                         ),
                       ),
@@ -440,47 +485,37 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               ] else if (running.isPaused) ...[
                 Row(
                   children: [
-                    // Nút Tiếp tục
                     Expanded(
                       child: SizedBox(
                         height: 60,
                         child: ElevatedButton.icon(
                           onPressed: () => running.resumeTracking(),
-                          icon: const Icon(Icons.play_arrow_rounded, color: Colors.black),
+                          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
                           label: const Text(
                             'TIẾP TỤC',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                            style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryNeon,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            backgroundColor: AppTheme.success,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 14),
-                    // Nút Kết thúc
                     Expanded(
                       child: SizedBox(
                         height: 60,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            final session = running.stopAndSaveTracking(
-                              userId: user?.id ?? 'runner_01',
-                              userName: user?.name ?? 'Nguyễn Văn Chạy',
-                            );
-                            if (session != null) {
-                              _showFinishDialog(context, session);
-                            }
-                          },
-                          icon: const Icon(Icons.stop_rounded, color: Colors.white),
+                          onPressed: () => _showSaveRunDialog(context, running, user?.id ?? '', user?.name ?? ''),
+                          icon: const Icon(Icons.stop_rounded, color: Colors.white, size: 28),
                           label: const Text(
                             'KẾT THÚC',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.danger,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            backgroundColor: AppTheme.primaryNeon,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                         ),
                       ),
@@ -488,80 +523,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                   ],
                 ),
               ],
-              const SizedBox(height: 10),
             ],
           ),
         ),
       ),
     );
   }
-
-  Widget _buildMetricCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-              ),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Vẽ đồ họa mô phỏng đường chạy theo thời gian thực
-class RoutePainter extends CustomPainter {
-  final List<RunPoint> points;
-  final Color color;
-
-  RoutePainter({required this.points, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (points.length < 2) return;
-
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    final centerX = size.width / 2;
-    final centerY = size.height / 2;
-
-    path.moveTo(centerX + points.first.x, centerY + points.first.y);
-    for (int i = 1; i < points.length; i++) {
-      path.lineTo(centerX + points[i].x, centerY + points[i].y);
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant RoutePainter oldDelegate) => true;
 }
