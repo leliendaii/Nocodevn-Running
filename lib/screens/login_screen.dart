@@ -14,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isRegisterMode = false;
+  bool _isLoading = false;
 
   // Controllers cho Đăng nhập (Hỗ trợ cả Email & Username)
   final _loginIdentifierController = TextEditingController();
@@ -48,8 +49,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final identifier = _loginIdentifierController.text.trim();
     final password = _loginPasswordController.text.trim();
 
+    setState(() => _isLoading = true);
     final error = await context.read<AuthProvider>().login(identifier, password);
     if (!mounted) return;
+    setState(() => _isLoading = false);
+
     if (error != null) {
       TopSyncToast.show(
         context,
@@ -59,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _onRegisterSubmit() {
+  Future<void> _onRegisterSubmit() async {
     final name = _regNameController.text.trim();
     final username = _regUsernameController.text.trim();
     final email = _regEmailController.text.trim();
@@ -128,6 +132,32 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    setState(() => _isLoading = true);
+
+    // Gửi yêu cầu đăng ký lên Supabase và gửi OTP về Email
+    final error = await context.read<AuthProvider>().register(
+      name: name,
+      username: username,
+      email: email,
+      password: pass,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error != null) {
+      TopSyncToast.show(context, message: error, isSuccess: false);
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    if (auth.isAuthenticated) {
+      TopSyncToast.show(context, message: '🎉 Đăng ký thành công! Đang vào ứng dụng...', isSuccess: true);
+      return;
+    }
+
+    // Mở popup nhập mã OTP gửi về Email
+    _resendAttempts++;
     _showOtpModalPopup();
   }
 
@@ -308,8 +338,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _handleLogin,
-                    child: const Text('ĐĂNG NHẬP'),
+                    onPressed: _isLoading ? null : _handleLogin,
+                    child: _isLoading
+                        ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('ĐĂNG NHẬP'),
                   ),
                 ]
 
@@ -376,8 +408,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: _onRegisterSubmit,
-                    child: const Text('ĐĂNG KÝ'),
+                    onPressed: _isLoading ? null : _onRegisterSubmit,
+                    child: _isLoading
+                        ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('ĐĂNG KÝ'),
                   ),
                 ],
               ],

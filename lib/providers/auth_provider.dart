@@ -90,12 +90,10 @@ class AuthProvider with ChangeNotifier {
 
     final serverUser = await SupabaseService.verifyServerSession();
     if (serverUser == null) {
-      // User đã bị xóa trên Supabase DB -> Logout ngay!
       logout();
       return false;
     }
 
-    // Cập nhật lại Role và Username từ bảng profiles trên web Supabase
     final profile = await SupabaseService.fetchProfile(serverUser.id, serverUser.email);
     final roleStr = SupabaseService.extractRole(serverUser, profile);
     final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
@@ -119,7 +117,7 @@ class AuthProvider with ChangeNotifier {
     return true;
   }
 
-  /// Đăng ký tài khoản mới lên Supabase Cloud (Hỗ trợ Username)
+  /// Bước 1: Gửi yêu cầu đăng ký lên Supabase (Gửi OTP qua Email thực tế)
   Future<String?> register({
     required String name,
     required String username,
@@ -155,30 +153,101 @@ class AuthProvider with ChangeNotifier {
         );
 
         if (res?.user != null) {
-          final newUser = AppUser(
-            id: res!.user!.id,
-            name: cleanName,
-            username: cleanUsername,
-            email: cleanEmail,
-            role: role == 'admin' ? UserRole.admin : UserRole.user,
-          );
-
-          _currentUser = newUser;
-          await LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
-          notifyListeners();
-          return null;
+          // Nếu Supabase trả về session ngay (trường hợp confirm email tắt)
+          if (res?.session != null) {
+            final newUser = AppUser(
+              id: res!.user!.id,
+              name: cleanName,
+              username: cleanUsername,
+              email: cleanEmail,
+              role: role == 'admin' ? UserRole.admin : UserRole.user,
+            );
+            _currentUser = newUser;
+            await LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
+            notifyListeners();
+          }
+          return null; // Thành công gửi OTP về Email
         }
       }
     } catch (e) {
       debugPrint('Supabase signup error: $e');
       final errStr = e.toString().toLowerCase();
-      if (errStr.contains('unique') || errStr.contains('already exists')) {
+      if (errStr.contains('unique') || errStr.contains('already exists') || errStr.contains('already registered')) {
         return 'Email hoặc Tên đăng nhập này đã được sử dụng!';
       }
       return 'Lỗi đăng ký: ${e.toString().replaceAll('Exception:', '').trim()}';
     }
 
     return 'Không thể kết nối đến máy chủ cơ sở dữ liệu Supabase.';
+  }
+
+  /// Bước 2: Xác thực mã OTP gửi về Email để kích hoạt tài khoản
+  Future<String?> verifyOtpAndActivate({
+    required String email,
+    required String token,
+    required String name,
+    required String username,
+    required String password,
+    bool remember = true,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanUsername = username.trim().toLowerCase().replaceAll('@', '');
+    final cleanName = name.trim();
+
+    try {
+      final res = await SupabaseService.verifyEmailOtp(
+        email: cleanEmail,
+        token: token.trim(),
+      );
+
+      final user = res.user;
+      if (user != null) {
+        // Cập nhật bảng profiles
+        await SupabaseService.updateProfileTable(
+          user.id,
+          name: cleanName,
+          username: cleanUsername,
+          email: cleanEmail,
+        );
+
+        final profile = await SupabaseService.fetchProfile(user.id, cleanEmail);
+        final roleStr = SupabaseService.extractRole(user, profile);
+
+        final appUser = AppUser(
+          id: user.id,
+          name: cleanName.isNotEmpty ? cleanName : (profile?['name'] ?? cleanEmail.split('@').first),
+          username: cleanUsername.isNotEmpty ? cleanUsername : (profile?['username'] ?? ''),
+          email: cleanEmail,
+          role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
+          avatarUrl: profile?['avatar_url'] ?? '',
+        );
+
+        _currentUser = appUser;
+        await LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Lỗi verify OTP: $e');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('invalid') || errStr.contains('expired') || errStr.contains('token')) {
+        return 'Mã OTP không chính xác hoặc đã hết hạn!';
+      }
+      return 'Lỗi xác thực: ${e.toString().replaceAll('Exception:', '').trim()}';
+    }
+
+    return 'Không thể xác thực mã OTP.';
+  }
+
+  /// Gửi lại mã OTP qua Email thực tế
+  Future<String?> resendOtp(String email) async {
+    try {
+      await SupabaseService.resendEmailOtp(email: email);
+      return null;
+    } catch (e) {
+      debugPrint('Lỗi gửi lại OTP: $e');
+      return 'Lỗi gửi lại mã: ${e.toString().replaceAll('Exception:', '').trim()}';
+    }
   }
 
   /// Đăng nhập (Hỗ trợ nhập Email HOẶC Username)
@@ -189,13 +258,12 @@ class AuthProvider with ChangeNotifier {
       return 'Vui lòng nhập Email/Tên đăng nhập và Mật khẩu.';
     }
 
-    // Đăng nhập trực tiếp với Supabase Cloud
     try {
       if (SupabaseService.isConfigured) {
         final res = await SupabaseService.signIn(identifier: cleanIdentifier, password: password);
         final u = res?.user;
         if (u != null) {
-          final profile = await SupabaseService.fetchProfile(u.id);
+          final profile = await SupabaseService.fetchProfile(u.id, u.email);
           final roleStr = SupabaseService.extractRole(u, profile);
           final displayName = profile?['name'] ?? u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
           final username = profile?['username'] ?? u.userMetadata?['username'] ?? cleanIdentifier;
@@ -217,10 +285,13 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Supabase login error: $e');
       final errStr = e.toString().toLowerCase();
-      if (errStr.contains('không tồn tại')) {
+      if (errStr.contains('không tồn tại') || errStr.contains('tên đăng nhập')) {
         return e.toString().replaceAll('Exception:', '').trim();
       }
-      if (errStr.contains('invalid login credentials') || errStr.contains('user not found')) {
+      if (errStr.contains('email not confirmed')) {
+        return 'Tài khoản chưa được kích hoạt qua Email! Vui lòng nhập mã OTP để kích hoạt.';
+      }
+      if (errStr.contains('invalid login credentials') || errStr.contains('user not found') || errStr.contains('invalid_credentials')) {
         return 'Tên đăng nhập/Email hoặc mật khẩu không chính xác!';
       }
       return 'Lỗi đăng nhập: ${e.toString().replaceAll('Exception:', '').trim()}';

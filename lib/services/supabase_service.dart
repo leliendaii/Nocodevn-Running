@@ -46,7 +46,7 @@ class SupabaseService {
   // XÁC THỰC TÀI KHOẢN & BẢNG PROFILES CLOUD
   // ==========================================
 
-  /// Tìm email tương ứng qua username
+  /// Tìm email tương ứng qua username (cho phép đăng nhập bằng username)
   static Future<String?> fetchEmailByUsername(String username) async {
     final supa = client;
     if (supa == null) return null;
@@ -78,7 +78,7 @@ class SupabaseService {
     }
   }
 
-  /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user, Username) từ bảng profiles (tìm theo ID hoặc Email)
+  /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user, Username) từ bảng profiles
   static Future<Map<String, dynamic>?> fetchProfile(String userId, [String? email]) async {
     final supa = client;
     if (supa == null) return null;
@@ -128,7 +128,7 @@ class SupabaseService {
     return 'user';
   }
 
-  /// Đăng ký tài khoản mới lên Supabase Cloud (hỗ trợ cả Email & Username)
+  /// Đăng ký tài khoản mới lên Supabase Cloud (Tự động gửi email OTP xác thực)
   static Future<AuthResponse?> signUp({
     required String email,
     required String username,
@@ -140,35 +140,75 @@ class SupabaseService {
     if (supa == null) return null;
 
     final cleanUsername = username.trim().toLowerCase();
+    final cleanEmail = email.trim().toLowerCase();
 
     try {
       final response = await supa.auth.signUp(
-        email: email,
+        email: cleanEmail,
         password: password,
         data: {
-          'name': name,
+          'name': name.trim(),
           'username': cleanUsername,
           'role': role,
         },
       );
 
-      // Đồng bộ ngay vào bảng profiles
+      // Tự động thêm ngay vào bảng profiles
       if (response.user != null) {
         try {
           await supa.from('profiles').upsert({
             'id': response.user!.id,
-            'email': email,
+            'email': cleanEmail,
             'username': cleanUsername,
-            'name': name,
+            'name': name.trim(),
             'role': role,
             'avatar_url': '',
           });
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Lỗi upsert profiles khi signup: $e');
+        }
       }
 
       return response;
     } catch (e) {
       debugPrint('Lỗi đăng ký Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Xác thực mã OTP gửi về Email thực tế qua Supabase Cloud
+  static Future<AuthResponse> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    final supa = client;
+    if (supa == null) throw Exception('Supabase client chưa kết nối.');
+
+    try {
+      final response = await supa.auth.verifyOTP(
+        email: email.trim().toLowerCase(),
+        token: token.trim(),
+        type: OtpType.signup,
+      );
+      return response;
+    } catch (e) {
+      debugPrint('Lỗi xác thực OTP Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Gửi lại mã OTP qua Email thực tế
+  static Future<void> resendEmailOtp({required String email}) async {
+    final supa = client;
+    if (supa == null) throw Exception('Supabase client chưa kết nối.');
+
+    try {
+      await supa.auth.resend(
+        email: email.trim().toLowerCase(),
+        type: OtpType.signup,
+      );
+    } catch (e) {
+      debugPrint('Lỗi gửi lại OTP Supabase: $e');
       rethrow;
     }
   }
@@ -187,7 +227,7 @@ class SupabaseService {
     if (!targetEmail.contains('@')) {
       final resolvedEmail = await fetchEmailByUsername(targetEmail);
       if (resolvedEmail == null || resolvedEmail.isEmpty) {
-        throw Exception('Tên đăng nhập "$targetEmail" không tồn tại!');
+        throw Exception('Tên đăng nhập "$targetEmail" không tồn tại trên hệ thống!');
       }
       targetEmail = resolvedEmail;
     }

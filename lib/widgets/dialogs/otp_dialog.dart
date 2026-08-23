@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -31,19 +30,20 @@ class OtpVerificationDialog extends StatefulWidget {
 }
 
 class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
-  String _generatedOtp = '';
   int _otpCountdown = 60;
   Timer? _otpTimer;
   late int _resendAttempts;
+  bool _isSubmitting = false;
 
-  final List<TextEditingController> _otpControllers = List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _otpFocusNodes = List.generate(4, (_) => FocusNode());
+  // Hỗ trợ 6 ô nhập mã OTP (chuẩn quốc tế của Supabase)
+  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
   @override
   void initState() {
     super.initState();
     _resendAttempts = widget.initialAttempts;
-    _sendOtp();
+    _startCountdown();
   }
 
   @override
@@ -58,7 +58,23 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
     super.dispose();
   }
 
-  void _sendOtp() {
+  void _startCountdown() {
+    _otpTimer?.cancel();
+    setState(() {
+      _otpCountdown = 60;
+    });
+
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_otpCountdown > 0) {
+        setState(() => _otpCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  // Gửi lại mã OTP qua Email thực tế
+  Future<void> _resendOtp() async {
     if (_resendAttempts >= 5) {
       final lockUntil = DateTime.now().add(const Duration(hours: 1));
       widget.onLock(lockUntil);
@@ -74,41 +90,33 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
     _resendAttempts++;
     widget.onAttemptIncrement();
 
-    final random = Random();
-    _generatedOtp = (1000 + random.nextInt(9000)).toString();
-
     for (var c in _otpControllers) {
       c.clear();
     }
 
-    setState(() {
-      _otpCountdown = 60;
-    });
+    final error = await context.read<AuthProvider>().resendOtp(widget.email);
+    if (!mounted) return;
 
-    _otpTimer?.cancel();
-    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_otpCountdown > 0) {
-        setState(() => _otpCountdown--);
-      } else {
-        timer.cancel();
-      }
-    });
-
-    TopSyncToast.show(
-      context,
-      message: 'Mã OTP xác thực: $_generatedOtp (Còn 60s)',
-      isSuccess: true,
-      duration: const Duration(seconds: 10),
-    );
+    if (error != null) {
+      TopSyncToast.show(context, message: error, isSuccess: false);
+    } else {
+      _startCountdown();
+      TopSyncToast.show(
+        context,
+        message: 'Đã gửi mã OTP mới tới email: ${widget.email}',
+        isSuccess: true,
+      );
+    }
   }
 
+  // Xác thực mã OTP và kích hoạt tài khoản
   Future<void> _verifyOtpAndRegister() async {
     final enteredOtp = _otpControllers.map((c) => c.text.trim()).join();
 
-    if (enteredOtp.length < 4) {
+    if (enteredOtp.length < 6) {
       TopSyncToast.show(
         context,
-        message: 'Vui lòng nhập đủ 4 chữ số OTP!',
+        message: 'Vui lòng nhập đủ 6 chữ số OTP từ Email!',
         isSuccess: false,
       );
       return;
@@ -117,29 +125,24 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
     if (_otpCountdown <= 0) {
       TopSyncToast.show(
         context,
-        message: '⏱️ Mã OTP đã hết hạn! Vui lòng bấm gửi lại.',
+        message: '⏱️ Mã OTP đã hết hạn! Vui lòng bấm gửi lại mã mới.',
         isSuccess: false,
       );
       return;
     }
 
-    if (enteredOtp != _generatedOtp) {
-      TopSyncToast.show(
-        context,
-        message: '❌ Mã OTP không chính xác!',
-        isSuccess: false,
-      );
-      return;
-    }
+    setState(() => _isSubmitting = true);
 
-    final error = await context.read<AuthProvider>().register(
+    final error = await context.read<AuthProvider>().verifyOtpAndActivate(
+      email: widget.email,
+      token: enteredOtp,
       name: widget.name,
       username: widget.username,
-      email: widget.email,
       password: widget.password,
     );
 
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
 
     if (error != null) {
       TopSyncToast.show(
@@ -152,7 +155,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
       Navigator.of(context).pop();
       TopSyncToast.show(
         context,
-        message: '🎉 Xác thực OTP thành công! Đã kích hoạt tài khoản.',
+        message: '🎉 Xác thực Email thành công! Đã kích hoạt tài khoản.',
         isSuccess: true,
       );
     }
@@ -167,7 +170,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
         side: const BorderSide(color: AppTheme.secondaryNeon, width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -188,11 +191,11 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                     ),
                   ),
                   const Text(
-                    'XÁC THỰC MÃ OTP',
+                    'XÁC THỰC EMAIL OTP',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 1.0,
+                      letterSpacing: 0.8,
                       color: AppTheme.secondaryNeon,
                     ),
                   ),
@@ -204,19 +207,19 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Mã xác nhận 4 số đã được gửi tới email:\n${widget.email}',
+                'Mã xác nhận 6 số đã được gửi tới hộp thư Email:\n${widget.email}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
 
-              // 4 Ô NHẬP MÃ OTP
+              // 6 Ô NHẬP MÃ OTP
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(4, (index) {
+                children: List.generate(6, (index) {
                   return SizedBox(
-                    width: 52,
-                    height: 58,
+                    width: 42,
+                    height: 52,
                     child: TextField(
                       controller: _otpControllers[index],
                       focusNode: _otpFocusNodes[index],
@@ -224,7 +227,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                       textAlign: TextAlign.center,
                       maxLength: 1,
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: AppTheme.secondaryNeon,
                       ),
@@ -232,17 +235,18 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                         counterText: '',
                         filled: true,
                         fillColor: AppTheme.surfaceLight,
+                        contentPadding: EdgeInsets.zero,
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: AppTheme.divider, width: 1.5),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: AppTheme.secondaryNeon, width: 2),
                         ),
                       ),
                       onChanged: (val) {
-                        if (val.isNotEmpty && index < 3) {
+                        if (val.isNotEmpty && index < 5) {
                           _otpFocusNodes[index + 1].requestFocus();
                         } else if (val.isEmpty && index > 0) {
                           _otpFocusNodes[index - 1].requestFocus();
@@ -255,7 +259,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                   );
                 }),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
 
               // ĐỒNG HỒ ĐẾM NGƯỢC 60 GIÂY
               Container(
@@ -294,6 +298,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
               ),
               const SizedBox(height: 20),
 
+              // NÚT XÁC THỰC & KÍCH HOẠT
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -303,20 +308,27 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: _verifyOtpAndRegister,
-                  child: const Text(
-                    'XÁC THỰC & KÍCH HOẠT TÀI KHOẢN',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-                  ),
+                  onPressed: _isSubmitting ? null : _verifyOtpAndRegister,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                        )
+                      : const Text(
+                          'XÁC THỰC & KÍCH HOẠT TÀI KHOẢN',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                        ),
                 ),
               ),
               const SizedBox(height: 10),
 
+              // NÚT GỬI LẠI MÃ (RESEND)
               TextButton(
-                onPressed: _otpCountdown <= 0 ? _sendOtp : null,
+                onPressed: _otpCountdown <= 0 ? _resendOtp : null,
                 child: Text(
                   _otpCountdown <= 0
-                      ? '🔄 GỬI LẠI MÃ OTP MỚI (${5 - _resendAttempts} lần còn lại)'
+                      ? '🔄 GỬI LẠI MÃ VỀ EMAIL (${5 - _resendAttempts} lần còn lại)'
                       : 'Chờ 60s để gửi lại mã (${_otpCountdown}s)',
                   style: TextStyle(
                     fontSize: 12,
