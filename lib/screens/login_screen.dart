@@ -67,11 +67,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_lockUntil != null) {
       if (DateTime.now().isBefore(_lockUntil!)) {
         final remainingMinutes = _lockUntil!.difference(DateTime.now()).inMinutes + 1;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.danger,
-            content: Text('⚠️ Bạn đã yêu cầu gửi mã quá 5 lần! Vui lòng thử lại sau $remainingMinutes phút.'),
-          ),
+        TopSyncToast.show(
+          context,
+          message: '⚠️ Quá 5 lần! Thử lại sau $remainingMinutes phút.',
+          isSuccess: false,
         );
         return;
       } else {
@@ -83,11 +82,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (_resendAttempts >= 5) {
       _lockUntil = DateTime.now().add(const Duration(hours: 1));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('⛔ Bạn đã gửi mã quá 5 lần! Hệ thống tạm khóa gửi OTP trong 1 tiếng.'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: '⛔ Đã gửi quá 5 lần! Tạm khóa gửi OTP trong 1 tiếng.',
+        isSuccess: false,
       );
       return;
     }
@@ -116,10 +114,11 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     });
 
-    // Thông báo mã OTP gửi về Email
+    // Thông báo mã OTP gửi về Email (Đẩy góc trên bên phải)
     TopSyncToast.show(
       context,
-      message: 'Mã OTP của bạn: $_generatedOtp (Hết hạn sau 60s)',
+      message: 'Mã OTP xác thực: $_generatedOtp (Còn 60s)',
+      isSuccess: true,
       duration: const Duration(seconds: 10),
     );
   }
@@ -129,31 +128,28 @@ class _LoginScreenState extends State<LoginScreen> {
     final enteredOtp = _otpControllers.map((c) => c.text.trim()).join();
 
     if (enteredOtp.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('Vui lòng nhập đủ 4 chữ số mã OTP!'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: 'Vui lòng nhập đủ 4 chữ số OTP!',
+        isSuccess: false,
       );
       return;
     }
 
     if (_otpCountdown <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('⏱️ Mã OTP đã hết hạn 1 phút! Vui lòng bấm "Gửi lại mã mới".'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: '⏱️ Mã OTP đã hết hạn! Vui lòng bấm gửi lại.',
+        isSuccess: false,
       );
       return;
     }
 
     if (enteredOtp != _generatedOtp) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('❌ Mã OTP không chính xác! Vui lòng kiểm tra lại.'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: '❌ Mã OTP không chính xác!',
+        isSuccess: false,
       );
       return;
     }
@@ -174,20 +170,18 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text(error),
-        ),
+      TopSyncToast.show(
+        context,
+        message: error,
+        isSuccess: false,
       );
     } else {
       _otpTimer?.cancel();
       setState(() => _isVerifyingOtp = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.success,
-          content: Text('🎉 Xác thực OTP thành công! Tài khoản đã được kích hoạt.'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: '🎉 Xác thực OTP thành công! Đã kích hoạt tài khoản.',
+        isSuccess: true,
       );
     }
   }
@@ -199,11 +193,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final error = await context.read<AuthProvider>().login(identifier, password);
     if (!mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text(error),
-        ),
+      TopSyncToast.show(
+        context,
+        message: error,
+        isSuccess: false,
       );
     }
   }
@@ -216,41 +209,37 @@ class _LoginScreenState extends State<LoginScreen> {
     final confirmPass = _regConfirmPasswordController.text.trim();
 
     if (name.isEmpty || username.isEmpty || email.isEmpty || pass.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('Vui lòng điền đầy đủ tất cả các trường!'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: 'Vui lòng điền đầy đủ tất cả các trường!',
+        isSuccess: false,
       );
       return;
     }
 
     if (username.length < 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('Tên đăng nhập phải có ít nhất 3 ký tự!'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: 'Tên đăng nhập phải có ít nhất 3 ký tự!',
+        isSuccess: false,
       );
       return;
     }
 
     if (pass.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('Mật khẩu phải có ít nhất 6 ký tự!'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: 'Mật khẩu phải có ít nhất 6 ký tự!',
+        isSuccess: false,
       );
       return;
     }
 
     if (pass != confirmPass) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppTheme.danger,
-          content: Text('Mật khẩu xác nhận không trùng khớp!'),
-        ),
+      TopSyncToast.show(
+        context,
+        message: 'Mật khẩu xác nhận không trùng khớp!',
+        isSuccess: false,
       );
       return;
     }

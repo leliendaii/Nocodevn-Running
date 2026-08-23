@@ -191,11 +191,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 final int totalSec = (h * 3600) + (m * 60) + s;
 
                 if (newDistance == null || newDistance <= 0 || totalSec <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      backgroundColor: AppTheme.danger,
-                      content: Text('Vui lòng nhập Quãng đường và Thời gian hợp lệ!'),
-                    ),
+                  TopSyncToast.show(
+                    context,
+                    message: 'Vui lòng nhập Quãng đường và Thời gian hợp lệ!',
+                    isSuccess: false,
                   );
                   return;
                 }

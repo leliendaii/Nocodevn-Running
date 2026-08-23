@@ -602,9 +602,7 @@ class _MainShellState extends State<MainShell> {
                     final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
                     auth.updateAvatar(base64String);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật ảnh đại diện từ điện thoại!')),
-                      );
+                      TopSyncToast.show(context, message: 'Đã cập nhật ảnh đại diện mới!', isSuccess: true);
                     }
                   }
                 } catch (e) {
@@ -625,9 +623,7 @@ class _MainShellState extends State<MainShell> {
                     final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
                     auth.updateAvatar(base64String);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã chụp ảnh đại diện mới!')),
-                      );
+                      TopSyncToast.show(context, message: 'Đã chụp ảnh đại diện mới!', isSuccess: true);
                     }
                   }
                 } catch (e) {
@@ -650,9 +646,7 @@ class _MainShellState extends State<MainShell> {
                   onTap: () {
                     auth.updateAvatar(url);
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật avatar mẫu!')),
-                    );
+                    TopSyncToast.show(context, message: 'Đã cập nhật avatar mẫu!', isSuccess: true);
                   },
                   child: CircleAvatar(
                     radius: 26,
@@ -768,19 +762,12 @@ class _MainShellState extends State<MainShell> {
               final error = await auth.updateProfile(newName: n, newUsername: u, newEmail: e);
               if (error != null) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
-                  );
+                  TopSyncToast.show(context, message: error, isSuccess: false);
                 }
               } else {
                 if (context.mounted) {
                   Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      backgroundColor: AppTheme.success,
-                      content: Text('✅ Đã cập nhật thông tin thành công!'),
-                    ),
-                  );
+                  TopSyncToast.show(context, message: 'Đã cập nhật thông tin thành công!', isSuccess: true);
                 }
               }
             },
@@ -862,11 +849,10 @@ class _MainShellState extends State<MainShell> {
               final n2 = confirmPassController.text.trim();
 
               if (n1 != n2) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppTheme.danger,
-                    content: Text('Mật khẩu mới xác nhận không khớp!'),
-                  ),
+                TopSyncToast.show(
+                  context,
+                  message: 'Mật khẩu mới xác nhận không khớp!',
+                  isSuccess: false,
                 );
                 return;
               }
@@ -878,19 +864,12 @@ class _MainShellState extends State<MainShell> {
 
               if (error != null) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
-                  );
+                  TopSyncToast.show(context, message: error, isSuccess: false);
                 }
               } else {
                 if (context.mounted) {
                   Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      backgroundColor: AppTheme.success,
-                      content: Text('✅ Đã đổi mật khẩu thành công!'),
-                    ),
-                  );
+                  TopSyncToast.show(context, message: 'Đã đổi mật khẩu thành công!', isSuccess: true);
                 }
               }
             },
