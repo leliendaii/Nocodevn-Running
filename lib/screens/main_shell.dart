@@ -6,7 +6,6 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
-import '../widgets/top_sync_toast.dart';
 import '../widgets/dialogs/edit_profile_dialog.dart';
 import '../widgets/dialogs/change_password_dialog.dart';
 import '../widgets/dialogs/avatar_picker_dialog.dart';
@@ -385,22 +384,6 @@ class _MainShellState extends State<MainShell> {
                     fontWeight: FontWeight.w900,
                     color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Nút bấm làm mới quyền trực tiếp từ Cloud
-              TextButton.icon(
-                onPressed: () async {
-                  await auth.refreshProfileFromServer();
-                  if (context.mounted) {
-                    TopSyncToast.show(context, message: 'Đã cập nhật quyền từ Cloud!');
-                  }
-                },
-                icon: const Icon(Icons.sync_rounded, color: AppTheme.secondaryNeon, size: 16),
-                label: const Text(
-                  'Làm mới quyền & dữ liệu từ Cloud',
-                  style: TextStyle(color: AppTheme.secondaryNeon, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(height: 16),

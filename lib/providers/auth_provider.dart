@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
@@ -6,6 +8,8 @@ import '../services/local_storage_service.dart';
 class AuthProvider with ChangeNotifier {
   AppUser? _currentUser;
   bool _rememberMe = true;
+  RealtimeChannel? _realtimeProfileChannel;
+  Timer? _autoSyncTimer;
 
   AppUser? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
@@ -28,12 +32,45 @@ class AuthProvider with ChangeNotifier {
     if (savedUser != null) {
       _currentUser = savedUser;
       notifyListeners();
+      _startAutoSyncRealtime();
     }
 
     // 2. Kiểm tra ngầm với Supabase để cập nhật quyền Admin
     if (SupabaseService.isConfigured) {
       refreshProfileFromServer();
     }
+  }
+
+  /// Lắng nghe Realtime thay đổi từ Supabase & Auto-sync định kỳ
+  void _startAutoSyncRealtime() {
+    _autoSyncTimer?.cancel();
+    _realtimeProfileChannel?.unsubscribe();
+
+    if (_currentUser == null || !SupabaseService.isConfigured) return;
+
+    final supa = SupabaseService.client;
+    if (supa != null) {
+      // 1. Lắng nghe thay đổi tức thì (Realtime WebSocket)
+      _realtimeProfileChannel = supa
+          .channel('public:profiles:${_currentUser!.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'profiles',
+            callback: (payload) {
+              debugPrint('🔔 [Realtime] Dữ liệu Supabase thay đổi, tự động cập nhật UI!');
+              refreshProfileFromServer();
+            },
+          )
+          .subscribe();
+    }
+
+    // 2. Định kỳ 15 giây tự động đồng bộ ngầm
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (_currentUser != null) {
+        refreshProfileFromServer();
+      }
+    });
   }
 
   /// Làm mới thông tin quyền Admin và Profile từ Cloud
@@ -53,16 +90,21 @@ class AuthProvider with ChangeNotifier {
         final username = profile['username'] as String? ?? _currentUser!.username;
         final avatar = profile['avatar_url'] as String? ?? _currentUser!.avatarUrl;
 
-        _currentUser = AppUser(
-          id: _currentUser!.id,
-          name: displayName,
-          username: username,
-          email: _currentUser!.email,
-          role: newRole,
-          avatarUrl: avatar,
-        );
-        LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
-        notifyListeners();
+        if (_currentUser!.role != newRole ||
+            _currentUser!.name != displayName ||
+            _currentUser!.username != username ||
+            _currentUser!.avatarUrl != avatar) {
+          _currentUser = AppUser(
+            id: _currentUser!.id,
+            name: displayName,
+            username: username,
+            email: _currentUser!.email,
+            role: newRole,
+            avatarUrl: avatar,
+          );
+          LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
+          notifyListeners();
+        }
       }
     } catch (e) {
       debugPrint('Lỗi làm mới profile: $e');
@@ -76,7 +118,7 @@ class AuthProvider with ChangeNotifier {
     return true;
   }
 
-  /// Bước 1: Gửi yêu cầu đăng ký lên Supabase (Gửi OTP 4 số)
+  /// Bước 1: Gửi yêu cầu đăng ký lên Supabase
   Future<String?> register({
     required String name,
     required String username,
@@ -112,7 +154,6 @@ class AuthProvider with ChangeNotifier {
         );
 
         if (res?.user != null) {
-          // Nếu Supabase trả về session ngay
           if (res?.session != null) {
             final newUser = AppUser(
               id: res!.user!.id,
@@ -123,6 +164,7 @@ class AuthProvider with ChangeNotifier {
             );
             _currentUser = newUser;
             LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
+            _startAutoSyncRealtime();
             notifyListeners();
           }
           return null;
@@ -140,7 +182,7 @@ class AuthProvider with ChangeNotifier {
     return 'Không thể kết nối đến máy chủ cơ sở dữ liệu Supabase.';
   }
 
-  /// Bước 2: Xác thực mã OTP 4 số và kích hoạt tài khoản
+  /// Bước 2: Xác thực mã OTP 6 số và kích hoạt tài khoản
   Future<String?> verifyOtpAndActivate({
     required String email,
     required String token,
@@ -161,7 +203,6 @@ class AuthProvider with ChangeNotifier {
 
       final user = res.user;
       if (user != null) {
-        // Tối ưu tạo user ngay tức thì
         final appUser = AppUser(
           id: user.id,
           name: cleanName.isNotEmpty ? cleanName : cleanEmail.split('@').first,
@@ -173,6 +214,7 @@ class AuthProvider with ChangeNotifier {
 
         _currentUser = appUser;
         LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
+        _startAutoSyncRealtime();
         notifyListeners();
 
         // Sync bảng profiles ngầm
@@ -209,7 +251,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Đăng nhập siêu tốc (< 1s)
+  /// Đăng nhập siêu tốc (< 1s) & Kích hoạt Realtime sync
   Future<String?> login(String identifier, String password, {bool remember = true}) async {
     final cleanIdentifier = identifier.trim();
 
@@ -225,7 +267,7 @@ class AuthProvider with ChangeNotifier {
           final displayName = u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
           final username = u.userMetadata?['username'] ?? (cleanIdentifier.contains('@') ? '' : cleanIdentifier);
 
-          // 1. Tạo session người dùng tức thì (0ms) để vào ngay app
+          // Tạo session người dùng tức thì (0ms) để vào ngay app
           final appUser = AppUser(
             id: u.id,
             name: displayName,
@@ -237,9 +279,10 @@ class AuthProvider with ChangeNotifier {
 
           _currentUser = appUser;
           LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
+          _startAutoSyncRealtime();
           notifyListeners();
 
-          // 2. Tự động kiểm tra quyền Admin từ profiles ngầm (không block UI)
+          // Tự động kiểm tra quyền Admin từ profiles ngầm
           refreshProfileFromServer();
 
           return null;
@@ -285,7 +328,7 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
-  /// Cập nhật Họ tên, Username và Email (Optimistic Update - 0ms delay)
+  /// Cập nhật Họ tên và Email (Optimistic Update - 0ms delay)
   Future<String?> updateProfile({
     required String newName,
     required String newUsername,
@@ -350,9 +393,18 @@ class AuthProvider with ChangeNotifier {
   }
 
   void logout() {
+    _autoSyncTimer?.cancel();
+    _realtimeProfileChannel?.unsubscribe();
     SupabaseService.signOut();
     LocalStorageService.clearUserSession();
     _currentUser = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _autoSyncTimer?.cancel();
+    _realtimeProfileChannel?.unsubscribe();
+    super.dispose();
   }
 }
