@@ -5,6 +5,6 @@ void main() {
   testWidgets('App starts smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const RunningTrackerApp());
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('RUN TRACKER'), findsWidgets);
+    expect(find.text('RUN TRACKER PRO'), findsWidgets);
   });
 }

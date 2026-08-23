@@ -239,6 +239,46 @@ class _MainShellState extends State<MainShell> {
                   ],
                 ),
               ),
+              // Nút Đổi mật khẩu
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.key_rounded, color: AppTheme.secondaryNeon, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Bảo mật tài khoản', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('Thay đổi mật khẩu đăng nhập', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.surfaceLight,
+                        foregroundColor: AppTheme.primaryNeon,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      ),
+                      onPressed: () => _showChangePasswordDialog(context, auth),
+                      child: const Text('ĐỔI MK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
               const Spacer(),
 
               // Nút Đăng xuất
@@ -258,6 +298,112 @@ class _MainShellState extends State<MainShell> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context, AuthProvider auth) {
+    final currentPassController = TextEditingController();
+    final newPassController = TextEditingController();
+    final confirmPassController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppTheme.secondaryNeon, width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_reset_rounded, color: AppTheme.secondaryNeon),
+            SizedBox(width: 10),
+            Text('Đổi Mật Khẩu', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentPassController,
+              obscureText: true,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Mật khẩu hiện tại',
+                hintText: 'Nhập mật khẩu đang dùng',
+                prefixIcon: Icon(Icons.key, color: AppTheme.secondaryNeon),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: newPassController,
+              obscureText: true,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Mật khẩu mới (ít nhất 6 ký tự)',
+                prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryNeon),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: confirmPassController,
+              obscureText: true,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Nhập lại mật khẩu mới',
+                prefixIcon: Icon(Icons.lock_reset, color: AppTheme.primaryNeon),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.secondaryNeon,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () {
+              final cur = currentPassController.text.trim();
+              final n1 = newPassController.text.trim();
+              final n2 = confirmPassController.text.trim();
+
+              if (n1 != n2) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: AppTheme.danger,
+                    content: Text('Mật khẩu mới xác nhận không khớp!'),
+                  ),
+                );
+                return;
+              }
+
+              final error = auth.changePassword(
+                currentPassword: cur,
+                newPassword: n1,
+              );
+
+              if (error != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
+                );
+              } else {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: AppTheme.success,
+                    content: Text('✅ Đã đổi mật khẩu thành công!'),
+                  ),
+                );
+              }
+            },
+            child: const Text('LƯU MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
