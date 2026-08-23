@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/running_provider.dart';
+import '../models/user_model.dart';
 import '../theme/app_theme.dart';
 import 'running_screen.dart';
 import 'history_screen.dart';
@@ -15,158 +19,340 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  TimeFilter _personalFilter = TimeFilter.week;
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
 
-    final List<Widget> screens = [
+    final List<Widget> pages = [
       const RunningScreen(),
       const HistoryScreen(),
-      const AdminDashboardScreen(),
-      _buildProfileTab(context, auth),
+      _buildPersonalStatsTab(user?.id ?? ''),
+      _buildProfileTab(context, auth, user),
     ];
 
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: screens,
+        children: pages,
       ),
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppTheme.surface,
-          border: const Border(
-            top: BorderSide(color: AppTheme.divider, width: 1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+          border: Border(top: BorderSide(color: AppTheme.divider, width: 1)),
+        ),
+        child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          indicatorColor: AppTheme.primaryNeon.withValues(alpha: 0.2),
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.directions_run_outlined, color: AppTheme.textSecondary),
+              selectedIcon: Icon(Icons.directions_run, color: AppTheme.primaryNeon),
+              label: 'Chạy',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.history_rounded, color: AppTheme.textSecondary),
+              selectedIcon: Icon(Icons.history_rounded, color: AppTheme.primaryNeon),
+              label: 'Lịch sử',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_rounded, color: AppTheme.textSecondary),
+              selectedIcon: Icon(Icons.bar_chart_rounded, color: AppTheme.primaryNeon),
+              label: 'Thống kê',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded, color: AppTheme.textSecondary),
+              selectedIcon: Icon(Icons.person_rounded, color: AppTheme.primaryNeon),
+              label: 'Cá nhân',
             ),
           ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, Icons.directions_run_rounded, 'Chạy bộ'),
-                _buildNavItem(1, Icons.history_rounded, 'Lịch sử'),
-                _buildNavItem(
-                  2,
-                  Icons.admin_panel_settings_rounded,
-                  'Quản trị',
-                  badge: user?.isAdmin == true ? 'ADMIN' : null,
-                ),
-                _buildNavItem(3, Icons.person_rounded, 'Cá nhân'),
-              ],
-            ),
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, {String? badge}) {
-    final isSelected = _currentIndex == index;
+  // TAB 3: THỐNG KÊ CÁ NHÂN CỦA NGƯỜI DÙNG (DÙNG CHUNG CHO CẢ USER VÀ ADMIN KHI CHẠY)
+  Widget _buildPersonalStatsTab(String userId) {
+    final running = context.watch<RunningProvider>();
+    final userRuns = running.getUserSessions(userId);
+    final chartData = running.getUserChartData(userId, _personalFilter);
 
-    return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryNeon.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected ? AppTheme.primaryNeon : AppTheme.textMuted,
-                  size: 24,
+    final double totalKm = userRuns.fold(0.0, (sum, s) => sum + s.distanceKm);
+    final int totalSec = userRuns.fold(0, (sum, s) => sum + s.durationSeconds);
+    final int totalCal = userRuns.fold(0, (sum, s) => sum + s.calories);
+
+    final hours = totalSec ~/ 3600;
+    final minutes = (totalSec % 3600) ~/ 60;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('THỐNG KÊ CỦA TÔI'),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Bộ lọc thời gian: Ngày / Tuần / Tháng / Năm
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.divider),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? AppTheme.primaryNeon : AppTheme.textMuted,
-                  ),
-                ),
-              ],
-            ),
-            if (badge != null)
-              Positioned(
-                top: -4,
-                right: -10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: AppTheme.secondaryNeon,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.black),
-                  ),
+                child: Row(
+                  children: [
+                    _buildFilterBtn('Ngày', TimeFilter.day),
+                    _buildFilterBtn('Tuần', TimeFilter.week),
+                    _buildFilterBtn('Tháng', TimeFilter.month),
+                    _buildFilterBtn('Năm', TimeFilter.year),
+                  ],
                 ),
               ),
-          ],
+              const SizedBox(height: 20),
+
+              // Thẻ tổng quan 3 chỉ số chính
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricCard('TỔNG QUÃNG ĐƯỜNG', '${totalKm.toStringAsFixed(1)} KM', Icons.straighten, AppTheme.primaryNeon),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildMetricCard('THỜI GIAN CHẠY', '${hours}h ${minutes}p', Icons.timer_outlined, AppTheme.secondaryNeon),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricCard('TỔNG CALO TIÊU THỤ', '$totalCal kcal', Icons.local_fire_department_outlined, AppTheme.accentOrange),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildMetricCard('TỔNG SỐ BUỔI CHẠY', '${userRuns.length} buổi', Icons.directions_run_rounded, AppTheme.success),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Biểu đồ cột phân nhóm
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'BIỂU ĐỒ QUÃNG ĐƯỜNG (KM)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        ),
+                        Icon(Icons.bar_chart_rounded, color: AppTheme.primaryNeon),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 200,
+                      child: chartData.isEmpty || totalKm == 0
+                          ? const Center(
+                              child: Text('Chưa có dữ liệu cho khoảng thời gian này', style: TextStyle(color: AppTheme.textMuted)),
+                            )
+                          : BarChart(
+                              BarChartData(
+                                alignment: BarChartAlignment.spaceAround,
+                                maxY: (chartData.map((e) => e.distanceKm).reduce((a, b) => a > b ? a : b) * 1.3).clamp(5.0, 100.0),
+                                barTouchData: BarTouchData(
+                                  touchTooltipData: BarTouchTooltipData(
+                                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                      return BarTooltipItem(
+                                        '${chartData[groupIndex].label}\n${rod.toY.toStringAsFixed(2)} km',
+                                        const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                titlesData: FlTitlesData(
+                                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      getTitlesWidget: (val, meta) {
+                                        final index = val.toInt();
+                                        if (index >= 0 && index < chartData.length) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(top: 8.0),
+                                            child: Text(
+                                              chartData[index].label,
+                                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                            ),
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                gridData: const FlGridData(show: false),
+                                borderData: FlBorderData(show: false),
+                                barGroups: chartData.asMap().entries.map((entry) {
+                                  return BarChartGroupData(
+                                    x: entry.key,
+                                    barRods: [
+                                      BarChartRodData(
+                                        toY: entry.value.distanceKm,
+                                        color: AppTheme.primaryNeon,
+                                        width: 14,
+                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileTab(BuildContext context, AuthProvider auth) {
-    final user = auth.currentUser;
+  Widget _buildFilterBtn(String label, TimeFilter filter) {
+    final isSelected = _personalFilter == filter;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _personalFilter = filter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primaryNeon : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : AppTheme.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 10),
+          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
+        ],
+      ),
+    );
+  }
+
+  // TAB 4: MÀN HÌNH HỒ SƠ CÁ NHÂN & CÀI ĐẶT
+  Widget _buildProfileTab(BuildContext context, AuthProvider auth, AppUser? user) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('HỒ SƠ CÁ NHÂN'),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
+              // Avatar với nút Tải ảnh lên
               Center(
                 child: Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: AppTheme.surfaceLight,
-                      child: Icon(
-                        user?.isAdmin == true ? Icons.admin_panel_settings : Icons.directions_run,
-                        size: 50,
-                        color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.surfaceLight,
+                        border: Border.all(
+                          color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon).withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
+                            ? Image.network(
+                                user.avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Icon(
+                                  Icons.person,
+                                  size: 55,
+                                  color: user.isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 55,
+                                color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                              ),
                       ),
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                      child: GestureDetector(
+                        onTap: () => _showAvatarPicker(context, auth),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                            border: Border.all(color: AppTheme.background, width: 2),
+                          ),
+                          child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
                         ),
-                        child: const Icon(Icons.check, size: 16, color: Colors.black),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Text(
                 user?.name ?? 'Người dùng',
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -193,53 +379,72 @@ class _MainShellState extends State<MainShell> {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-              // Thao tác chuyển đổi vai trò nhanh để kiểm thử
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.divider),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CHUYỂN ĐỔI VAI TRÒ ĐỂ KIỂM THỬ',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              // NÚT MỞ TRANG QUẢN TRỊ DÀNH RIÊNG CHO ADMIN
+              if (user?.isAdmin == true) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.surface,
+                        AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        tileColor: user?.isAdmin != true ? AppTheme.primaryNeon.withValues(alpha: 0.1) : null,
-                        leading: const Icon(Icons.directions_run, color: AppTheme.primaryNeon),
-                        title: const Text('Vận động viên (Runner)', style: TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Chuyên chạy bộ và theo dõi chỉ số cá nhân', style: TextStyle(fontSize: 11)),
-                        trailing: user?.isAdmin != true ? const Icon(Icons.radio_button_checked, color: AppTheme.primaryNeon) : null,
-                        onTap: () => auth.loginAsRunner(),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.secondaryNeon, width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondaryNeon.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.admin_panel_settings_rounded, color: AppTheme.secondaryNeon, size: 28),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        tileColor: user?.isAdmin == true ? AppTheme.secondaryNeon.withValues(alpha: 0.1) : null,
-                        leading: const Icon(Icons.admin_panel_settings, color: AppTheme.secondaryNeon),
-                        title: const Text('Quản trị viên (Admin)', style: TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Xem thống kê ngày/tuần/tháng/năm & sửa KM/thời gian', style: TextStyle(fontSize: 11)),
-                        trailing: user?.isAdmin == true ? const Icon(Icons.radio_button_checked, color: AppTheme.secondaryNeon) : null,
-                        onTap: () => auth.loginAsAdmin(),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TRANG QUẢN TRỊ TOÀN HỆ THỐNG',
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppTheme.secondaryNeon),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Thống kê toàn bộ runner & chỉnh sửa số KM, thời gian',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.secondaryNeon,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (ctx) => const AdminDashboardScreen()),
+                          );
+                        },
+                        child: const Row(
+                          children: [
+                            Text('MỞ', style: TextStyle(fontWeight: FontWeight.bold)),
+                            Icon(Icons.arrow_forward_ios_rounded, size: 12),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 14),
+              ],
 
               // Nút Chỉnh sửa Họ tên & Email
               Container(
@@ -323,7 +528,7 @@ class _MainShellState extends State<MainShell> {
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 24),
 
               // Nút Đăng xuất
               SizedBox(
@@ -341,6 +546,97 @@ class _MainShellState extends State<MainShell> {
               const SizedBox(height: 12),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // Hộp thoại chọn ảnh đại diện (Tải từ điện thoại hoặc chọn mẫu thể thao)
+  void _showAvatarPicker(BuildContext context, AuthProvider auth) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('ĐỔI ẢNH ĐẠI DIỆN', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppTheme.primaryNeon, child: Icon(Icons.photo_library, color: Colors.white)),
+              title: const Text('Chọn ảnh từ Thư viện điện thoại'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  final picker = ImagePicker();
+                  final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
+                  if (image != null) {
+                    auth.updateAvatar(image.path);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật ảnh đại diện!')),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('Lỗi chọn ảnh: $e');
+                }
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppTheme.secondaryNeon, child: Icon(Icons.camera_alt, color: Colors.white)),
+              title: const Text('Chụp ảnh từ Camera'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  final picker = ImagePicker();
+                  final image = await picker.pickImage(source: ImageSource.camera, maxWidth: 600);
+                  if (image != null) {
+                    auth.updateAvatar(image.path);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật ảnh đại diện!')),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('Lỗi chụp ảnh: $e');
+                }
+              },
+            ),
+            const Divider(color: AppTheme.divider),
+            const Text('Hoặc chọn Avatar thể thao mẫu:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+                'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+                'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=150',
+                'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+              ].map((url) {
+                return GestureDetector(
+                  onTap: () {
+                    auth.updateAvatar(url);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(backgroundColor: AppTheme.success, content: Text('✅ Đã cập nhật avatar mẫu!')),
+                    );
+                  },
+                  child: CircleAvatar(
+                    radius: 26,
+                    backgroundImage: NetworkImage(url),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
       ),
     );

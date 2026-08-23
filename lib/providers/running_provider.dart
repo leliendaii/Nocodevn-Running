@@ -369,6 +369,81 @@ class RunningProvider with ChangeNotifier {
     return points;
   }
 
+  /// Lấy danh sách buổi chạy của riêng một người dùng cụ thể
+  List<RunSession> getUserSessions(String userId) {
+    return _sessions.where((s) => s.userId == userId).toList();
+  }
+
+  /// Thống kê biểu đồ của riêng một người dùng cụ thể
+  List<ChartDataPoint> getUserChartData(String userId, TimeFilter filter) {
+    final now = DateTime.now();
+    final List<ChartDataPoint> points = [];
+    final userRuns = getUserSessions(userId);
+
+    switch (filter) {
+      case TimeFilter.day:
+        for (int h = 6; h <= 22; h += 3) {
+          final label = '$h:00';
+          final runs = userRuns.where((s) {
+            return s.startTime.year == now.year &&
+                s.startTime.month == now.month &&
+                s.startTime.day == now.day &&
+                s.startTime.hour >= h - 2 &&
+                s.startTime.hour <= h;
+          });
+          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
+          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+        }
+        break;
+
+      case TimeFilter.week:
+        final weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        for (int i = 1; i <= 7; i++) {
+          final targetDate = now.subtract(Duration(days: now.weekday - i));
+          final runs = userRuns.where((s) {
+            return s.startTime.year == targetDate.year &&
+                s.startTime.month == targetDate.month &&
+                s.startTime.day == targetDate.day;
+          });
+          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
+          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: weekDays[i - 1], distanceKm: dist, durationMinutes: durMin));
+        }
+        break;
+
+      case TimeFilter.month:
+        for (int w = 1; w <= 4; w++) {
+          final label = 'Tuần $w';
+          final startDay = (w - 1) * 7 + 1;
+          final endDay = w * 7;
+          final runs = userRuns.where((s) {
+            return s.startTime.year == now.year &&
+                s.startTime.month == now.month &&
+                s.startTime.day >= startDay &&
+                s.startTime.day <= endDay;
+          });
+          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
+          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+        }
+        break;
+
+      case TimeFilter.year:
+        for (int m = 1; m <= 12; m++) {
+          final label = 'T$m';
+          final runs = userRuns.where((s) {
+            return s.startTime.year == now.year && s.startTime.month == m;
+          });
+          final dist = runs.fold(0.0, (sum, r) => sum + r.distanceKm);
+          final durMin = runs.fold(0, (sum, r) => sum + r.durationSeconds) / 60.0;
+          points.add(ChartDataPoint(label: label, distanceKm: dist, durationMinutes: durMin));
+        }
+        break;
+    }
+    return points;
+  }
+
   // Dữ liệu khởi đầu trắng hoàn toàn (dữ liệu thật sẽ tải từ Supabase Cloud)
   void _initMockData() {
     // Không nạp dữ liệu mẫu nào

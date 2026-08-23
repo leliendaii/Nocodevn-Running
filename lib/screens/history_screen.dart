@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
@@ -11,7 +12,10 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final running = context.watch<RunningProvider>();
-    final sessions = running.allSessions;
+    final currentUser = context.watch<AuthProvider>().currentUser;
+    final sessions = currentUser != null
+        ? running.getUserSessions(currentUser.id)
+        : running.allSessions;
     final double totalKm = sessions.fold(0.0, (sum, s) => sum + s.distanceKm);
     final int totalSeconds = sessions.fold(0, (sum, s) => sum + s.durationSeconds);
     final int hours = totalSeconds ~/ 3600;

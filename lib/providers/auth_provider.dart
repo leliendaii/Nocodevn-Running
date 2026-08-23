@@ -198,6 +198,30 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
+  /// Cập nhật ảnh đại diện
+  void updateAvatar(String newAvatarUrl) {
+    if (_currentUser == null) return;
+
+    final updatedUser = AppUser(
+      id: _currentUser!.id,
+      name: _currentUser!.name,
+      email: _currentUser!.email,
+      role: _currentUser!.role,
+      avatarUrl: newAvatarUrl,
+    );
+
+    final email = _currentUser!.email.toLowerCase();
+    if (_accounts.containsKey(email)) {
+      _accounts[email] = RegisteredAccount(
+        user: updatedUser,
+        password: _accounts[email]!.password,
+      );
+    }
+
+    _currentUser = updatedUser;
+    notifyListeners();
+  }
+
   void logout() {
     _currentUser = null;
     notifyListeners();
