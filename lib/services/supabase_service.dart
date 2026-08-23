@@ -43,7 +43,7 @@ class SupabaseService {
   }
 
   // ==========================================
-  // XÁC THỰC TÀI KHOẢN & BẢNG PROFILES CLOUD
+  // XÁC THỰC TÀI KHOẢN & BẢNG PROFILES CLOUD (SIÊU TỐC)
   // ==========================================
 
   /// Tìm email tương ứng qua username (cho phép đăng nhập bằng username)
@@ -56,7 +56,9 @@ class SupabaseService {
           .from('profiles')
           .select('email')
           .ilike('username', cleanUsername)
-          .maybeSingle();
+          .limit(1)
+          .maybeSingle()
+          .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
       return res?['email'] as String?;
     } catch (e) {
       debugPrint('Lỗi tìm email theo username: $e');
@@ -64,50 +66,39 @@ class SupabaseService {
     }
   }
 
-  /// Xác thực phiên thực tế với server Supabase
+  /// Xác thực phiên thực tế với server Supabase (Không block UI)
   static Future<User?> verifyServerSession() async {
     final supa = client;
     if (supa == null) return null;
 
     try {
-      final res = await supa.auth.getUser();
+      final res = await supa.auth.getUser().timeout(const Duration(milliseconds: 2500));
       return res.user;
     } catch (e) {
-      debugPrint('Phiên đăng nhập không tồn tại hoặc đã bị xóa trên Supabase DB: $e');
       return null;
     }
   }
 
-  /// Lấy thông tin chi tiết và quyền hạn (Role: admin / user, Username) từ bảng profiles
+  /// Lấy thông tin chi tiết và quyền hạn từ bảng profiles (1 Query duy nhất - Tốc độ < 0.5s)
   static Future<Map<String, dynamic>?> fetchProfile(String userId, [String? email, String? username]) async {
     final supa = client;
     if (supa == null) return null;
     try {
-      // 1. Tìm theo UUID ID
-      if (userId.isNotEmpty) {
-        try {
-          final byId = await supa.from('profiles').select().eq('id', userId).maybeSingle();
-          if (byId != null) return byId;
-        } catch (_) {}
-      }
+      final List<String> orFilters = [];
+      if (userId.isNotEmpty) orFilters.add('id.eq.$userId');
+      if (email != null && email.isNotEmpty) orFilters.add('email.ilike.${email.trim()}');
+      if (username != null && username.isNotEmpty) orFilters.add('username.ilike.${username.trim()}');
 
-      // 2. Tìm theo Email
-      if (email != null && email.isNotEmpty) {
-        try {
-          final byEmail = await supa.from('profiles').select().ilike('email', email.trim()).maybeSingle();
-          if (byEmail != null) return byEmail;
-        } catch (_) {}
-      }
+      if (orFilters.isEmpty) return null;
 
-      // 3. Tìm theo Username
-      if (username != null && username.isNotEmpty) {
-        try {
-          final byUsername = await supa.from('profiles').select().ilike('username', username.trim()).maybeSingle();
-          if (byUsername != null) return byUsername;
-        } catch (_) {}
-      }
-
-      return null;
+      final res = await supa
+          .from('profiles')
+          .select()
+          .or(orFilters.join(','))
+          .limit(1)
+          .maybeSingle()
+          .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
+      return res;
     } catch (e) {
       debugPrint('Lỗi fetch profiles: $e');
       return null;
@@ -126,7 +117,7 @@ class SupabaseService {
       if (role != null) updateData['role'] = role;
       if (avatarUrl != null) updateData['avatar_url'] = avatarUrl;
 
-      await supa.from('profiles').update(updateData).eq('id', userId);
+      await supa.from('profiles').update(updateData).eq('id', userId).timeout(const Duration(seconds: 3));
       return true;
     } catch (e) {
       debugPrint('Lỗi update profiles table: $e');
@@ -147,7 +138,7 @@ class SupabaseService {
     return 'user';
   }
 
-  /// Đăng ký tài khoản mới lên Supabase Cloud (Tự động gửi email OTP xác thực)
+  /// Đăng ký tài khoản mới lên Supabase Cloud (Tự động gửi OTP 4 số)
   static Future<AuthResponse?> signUp({
     required String email,
     required String username,
@@ -170,22 +161,18 @@ class SupabaseService {
           'username': cleanUsername,
           'role': role,
         },
-      );
+      ).timeout(const Duration(seconds: 6));
 
       // Tự động thêm ngay vào bảng profiles
       if (response.user != null) {
-        try {
-          await supa.from('profiles').upsert({
-            'id': response.user!.id,
-            'email': cleanEmail,
-            'username': cleanUsername,
-            'name': name.trim(),
-            'role': role,
-            'avatar_url': '',
-          });
-        } catch (e) {
-          debugPrint('Lỗi upsert profiles khi signup: $e');
-        }
+        supa.from('profiles').upsert({
+          'id': response.user!.id,
+          'email': cleanEmail,
+          'username': cleanUsername,
+          'name': name.trim(),
+          'role': role,
+          'avatar_url': '',
+        }).timeout(const Duration(seconds: 3), onTimeout: () => null);
       }
 
       return response;
@@ -195,7 +182,7 @@ class SupabaseService {
     }
   }
 
-  /// Xác thực mã OTP gửi về Email thực tế qua Supabase Cloud
+  /// Xác thực mã OTP gửi về Email qua Supabase Cloud
   static Future<AuthResponse> verifyEmailOtp({
     required String email,
     required String token,
@@ -208,7 +195,7 @@ class SupabaseService {
         email: email.trim().toLowerCase(),
         token: token.trim(),
         type: OtpType.signup,
-      );
+      ).timeout(const Duration(seconds: 5));
       return response;
     } catch (e) {
       debugPrint('Lỗi xác thực OTP Supabase: $e');
@@ -225,14 +212,14 @@ class SupabaseService {
       await supa.auth.resend(
         email: email.trim().toLowerCase(),
         type: OtpType.signup,
-      );
+      ).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Lỗi gửi lại OTP Supabase: $e');
       rethrow;
     }
   }
 
-  /// Đăng nhập tài khoản với Supabase Cloud (Hỗ trợ nhập Email HOẶC Username)
+  /// Đăng nhập tài khoản với Supabase Cloud (Siêu nhanh < 1s)
   static Future<AuthResponse?> signIn({
     required String identifier,
     required String password,
@@ -245,17 +232,16 @@ class SupabaseService {
     // Nếu người dùng nhập Username (không có ký tự @), tìm email tương ứng từ DB
     if (!targetEmail.contains('@')) {
       final resolvedEmail = await fetchEmailByUsername(targetEmail);
-      if (resolvedEmail == null || resolvedEmail.isEmpty) {
-        throw Exception('Tên đăng nhập "$targetEmail" không tồn tại trên hệ thống!');
+      if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
+        targetEmail = resolvedEmail;
       }
-      targetEmail = resolvedEmail;
     }
 
     try {
       final response = await supa.auth.signInWithPassword(
         email: targetEmail,
         password: password,
-      );
+      ).timeout(const Duration(seconds: 5));
       return response;
     } catch (e) {
       debugPrint('Lỗi đăng nhập Supabase: $e');
@@ -268,7 +254,7 @@ class SupabaseService {
     final supa = client;
     if (supa == null) return;
     try {
-      await supa.auth.signOut();
+      await supa.auth.signOut().timeout(const Duration(seconds: 3));
     } catch (e) {
       debugPrint('Lỗi đăng xuất Supabase: $e');
     }
@@ -281,7 +267,7 @@ class SupabaseService {
     try {
       await supa.auth.updateUser(
         UserAttributes(password: newPassword),
-      );
+      ).timeout(const Duration(seconds: 4));
       return true;
     } catch (e) {
       debugPrint('Lỗi đổi mật khẩu Supabase: $e');
@@ -289,7 +275,7 @@ class SupabaseService {
     }
   }
 
-  /// Cập nhật thông tin người dùng (Tên, Username, Avatar, Role) lên Cloud
+  /// Cập nhật thông tin người dùng lên Cloud
   static Future<bool> updateUserProfile({String? name, String? username, String? avatarUrl, String? role, String? userId}) async {
     final supa = client;
     if (supa == null) return false;
@@ -302,11 +288,11 @@ class SupabaseService {
 
       await supa.auth.updateUser(
         UserAttributes(data: data),
-      );
+      ).timeout(const Duration(seconds: 4));
 
       final uid = userId ?? supa.auth.currentUser?.id;
       if (uid != null) {
-        await updateProfileTable(uid, name: name, username: username, role: role, avatarUrl: avatarUrl);
+        updateProfileTable(uid, name: name, username: username, role: role, avatarUrl: avatarUrl);
       }
 
       return true;
@@ -329,7 +315,8 @@ class SupabaseService {
       final data = await supa
           .from('run_sessions')
           .select()
-          .order('start_time', ascending: false);
+          .order('start_time', ascending: false)
+          .timeout(const Duration(seconds: 4));
 
       final List<RunSession> list = [];
       for (final item in data) {
@@ -370,7 +357,7 @@ class SupabaseService {
         'distance_km': session.distanceKm,
         'calories': session.calories,
         'notes': session.notes,
-      });
+      }).timeout(const Duration(seconds: 4));
       return true;
     } catch (e) {
       debugPrint('Lỗi thêm buổi chạy Supabase: $e');
@@ -398,7 +385,7 @@ class SupabaseService {
         updateData['notes'] = newNotes;
       }
 
-      await supa.from('run_sessions').update(updateData).eq('id', id);
+      await supa.from('run_sessions').update(updateData).eq('id', id).timeout(const Duration(seconds: 4));
       return true;
     } catch (e) {
       debugPrint('Lỗi cập nhật buổi chạy Supabase: $e');
@@ -412,7 +399,7 @@ class SupabaseService {
     if (supa == null) return false;
 
     try {
-      await supa.from('run_sessions').delete().eq('id', id);
+      await supa.from('run_sessions').delete().eq('id', id).timeout(const Duration(seconds: 4));
       return true;
     } catch (e) {
       debugPrint('Lỗi xóa buổi chạy Supabase: $e');

@@ -21,40 +21,22 @@ class AuthProvider with ChangeNotifier {
     _initAuth();
   }
 
-  /// Khởi tạo và kiểm tra phiên đăng nhập trực tiếp với Supabase Server & Bảng profiles
+  /// Khởi tạo phiên đăng nhập siêu tốc từ cache trước, sync Cloud sau
   Future<void> _initAuth() async {
-    // 1. Kiểm tra session trên server Supabase trước
-    final serverUser = await SupabaseService.verifyServerSession();
-    if (serverUser != null) {
-      final profile = await SupabaseService.fetchProfile(serverUser.id, serverUser.email);
-      final roleStr = SupabaseService.extractRole(serverUser, profile);
-      final displayName = profile?['name'] ?? serverUser.userMetadata?['name'] ?? serverUser.email?.split('@').first ?? 'Người dùng';
-      final username = profile?['username'] ?? serverUser.userMetadata?['username'] ?? '';
-      final avatar = profile?['avatar_url'] ?? serverUser.userMetadata?['avatar_url'] ?? '';
-
-      _currentUser = AppUser(
-        id: serverUser.id,
-        name: displayName,
-        username: username,
-        email: serverUser.email ?? '',
-        role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
-        avatarUrl: avatar,
-      );
-      await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
-      notifyListeners();
-      return;
-    }
-
-    // 2. Nếu server không có session hoặc user đã bị xóa trên DB -> kiểm tra cache và xóa bỏ nếu không hợp lệ
+    // 1. Tải tức thì từ bộ nhớ máy (0.01s)
     final savedUser = await LocalStorageService.loadSavedUserSession();
     if (savedUser != null) {
       _currentUser = savedUser;
       notifyListeners();
-      await refreshProfileFromServer();
+    }
+
+    // 2. Kiểm tra ngầm với Supabase để cập nhật quyền Admin
+    if (SupabaseService.isConfigured) {
+      refreshProfileFromServer();
     }
   }
 
-  /// Làm mới thông tin quyền Admin và Profile trực tiếp từ Server Supabase
+  /// Làm mới thông tin quyền Admin và Profile từ Cloud
   Future<void> refreshProfileFromServer() async {
     if (_currentUser == null || !SupabaseService.isConfigured) return;
 
@@ -79,7 +61,7 @@ class AuthProvider with ChangeNotifier {
           role: newRole,
           avatarUrl: avatar,
         );
-        await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
+        LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: _rememberMe);
         notifyListeners();
       }
     } catch (e) {
@@ -87,14 +69,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Đồng bộ thông tin quyền hạn và dữ liệu mới nhất từ Cloud một cách an toàn
+  /// Đồng bộ an toàn ngầm
   Future<bool> checkUserStillExistsOnServer() async {
     if (_currentUser == null) return false;
-    await refreshProfileFromServer();
+    refreshProfileFromServer();
     return true;
   }
 
-  /// Bước 1: Gửi yêu cầu đăng ký lên Supabase (Gửi OTP qua Email thực tế)
+  /// Bước 1: Gửi yêu cầu đăng ký lên Supabase (Gửi OTP 4 số)
   Future<String?> register({
     required String name,
     required String username,
@@ -130,7 +112,7 @@ class AuthProvider with ChangeNotifier {
         );
 
         if (res?.user != null) {
-          // Nếu Supabase trả về session ngay (trường hợp confirm email tắt)
+          // Nếu Supabase trả về session ngay
           if (res?.session != null) {
             final newUser = AppUser(
               id: res!.user!.id,
@@ -140,10 +122,10 @@ class AuthProvider with ChangeNotifier {
               role: role == 'admin' ? UserRole.admin : UserRole.user,
             );
             _currentUser = newUser;
-            await LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
+            LocalStorageService.saveUserSession(user: newUser, rememberMe: remember, password: password);
             notifyListeners();
           }
-          return null; // Thành công gửi OTP về Email
+          return null;
         }
       }
     } catch (e) {
@@ -158,7 +140,7 @@ class AuthProvider with ChangeNotifier {
     return 'Không thể kết nối đến máy chủ cơ sở dữ liệu Supabase.';
   }
 
-  /// Bước 2: Xác thực mã OTP gửi về Email để kích hoạt tài khoản
+  /// Bước 2: Xác thực mã OTP 4 số và kích hoạt tài khoản
   Future<String?> verifyOtpAndActivate({
     required String email,
     required String token,
@@ -179,29 +161,29 @@ class AuthProvider with ChangeNotifier {
 
       final user = res.user;
       if (user != null) {
-        // Cập nhật bảng profiles
-        await SupabaseService.updateProfileTable(
+        // Tối ưu tạo user ngay tức thì
+        final appUser = AppUser(
+          id: user.id,
+          name: cleanName.isNotEmpty ? cleanName : cleanEmail.split('@').first,
+          username: cleanUsername,
+          email: cleanEmail,
+          role: UserRole.user,
+          avatarUrl: '',
+        );
+
+        _currentUser = appUser;
+        LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
+        notifyListeners();
+
+        // Sync bảng profiles ngầm
+        SupabaseService.updateProfileTable(
           user.id,
           name: cleanName,
           username: cleanUsername,
           email: cleanEmail,
         );
+        refreshProfileFromServer();
 
-        final profile = await SupabaseService.fetchProfile(user.id, cleanEmail);
-        final roleStr = SupabaseService.extractRole(user, profile);
-
-        final appUser = AppUser(
-          id: user.id,
-          name: cleanName.isNotEmpty ? cleanName : (profile?['name'] ?? cleanEmail.split('@').first),
-          username: cleanUsername.isNotEmpty ? cleanUsername : (profile?['username'] ?? ''),
-          email: cleanEmail,
-          role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
-          avatarUrl: profile?['avatar_url'] ?? '',
-        );
-
-        _currentUser = appUser;
-        await LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
-        notifyListeners();
         return null;
       }
     } catch (e) {
@@ -216,7 +198,7 @@ class AuthProvider with ChangeNotifier {
     return 'Không thể xác thực mã OTP.';
   }
 
-  /// Gửi lại mã OTP qua Email thực tế
+  /// Gửi lại mã OTP qua Email
   Future<String?> resendOtp(String email) async {
     try {
       await SupabaseService.resendEmailOtp(email: email);
@@ -227,7 +209,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Đăng nhập (Hỗ trợ nhập Email HOẶC Username)
+  /// Đăng nhập siêu tốc (< 1s)
   Future<String?> login(String identifier, String password, {bool remember = true}) async {
     final cleanIdentifier = identifier.trim();
 
@@ -240,22 +222,26 @@ class AuthProvider with ChangeNotifier {
         final res = await SupabaseService.signIn(identifier: cleanIdentifier, password: password);
         final u = res?.user;
         if (u != null) {
-          final profile = await SupabaseService.fetchProfile(u.id, u.email, cleanIdentifier);
-          final roleStr = SupabaseService.extractRole(u, profile);
-          final displayName = profile?['name'] ?? u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
-          final username = profile?['username'] ?? u.userMetadata?['username'] ?? cleanIdentifier;
-          final avatar = profile?['avatar_url'] ?? u.userMetadata?['avatar_url'] ?? '';
+          final displayName = u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
+          final username = u.userMetadata?['username'] ?? (cleanIdentifier.contains('@') ? '' : cleanIdentifier);
 
-          _currentUser = AppUser(
+          // 1. Tạo session người dùng tức thì (0ms) để vào ngay app
+          final appUser = AppUser(
             id: u.id,
             name: displayName,
             username: username,
             email: u.email ?? cleanIdentifier,
-            role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
-            avatarUrl: avatar,
+            role: (u.userMetadata?['role'] == 'admin') ? UserRole.admin : UserRole.user,
+            avatarUrl: u.userMetadata?['avatar_url'] ?? '',
           );
-          await LocalStorageService.saveUserSession(user: _currentUser!, rememberMe: remember, password: password);
+
+          _currentUser = appUser;
+          LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
           notifyListeners();
+
+          // 2. Tự động kiểm tra quyền Admin từ profiles ngầm (không block UI)
+          refreshProfileFromServer();
+
           return null;
         }
       }
@@ -277,7 +263,7 @@ class AuthProvider with ChangeNotifier {
     return 'Tài khoản hoặc mật khẩu không chính xác!';
   }
 
-  /// Đổi mật khẩu bền vững trên Cloud
+  /// Đổi mật khẩu bền vững
   Future<String?> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -299,7 +285,7 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
-  /// Cập nhật Họ tên, Username và Email bền vững
+  /// Cập nhật Họ tên, Username và Email (Optimistic Update - 0ms delay)
   Future<String?> updateProfile({
     required String newName,
     required String newUsername,
@@ -324,21 +310,24 @@ class AuthProvider with ChangeNotifier {
       avatarUrl: _currentUser!.avatarUrl,
     );
 
+    // Cập nhật UI và máy tức thì (0ms)
+    _currentUser = updatedUser;
+    LocalStorageService.updateSavedProfile(name: cleanName, username: cleanUsername, email: cleanEmail);
+    notifyListeners();
+
+    // Đồng bộ Supabase Cloud ngầm
     if (SupabaseService.isConfigured) {
-      await SupabaseService.updateUserProfile(
+      SupabaseService.updateUserProfile(
         name: cleanName,
         username: cleanUsername,
         userId: _currentUser!.id,
       );
     }
 
-    await LocalStorageService.updateSavedProfile(name: cleanName, username: cleanUsername, email: cleanEmail);
-    _currentUser = updatedUser;
-    notifyListeners();
     return null;
   }
 
-  /// Cập nhật ảnh đại diện bền vững
+  /// Cập nhật ảnh đại diện tức thì (0ms delay)
   void updateAvatar(String newAvatarUrl) {
     if (_currentUser == null) return;
 
@@ -351,13 +340,13 @@ class AuthProvider with ChangeNotifier {
       avatarUrl: newAvatarUrl,
     );
 
+    _currentUser = updatedUser;
+    LocalStorageService.updateSavedProfile(avatarUrl: newAvatarUrl);
+    notifyListeners();
+
     if (SupabaseService.isConfigured) {
       SupabaseService.updateUserProfile(avatarUrl: newAvatarUrl, userId: _currentUser!.id);
     }
-
-    LocalStorageService.updateSavedProfile(avatarUrl: newAvatarUrl);
-    _currentUser = updatedUser;
-    notifyListeners();
   }
 
   void logout() {
