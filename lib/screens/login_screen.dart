@@ -126,13 +126,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 18),
                 const Text(
-                  'RUN TRACKER PRO',
+                  'NOCODE RUNNING',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 26,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 2.0,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.primaryNeon,
                   ),
                 ),
                 const SizedBox(height: 6),

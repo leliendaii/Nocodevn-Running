@@ -150,7 +150,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('RUN TRACKER'),
+        title: const Text('NOCODE RUNNING'),
         actions: [
           IconButton(
             tooltip: 'Đăng xuất',

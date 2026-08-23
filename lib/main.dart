@@ -27,7 +27,7 @@ class RunningTrackerApp extends StatelessWidget {
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {
           return MaterialApp(
-            title: 'Run Tracker Pro',
+            title: 'Nocode Running',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
             home: auth.isAuthenticated ? const MainShell() : const LoginScreen(),
