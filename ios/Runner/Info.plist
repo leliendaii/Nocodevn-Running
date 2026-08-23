@@ -16,6 +16,14 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>running_tracker</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần quyền GPS để đo quãng đường và tốc độ khi bạn chạy bộ.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Ứng dụng cần quyền vị trí để tiếp tục tính km khi bạn tắt màn hình hoặc chạy ngầm.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

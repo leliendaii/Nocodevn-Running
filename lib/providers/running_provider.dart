@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/run_session.dart';
 import '../services/supabase_service.dart';
 
@@ -29,7 +29,8 @@ class RunningProvider with ChangeNotifier {
   DateTime? _runStartTime;
   Timer? _timer;
   final List<RunPoint> _currentRoute = [];
-  double _simulatedAngle = 0.0;
+  Position? _lastPosition;
+  StreamSubscription<Position>? _positionStream;
 
   // Danh sách toàn bộ lịch sử các buổi chạy (có sẵn dữ liệu mẫu thực tế)
   final List<RunSession> _sessions = [];
@@ -77,44 +78,70 @@ class RunningProvider with ChangeNotifier {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  // Bắt đầu chạy
-  void startTracking() {
+  // Bắt đầu chạy đo GPS thực tế
+  Future<void> startTracking() async {
     _state = TrackingState.running;
     _durationSeconds = 0;
     _distanceKm = 0.0;
     _calories = 0;
     _runStartTime = DateTime.now();
     _currentRoute.clear();
-    _simulatedAngle = 0.0;
-    _currentRoute.add(const RunPoint(0, 0));
+    _lastPosition = null;
 
+    // Timer chỉ đếm thời gian (giây), KHÔNG tự tăng Km nếu người dùng đứng yên
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_state == TrackingState.running) {
         _durationSeconds++;
-
-        // Mô phỏng tốc độ chạy thực tế ~ 10-12 km/h khi test dev
-        // (tương đương ~3 mét mỗi giây)
-        final double deltaDistance = 0.003 + (Random().nextDouble() * 0.001);
-        _distanceKm += deltaDistance;
-
-        // Tính calo dựa trên quãng đường chạy (trung bình ~62 kcal/km)
-        _calories = (_distanceKm * 62).round();
-
-        // Tạo điểm lộ trình chạy mô phỏng
-        _simulatedAngle += (Random().nextDouble() - 0.5) * 0.2;
-        final double lastX = _currentRoute.isNotEmpty ? _currentRoute.last.x : 0;
-        final double lastY = _currentRoute.isNotEmpty ? _currentRoute.last.y : 0;
-        _currentRoute.add(
-          RunPoint(
-            lastX + cos(_simulatedAngle) * 2,
-            lastY + sin(_simulatedAngle) * 2,
-          ),
-        );
-
         notifyListeners();
       }
     });
+
+    // Lắng nghe tín hiệu GPS thực tế từ iPhone
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
+        const locationSettings = LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 2, // Chỉ ghi nhận khi di chuyển tối thiểu 2m
+        );
+
+        _positionStream?.cancel();
+        _positionStream = Geolocator.getPositionStream(
+          locationSettings: locationSettings,
+        ).listen((Position position) {
+          if (_state != TrackingState.running) return;
+
+          if (_lastPosition != null) {
+            final double distanceInMeters = Geolocator.distanceBetween(
+              _lastPosition!.latitude,
+              _lastPosition!.longitude,
+              position.latitude,
+              position.longitude,
+            );
+
+            // Lọc nhiễu đứng yên: Chỉ cộng Km khi di chuyển thật > 1.5 mét
+            if (distanceInMeters >= 1.5 && position.accuracy <= 35.0) {
+              _distanceKm += distanceInMeters / 1000.0;
+              _calories = (_distanceKm * 62).round();
+              _currentRoute.add(RunPoint(position.longitude, position.latitude));
+            }
+          } else {
+            _currentRoute.add(RunPoint(position.longitude, position.latitude));
+          }
+
+          _lastPosition = position;
+          notifyListeners();
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi GPS: $e');
+    }
 
     notifyListeners();
   }
@@ -122,12 +149,14 @@ class RunningProvider with ChangeNotifier {
   // Tạm dừng chạy
   void pauseTracking() {
     _state = TrackingState.paused;
+    _positionStream?.pause();
     notifyListeners();
   }
 
   // Tiếp tục chạy
   void resumeTracking() {
     _state = TrackingState.running;
+    _positionStream?.resume();
     notifyListeners();
   }
 
@@ -139,6 +168,9 @@ class RunningProvider with ChangeNotifier {
   }) {
     _timer?.cancel();
     _timer = null;
+    _positionStream?.cancel();
+    _positionStream = null;
+    _lastPosition = null;
 
     final RunSession newSession = RunSession(
       id: 'run_${DateTime.now().millisecondsSinceEpoch}',
@@ -166,6 +198,9 @@ class RunningProvider with ChangeNotifier {
   void resetTracking() {
     _timer?.cancel();
     _timer = null;
+    _positionStream?.cancel();
+    _positionStream = null;
+    _lastPosition = null;
     _state = TrackingState.idle;
     _durationSeconds = 0;
     _distanceKm = 0.0;
