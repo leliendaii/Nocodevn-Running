@@ -35,8 +35,9 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
   late int _resendAttempts;
   bool _isSubmitting = false;
 
-  final TextEditingController _otpController = TextEditingController();
-  final FocusNode _otpFocusNode = FocusNode();
+  // ĐỒNG BỘ CHUẨN 6 Ô NHẬP MÃ OTP KHỚP 100% SUPABASE
+  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
   @override
   void initState() {
@@ -48,8 +49,12 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
   @override
   void dispose() {
     _otpTimer?.cancel();
-    _otpController.dispose();
-    _otpFocusNode.dispose();
+    for (var c in _otpControllers) {
+      c.dispose();
+    }
+    for (var f in _otpFocusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -68,7 +73,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
     });
   }
 
-  // Gửi lại mã OTP qua Email
+  // Gửi lại mã OTP 6 số qua Email thực tế
   Future<void> _resendOtp() async {
     if (_resendAttempts >= 5) {
       final lockUntil = DateTime.now().add(const Duration(hours: 1));
@@ -84,7 +89,10 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
 
     _resendAttempts++;
     widget.onAttemptIncrement();
-    _otpController.clear();
+
+    for (var c in _otpControllers) {
+      c.clear();
+    }
 
     final error = await context.read<AuthProvider>().resendOtp(widget.email);
     if (!mounted) return;
@@ -95,20 +103,20 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
       _startCountdown();
       TopSyncToast.show(
         context,
-        message: 'Đã gửi lại mã OTP tới email: ${widget.email}',
+        message: 'Đã gửi lại mã OTP 6 số tới: ${widget.email}',
         isSuccess: true,
       );
     }
   }
 
-  // Xác thực mã OTP (Hỗ trợ linh hoạt từ 4 đến 8 số)
+  // Xác thực mã OTP 6 số và kích hoạt tài khoản
   Future<void> _verifyOtpAndRegister() async {
-    final enteredOtp = _otpController.text.trim();
+    final enteredOtp = _otpControllers.map((c) => c.text.trim()).join();
 
-    if (enteredOtp.length < 4) {
+    if (enteredOtp.length < 6) {
       TopSyncToast.show(
         context,
-        message: 'Vui lòng nhập mã OTP nhận được trong Email!',
+        message: 'Vui lòng nhập đủ 6 chữ số OTP từ Email!',
         isSuccess: false,
       );
       return;
@@ -147,7 +155,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
       Navigator.of(context).pop();
       TopSyncToast.show(
         context,
-        message: '🎉 Kích hoạt tài khoản thành công!',
+        message: '🎉 Xác thực Email thành công! Đã kích hoạt tài khoản.',
         isSuccess: true,
       );
     }
@@ -162,7 +170,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
         side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -183,9 +191,9 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                     ),
                   ),
                   const Text(
-                    'XÁC THỰC MÃ OTP',
+                    'XÁC THỰC MÃ OTP (6 SỐ)',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.8,
                       color: AppTheme.primaryNeon,
@@ -199,55 +207,59 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Nhập mã xác nhận nhận được từ email:\n${widget.email}',
+                'Mã xác nhận 6 số đã được gửi tới email:\n${widget.email}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 20),
 
-              // Ô NHẬP MÃ OTP LINH HOẠT THỂ THAO (HỖ TRỢ DÁN / GÕ 4 ĐẾN 8 SỐ)
-              Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.primaryNeon, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                      blurRadius: 16,
-                      spreadRadius: 2,
+              // 6 Ô NHẬP MÃ OTP CHUẨN ĐẸP KHỚP 100% SUPABASE
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(6, (index) {
+                  return SizedBox(
+                    width: 44,
+                    height: 54,
+                    child: TextField(
+                      controller: _otpControllers[index],
+                      focusNode: _otpFocusNodes[index],
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      maxLength: 1,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryNeon,
+                      ),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        filled: true,
+                        fillColor: AppTheme.surfaceLight,
+                        contentPadding: EdgeInsets.zero,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppTheme.divider, width: 1.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppTheme.primaryNeon, width: 2),
+                        ),
+                      ),
+                      onChanged: (val) {
+                        if (val.isNotEmpty && index < 5) {
+                          _otpFocusNodes[index + 1].requestFocus();
+                        } else if (val.isEmpty && index > 0) {
+                          _otpFocusNodes[index - 1].requestFocus();
+                        }
+                        if (_otpControllers.every((c) => c.text.isNotEmpty)) {
+                          _verifyOtpAndRegister();
+                        }
+                      },
                     ),
-                  ],
-                ),
-                child: TextField(
-                  controller: _otpController,
-                  focusNode: _otpFocusNode,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 8,
-                  autofocus: true,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 8.0,
-                    color: AppTheme.primaryNeon,
-                    fontFamily: 'monospace',
-                  ),
-                  decoration: const InputDecoration(
-                    counterText: '',
-                    hintText: '• • • •',
-                    hintStyle: TextStyle(
-                      fontSize: 26,
-                      color: AppTheme.textMuted,
-                      letterSpacing: 6.0,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                  ),
-                  onSubmitted: (_) => _verifyOtpAndRegister(),
-                ),
+                  );
+                }),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               // ĐỒNG HỒ ĐẾM NGƯỢC 60 GIÂY
               Container(
