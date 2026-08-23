@@ -36,11 +36,12 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     final email = _loginEmailController.text.trim();
     final password = _loginPasswordController.text.trim();
 
-    final error = context.read<AuthProvider>().login(email, password);
+    final error = await context.read<AuthProvider>().login(email, password);
+    if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -51,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     final name = _regNameController.text.trim();
     final email = _regEmailController.text.trim();
     final pass = _regPasswordController.text.trim();
@@ -67,12 +68,13 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final error = context.read<AuthProvider>().register(
+    final error = await context.read<AuthProvider>().register(
       name: name,
       email: email,
       password: pass,
     );
 
+    if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

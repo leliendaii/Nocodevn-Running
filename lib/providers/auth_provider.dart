@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
+import '../services/supabase_service.dart';
 
 class RegisteredAccount {
   final AppUser user;
@@ -10,9 +11,8 @@ class RegisteredAccount {
 
 class AuthProvider with ChangeNotifier {
   AppUser? _currentUser;
-  String _adminPassword = 'admin'; // Mật khẩu mặc định của Admin
+  String _adminPassword = 'admin';
 
-  // Danh sách tài khoản đã đăng ký trong hệ thống
   final Map<String, RegisteredAccount> _accounts = {};
 
   AppUser? get currentUser => _currentUser;
@@ -21,7 +21,11 @@ class AuthProvider with ChangeNotifier {
   String get adminPassword => _adminPassword;
 
   AuthProvider() {
-    // Khởi tạo tài khoản Admin mặc định
+    _initDefaultAdmin();
+    _checkExistingSession();
+  }
+
+  void _initDefaultAdmin() {
     _accounts['admin@running.app'] = RegisteredAccount(
       user: const AppUser(
         id: 'admin_01',
@@ -33,35 +37,32 @@ class AuthProvider with ChangeNotifier {
     );
   }
 
-  void loginAsRunner() {
-    _currentUser = const AppUser(
-      id: 'runner_01',
-      name: 'Vận Động Viên',
-      email: 'runner@running.app',
-      role: UserRole.user,
-    );
-    notifyListeners();
+  void _checkExistingSession() {
+    final supaUser = SupabaseService.currentAuthUser;
+    if (supaUser != null) {
+      final meta = supaUser.userMetadata ?? {};
+      final roleStr = meta['role'] as String? ?? (supaUser.email?.contains('admin') == true ? 'admin' : 'user');
+      _currentUser = AppUser(
+        id: supaUser.id,
+        name: meta['name'] as String? ?? supaUser.email?.split('@').first ?? 'Người dùng',
+        email: supaUser.email ?? '',
+        role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
+        avatarUrl: (meta['avatar_url'] as String?) ?? '',
+      );
+      notifyListeners();
+    }
   }
 
-  void loginAsAdmin() {
-    _currentUser = _accounts['admin@running.app']?.user ??
-        const AppUser(
-          id: 'admin_01',
-          name: 'Ban Quản Trị',
-          email: 'admin@running.app',
-          role: UserRole.admin,
-        );
-    notifyListeners();
-  }
-
-  /// Đăng ký tài khoản User mới
-  String? register({
+  /// Đăng ký tài khoản User / Admin mới (Mật khẩu được băm và mã hóa trên Cloud)
+  Future<String?> register({
     required String name,
     required String email,
     required String password,
-  }) {
+  }) async {
     final cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail.isEmpty || name.trim().isEmpty || password.isEmpty) {
+    final cleanName = name.trim();
+
+    if (cleanEmail.isEmpty || cleanName.isEmpty || password.isEmpty) {
       return 'Vui lòng điền đầy đủ tất cả các trường thông tin.';
     }
 
@@ -69,59 +70,106 @@ class AuthProvider with ChangeNotifier {
       return 'Mật khẩu phải có ít nhất 6 ký tự.';
     }
 
+    final isUserAdmin = cleanEmail.contains('admin');
+
+    // Đăng ký trực tiếp lên Supabase Cloud với mật khẩu đã mã hóa băm chuẩn
+    try {
+      if (SupabaseService.isConfigured) {
+        final res = await SupabaseService.signUp(
+          email: cleanEmail,
+          password: password,
+          name: cleanName,
+          role: isUserAdmin ? 'admin' : 'user',
+        );
+
+        if (res?.user != null) {
+          final newUser = AppUser(
+            id: res!.user!.id,
+            name: cleanName,
+            email: cleanEmail,
+            role: isUserAdmin ? UserRole.admin : UserRole.user,
+          );
+
+          _accounts[cleanEmail] = RegisteredAccount(user: newUser, password: password);
+          _currentUser = newUser;
+          notifyListeners();
+          return null;
+        }
+      }
+    } catch (e) {
+      debugPrint('Supabase signup error (fallback to local): $e');
+    }
+
+    // Fallback lưu cục bộ nếu offline hoặc Supabase trả về lỗi
     if (_accounts.containsKey(cleanEmail)) {
-      return 'Email này đã được đăng ký trong hệ thống.';
+      return 'Email này đã tồn tại trong hệ thống.';
     }
 
     final newUser = AppUser(
       id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-      name: name.trim(),
+      name: cleanName,
       email: cleanEmail,
-      role: cleanEmail.contains('admin') ? UserRole.admin : UserRole.user,
+      role: isUserAdmin ? UserRole.admin : UserRole.user,
     );
 
-    _accounts[cleanEmail] = RegisteredAccount(
-      user: newUser,
-      password: password,
-    );
-
+    _accounts[cleanEmail] = RegisteredAccount(user: newUser, password: password);
     _currentUser = newUser;
     notifyListeners();
-    return null; // Thành công (không có lỗi)
+    return null;
   }
 
-  /// Đăng nhập
-  String? login(String email, String password) {
+  /// Đăng nhập (Kiểm tra trên Supabase Cloud hoặc tài khoản hệ thống)
+  Future<String?> login(String email, String password) async {
     final cleanEmail = email.trim().toLowerCase();
 
     if (cleanEmail.isEmpty || password.isEmpty) {
       return 'Vui lòng nhập đầy đủ Email và Mật khẩu.';
     }
 
-    // Đăng nhập Admin nhanh với tài khoản admin@running.app hoặc email chứa chữ admin
-    if (cleanEmail == 'admin@running.app' || cleanEmail == 'admin') {
-      if (password == _adminPassword) {
-        _currentUser = _accounts['admin@running.app']?.user ??
-            const AppUser(
-              id: 'admin_01',
-              name: 'Ban Quản Trị',
-              email: 'admin@running.app',
-              role: UserRole.admin,
-            );
-        notifyListeners();
-        return null;
-      } else {
-        return 'Mật khẩu Admin không chính xác!';
-      }
+    // Kiểm tra tài khoản Admin mặc định
+    if ((cleanEmail == 'admin@running.app' || cleanEmail == 'admin') && password == _adminPassword) {
+      _currentUser = _accounts['admin@running.app']?.user ??
+          const AppUser(
+            id: 'admin_01',
+            name: 'Ban Quản Trị',
+            email: 'admin@running.app',
+            role: UserRole.admin,
+          );
+      notifyListeners();
+      return null;
     }
 
+    // Đăng nhập qua Supabase Cloud
+    try {
+      if (SupabaseService.isConfigured) {
+        final res = await SupabaseService.signIn(email: cleanEmail, password: password);
+        if (res?.user != null) {
+          final meta = res!.user!.userMetadata ?? {};
+          final roleStr = meta['role'] as String? ?? (cleanEmail.contains('admin') ? 'admin' : 'user');
+
+          _currentUser = AppUser(
+            id: res.user!.id,
+            name: meta['name'] as String? ?? cleanEmail.split('@').first,
+            email: cleanEmail,
+            role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
+            avatarUrl: (meta['avatar_url'] as String?) ?? '',
+          );
+          notifyListeners();
+          return null;
+        }
+      }
+    } catch (e) {
+      debugPrint('Supabase login error (fallback to local): $e');
+    }
+
+    // Fallback kiểm tra tài khoản cục bộ
     if (!_accounts.containsKey(cleanEmail)) {
-      return 'Tài khoản chưa tồn tại. Vui lòng chuyển sang tab Đăng ký!';
+      return 'Tài khoản hoặc mật khẩu không chính xác!';
     }
 
     final account = _accounts[cleanEmail]!;
     if (account.password != password) {
-      return 'Mật khẩu không chính xác. Vui lòng thử lại!';
+      return 'Mật khẩu không chính xác!';
     }
 
     _currentUser = account.user;
@@ -129,16 +177,21 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
-  /// Đổi mật khẩu cho Admin hoặc User hiện tại
-  String? changePassword({
+  /// Đổi mật khẩu
+  Future<String?> changePassword({
     required String currentPassword,
     required String newPassword,
-  }) {
+  }) async {
     if (newPassword.length < 6) {
       return 'Mật khẩu mới phải có ít nhất 6 ký tự.';
     }
 
     if (_currentUser == null) return 'Chưa đăng nhập.';
+
+    // Đổi mật khẩu trên Cloud
+    if (SupabaseService.isConfigured) {
+      await SupabaseService.changePassword(newPassword);
+    }
 
     if (_currentUser!.isAdmin) {
       if (currentPassword != _adminPassword) {
@@ -161,14 +214,14 @@ class AuthProvider with ChangeNotifier {
         return null;
       }
     }
-    return 'Lỗi không xác định.';
+    return null;
   }
 
-  /// Cập nhật Họ tên và Email của người dùng
-  String? updateProfile({
+  /// Cập nhật Họ tên và Email
+  Future<String?> updateProfile({
     required String newName,
     required String newEmail,
-  }) {
+  }) async {
     final cleanName = newName.trim();
     final cleanEmail = newEmail.trim().toLowerCase();
 
@@ -178,8 +231,6 @@ class AuthProvider with ChangeNotifier {
 
     if (_currentUser == null) return 'Chưa đăng nhập.';
 
-    final oldEmail = _currentUser!.email.toLowerCase();
-
     final updatedUser = AppUser(
       id: _currentUser!.id,
       name: cleanName,
@@ -188,6 +239,11 @@ class AuthProvider with ChangeNotifier {
       avatarUrl: _currentUser!.avatarUrl,
     );
 
+    if (SupabaseService.isConfigured) {
+      SupabaseService.updateUserProfile(name: cleanName);
+    }
+
+    final oldEmail = _currentUser!.email.toLowerCase();
     if (_accounts.containsKey(oldEmail)) {
       final acc = _accounts.remove(oldEmail)!;
       _accounts[cleanEmail] = RegisteredAccount(user: updatedUser, password: acc.password);
@@ -210,6 +266,10 @@ class AuthProvider with ChangeNotifier {
       avatarUrl: newAvatarUrl,
     );
 
+    if (SupabaseService.isConfigured) {
+      SupabaseService.updateUserProfile(avatarUrl: newAvatarUrl);
+    }
+
     final email = _currentUser!.email.toLowerCase();
     if (_accounts.containsKey(email)) {
       _accounts[email] = RegisteredAccount(
@@ -223,6 +283,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   void logout() {
+    SupabaseService.signOut();
     _currentUser = null;
     notifyListeners();
   }

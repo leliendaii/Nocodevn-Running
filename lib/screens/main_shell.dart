@@ -690,23 +690,27 @@ class _MainShellState extends State<MainShell> {
             child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final n = nameController.text.trim();
               final e = emailController.text.trim();
 
-              final error = auth.updateProfile(newName: n, newEmail: e);
+              final error = await auth.updateProfile(newName: n, newEmail: e);
               if (error != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
+                  );
+                }
               } else {
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppTheme.success,
-                    content: Text('✅ Đã cập nhật Tên và Email thành công!'),
-                  ),
-                );
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: AppTheme.success,
+                      content: Text('✅ Đã cập nhật Tên và Email thành công!'),
+                    ),
+                  );
+                }
               }
             },
             child: const Text('LƯU THÔNG TIN', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -781,7 +785,7 @@ class _MainShellState extends State<MainShell> {
               backgroundColor: AppTheme.secondaryNeon,
               foregroundColor: Colors.black,
             ),
-            onPressed: () {
+            onPressed: () async {
               final cur = currentPassController.text.trim();
               final n1 = newPassController.text.trim();
               final n2 = confirmPassController.text.trim();
@@ -796,23 +800,27 @@ class _MainShellState extends State<MainShell> {
                 return;
               }
 
-              final error = auth.changePassword(
+              final error = await auth.changePassword(
                 currentPassword: cur,
                 newPassword: n1,
               );
 
               if (error != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(backgroundColor: AppTheme.danger, content: Text(error)),
+                  );
+                }
               } else {
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppTheme.success,
-                    content: Text('✅ Đã đổi mật khẩu thành công!'),
-                  ),
-                );
+                if (context.mounted) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: AppTheme.success,
+                      content: Text('✅ Đã đổi mật khẩu thành công!'),
+                    ),
+                  );
+                }
               }
             },
             child: const Text('LƯU MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.bold)),

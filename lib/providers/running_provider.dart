@@ -27,6 +27,8 @@ class RunningProvider with ChangeNotifier {
   double _distanceKm = 0.0;
   int _calories = 0;
   DateTime? _runStartTime;
+  DateTime? _pauseStartTime;
+  int _totalPausedSeconds = 0;
   Timer? _timer;
   final List<RunPoint> _currentRoute = [];
   Position? _lastPosition;
@@ -78,26 +80,35 @@ class RunningProvider with ChangeNotifier {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  // Bắt đầu chạy đo GPS thực tế
+  void _updateDurationFromWallClock() {
+    if (_state == TrackingState.running && _runStartTime != null) {
+      final elapsed = DateTime.now().difference(_runStartTime!).inSeconds;
+      _durationSeconds = (elapsed - _totalPausedSeconds).clamp(0, 99999999);
+    }
+  }
+
+  // Bắt đầu chạy đo GPS thực tế & Hỗ trợ chạy ngầm khi tắt màn hình iPhone
   Future<void> startTracking() async {
     _state = TrackingState.running;
     _durationSeconds = 0;
     _distanceKm = 0.0;
     _calories = 0;
     _runStartTime = DateTime.now();
+    _pauseStartTime = null;
+    _totalPausedSeconds = 0;
     _currentRoute.clear();
     _lastPosition = null;
 
-    // Timer chỉ đếm thời gian (giây), KHÔNG tự tăng Km nếu người dùng đứng yên
+    // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_state == TrackingState.running) {
-        _durationSeconds++;
+        _updateDurationFromWallClock();
         notifyListeners();
       }
     });
 
-    // Lắng nghe tín hiệu GPS thực tế từ iPhone
+    // Lắng nghe tín hiệu GPS thực tế và chạy ngầm trên iPhone
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -106,16 +117,33 @@ class RunningProvider with ChangeNotifier {
 
       if (permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse) {
-        const locationSettings = LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 2, // Chỉ ghi nhận khi di chuyển tối thiểu 2m
-        );
+        
+        // Cấu hình GPS nền chuyên dụng cho iOS (AppleSettings) và các nền tảng khác
+        LocationSettings locationSettings;
+        if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS) {
+          locationSettings = AppleSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            activityType: ActivityType.fitness,
+            distanceFilter: 2,
+            pauseLocationUpdatesAutomatically: false,
+            showBackgroundLocationIndicator: true,
+            allowBackgroundLocationUpdates: true,
+          );
+        } else {
+          locationSettings = const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 2,
+          );
+        }
 
         _positionStream?.cancel();
         _positionStream = Geolocator.getPositionStream(
           locationSettings: locationSettings,
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
+
+          // Cập nhật lại thời gian chính xác ngay khi nhận tọa độ ngầm
+          _updateDurationFromWallClock();
 
           if (_lastPosition != null) {
             final double distanceInMeters = Geolocator.distanceBetween(
@@ -149,14 +177,20 @@ class RunningProvider with ChangeNotifier {
   // Tạm dừng chạy
   void pauseTracking() {
     _state = TrackingState.paused;
+    _pauseStartTime = DateTime.now();
     _positionStream?.pause();
     notifyListeners();
   }
 
   // Tiếp tục chạy
   void resumeTracking() {
+    if (_pauseStartTime != null) {
+      _totalPausedSeconds += DateTime.now().difference(_pauseStartTime!).inSeconds;
+      _pauseStartTime = null;
+    }
     _state = TrackingState.running;
     _positionStream?.resume();
+    _updateDurationFromWallClock();
     notifyListeners();
   }
 
@@ -166,6 +200,7 @@ class RunningProvider with ChangeNotifier {
     required String userName,
     String notes = 'Buổi chạy ngoài trời',
   }) {
+    _updateDurationFromWallClock();
     _timer?.cancel();
     _timer = null;
     _positionStream?.cancel();
@@ -206,6 +241,9 @@ class RunningProvider with ChangeNotifier {
     _distanceKm = 0.0;
     _calories = 0;
     _currentRoute.clear();
+    _runStartTime = null;
+    _pauseStartTime = null;
+    _totalPausedSeconds = 0;
     notifyListeners();
   }
 
@@ -239,10 +277,9 @@ class RunningProvider with ChangeNotifier {
       // Đồng bộ cập nhật lên Supabase Cloud
       SupabaseService.updateRunSession(
         id,
-        distanceKm: updatedDistance,
-        durationSeconds: updatedDuration,
-        calories: updatedCalories,
-        notes: updatedNotes,
+        newDistanceKm: updatedDistance,
+        newDurationSeconds: updatedDuration,
+        newNotes: updatedNotes,
       );
     }
   }

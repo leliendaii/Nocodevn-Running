@@ -21,6 +21,10 @@ class SupabaseService {
     }
   }
 
+  static User? get currentAuthUser {
+    return client?.auth.currentUser;
+  }
+
   /// Khởi tạo Supabase khi khởi động app
   static Future<void> initialize() async {
     if (isConfigured) {
@@ -37,6 +41,105 @@ class SupabaseService {
       debugPrint('ℹ️ Supabase chưa điền URL/Key. App đang chạy ở chế độ Dữ liệu Bộ nhớ.');
     }
   }
+
+  // ==========================================
+  // XÁC THỰC TÀI KHOẢN CLOUD (MÃ HÓA & BĂM BCRYPT)
+  // ==========================================
+
+  /// Đăng ký tài khoản mới lên Supabase Cloud (Mật khẩu được băm và mã hóa chuẩn bảo mật quốc tế)
+  static Future<AuthResponse?> signUp({
+    required String email,
+    required String password,
+    required String name,
+    String role = 'user',
+  }) async {
+    final supa = client;
+    if (supa == null) return null;
+
+    try {
+      final response = await supa.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'name': name,
+          'role': role,
+        },
+      );
+      return response;
+    } catch (e) {
+      debugPrint('Lỗi đăng ký Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Đăng nhập tài khoản với Supabase Cloud
+  static Future<AuthResponse?> signIn({
+    required String email,
+    required String password,
+  }) async {
+    final supa = client;
+    if (supa == null) return null;
+
+    try {
+      final response = await supa.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      return response;
+    } catch (e) {
+      debugPrint('Lỗi đăng nhập Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Đăng xuất khỏi Cloud
+  static Future<void> signOut() async {
+    final supa = client;
+    if (supa == null) return;
+    try {
+      await supa.auth.signOut();
+    } catch (e) {
+      debugPrint('Lỗi đăng xuất Supabase: $e');
+    }
+  }
+
+  /// Đổi mật khẩu tài khoản trên Cloud
+  static Future<bool> changePassword(String newPassword) async {
+    final supa = client;
+    if (supa == null) return false;
+    try {
+      await supa.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Lỗi đổi mật khẩu Supabase: $e');
+      return false;
+    }
+  }
+
+  /// Cập nhật thông tin người dùng (Tên, Avatar) lên Cloud
+  static Future<bool> updateUserProfile({String? name, String? avatarUrl}) async {
+    final supa = client;
+    if (supa == null) return false;
+    try {
+      final Map<String, dynamic> data = {};
+      if (name != null) data['name'] = name;
+      if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+
+      await supa.auth.updateUser(
+        UserAttributes(data: data),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Lỗi cập nhật profile Supabase: $e');
+      return false;
+    }
+  }
+
+  // ==========================================
+  // QUẢN LÝ DỮ LIỆU BUỔI CHẠY (RUN SESSIONS)
+  // ==========================================
 
   /// Lấy toàn bộ danh sách buổi chạy từ Supabase Cloud
   static Future<List<RunSession>?> fetchRunSessions() async {
@@ -99,21 +202,24 @@ class SupabaseService {
   /// Admin cập nhật số KM và thời gian chạy lên Cloud
   static Future<bool> updateRunSession(
     String id, {
-    required double distanceKm,
-    required int durationSeconds,
-    required int calories,
-    required String notes,
+    required double newDistanceKm,
+    required int newDurationSeconds,
+    String? newNotes,
   }) async {
     final supa = client;
     if (supa == null) return false;
 
     try {
-      await supa.from('run_sessions').update({
-        'distance_km': distanceKm,
-        'duration_seconds': durationSeconds,
-        'calories': calories,
-        'notes': notes,
-      }).eq('id', id);
+      final Map<String, dynamic> updateData = {
+        'distance_km': newDistanceKm,
+        'duration_seconds': newDurationSeconds,
+        'calories': (newDistanceKm * 62).round(),
+      };
+      if (newNotes != null) {
+        updateData['notes'] = newNotes;
+      }
+
+      await supa.from('run_sessions').update(updateData).eq('id', id);
       return true;
     } catch (e) {
       debugPrint('Lỗi cập nhật buổi chạy Supabase: $e');
@@ -121,7 +227,7 @@ class SupabaseService {
     }
   }
 
-  /// Admin xóa buổi chạy trên Cloud
+  /// Xóa buổi chạy khỏi Cloud
   static Future<bool> deleteRunSession(String id) async {
     final supa = client;
     if (supa == null) return false;
