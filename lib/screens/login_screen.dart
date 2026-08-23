@@ -13,12 +13,13 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isRegisterMode = false;
 
-  // Khởi tạo ô trống sạch sẽ, không hiển thị trước tài khoản mặc định
-  final _loginEmailController = TextEditingController();
+  // Controllers cho Đăng nhập (Hỗ trợ cả Email & Username)
+  final _loginIdentifierController = TextEditingController();
   final _loginPasswordController = TextEditingController();
 
   // Controllers cho Đăng ký
   final _regNameController = TextEditingController();
+  final _regUsernameController = TextEditingController();
   final _regEmailController = TextEditingController();
   final _regPasswordController = TextEditingController();
   final _regConfirmPasswordController = TextEditingController();
@@ -27,9 +28,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _loginEmailController.dispose();
+    _loginIdentifierController.dispose();
     _loginPasswordController.dispose();
     _regNameController.dispose();
+    _regUsernameController.dispose();
     _regEmailController.dispose();
     _regPasswordController.dispose();
     _regConfirmPasswordController.dispose();
@@ -37,10 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final email = _loginEmailController.text.trim();
+    final identifier = _loginIdentifierController.text.trim();
     final password = _loginPasswordController.text.trim();
 
-    final error = await context.read<AuthProvider>().login(email, password);
+    final error = await context.read<AuthProvider>().login(identifier, password);
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -54,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleRegister() async {
     final name = _regNameController.text.trim();
+    final username = _regUsernameController.text.trim();
     final email = _regEmailController.text.trim();
     final pass = _regPasswordController.text.trim();
     final confirmPass = _regConfirmPasswordController.text.trim();
@@ -70,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final error = await context.read<AuthProvider>().register(
       name: name,
+      username: username,
       email: email,
       password: pass,
     );
@@ -205,16 +209,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // FORM ĐĂNG NHẬP (Sạch sẽ, không lộ pass/user)
+                // FORM ĐĂNG NHẬP (Hỗ trợ nhập Email HOẶC Username)
                 if (!_isRegisterMode) ...[
                   TextField(
-                    controller: _loginEmailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _loginIdentifierController,
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'Nhập email của bạn',
-                      prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
+                      labelText: 'Email hoặc Tên đăng nhập (Username)',
+                      hintText: 'Nhập username (ví dụ: admin, leliendai) hoặc email',
+                      prefixIcon: Icon(Icons.alternate_email_rounded, color: AppTheme.primaryNeon),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -246,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const Text(
-                        'Ghi nhớ đăng nhập (30 ngày không cần login lại)',
+                        'Ghi nhớ đăng nhập (30 ngày)',
                         style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ],
@@ -271,12 +274,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
                   TextField(
+                    controller: _regUsernameController,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                    decoration: const InputDecoration(
+                      labelText: 'Tên đăng nhập (Username)',
+                      hintText: 'Ví dụ: leliendai, runner01, admin...',
+                      prefixIcon: Icon(Icons.alternate_email_rounded, color: AppTheme.secondaryNeon),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
                     controller: _regEmailController,
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Email đăng ký',
-                      hintText: 'Nhập email',
+                      hintText: 'Nhập email (dùng để khôi phục)',
                       prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
                     ),
                   ),

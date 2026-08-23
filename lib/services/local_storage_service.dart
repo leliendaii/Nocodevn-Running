@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 class LocalStorageService {
   static const String _keyUserId = 'auth_user_id';
   static const String _keyUserName = 'auth_user_name';
+  static const String _keyUserUsername = 'auth_user_username';
   static const String _keyUserEmail = 'auth_user_email';
   static const String _keyUserRole = 'auth_user_role';
   static const String _keyUserAvatar = 'auth_user_avatar';
@@ -24,6 +25,7 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyUserId, user.id);
       await prefs.setString(_keyUserName, user.name);
+      await prefs.setString(_keyUserUsername, user.username);
       await prefs.setString(_keyUserEmail, user.email);
       await prefs.setString(_keyUserRole, user.role == UserRole.admin ? 'admin' : 'user');
       await prefs.setString(_keyUserAvatar, user.avatarUrl);
@@ -60,6 +62,7 @@ class LocalStorageService {
 
       final userId = prefs.getString(_keyUserId);
       final userName = prefs.getString(_keyUserName);
+      final userUsername = prefs.getString(_keyUserUsername) ?? '';
       final userEmail = prefs.getString(_keyUserEmail);
       final userRoleStr = prefs.getString(_keyUserRole);
       final userAvatar = prefs.getString(_keyUserAvatar) ?? '';
@@ -72,6 +75,7 @@ class LocalStorageService {
       return AppUser(
         id: userId,
         name: userName ?? userEmail.split('@').first,
+        username: userUsername,
         email: userEmail,
         role: userRoleStr == 'admin' ? UserRole.admin : UserRole.user,
         avatarUrl: userAvatar,
@@ -85,12 +89,14 @@ class LocalStorageService {
   /// Cập nhật thông tin người dùng đã lưu
   static Future<void> updateSavedProfile({
     String? name,
+    String? username,
     String? email,
     String? avatarUrl,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (name != null) await prefs.setString(_keyUserName, name);
+      if (username != null) await prefs.setString(_keyUserUsername, username);
       if (email != null) await prefs.setString(_keyUserEmail, email);
       if (avatarUrl != null) await prefs.setString(_keyUserAvatar, avatarUrl);
       await prefs.setInt(_keyLastActive, DateTime.now().millisecondsSinceEpoch);
@@ -163,6 +169,7 @@ class LocalStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyUserId);
       await prefs.remove(_keyUserName);
+      await prefs.remove(_keyUserUsername);
       await prefs.remove(_keyUserEmail);
       await prefs.remove(_keyUserRole);
       await prefs.remove(_keyUserAvatar);

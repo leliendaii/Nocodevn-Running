@@ -29,11 +29,13 @@ class AuthProvider with ChangeNotifier {
       final profile = await SupabaseService.fetchProfile(serverUser.id);
       final roleStr = SupabaseService.extractRole(serverUser, profile);
       final displayName = profile?['name'] ?? serverUser.userMetadata?['name'] ?? serverUser.email?.split('@').first ?? 'Người dùng';
+      final username = profile?['username'] ?? serverUser.userMetadata?['username'] ?? '';
       final avatar = profile?['avatar_url'] ?? serverUser.userMetadata?['avatar_url'] ?? '';
 
       _currentUser = AppUser(
         id: serverUser.id,
         name: displayName,
+        username: username,
         email: serverUser.email ?? '',
         role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
         avatarUrl: avatar,
@@ -72,17 +74,19 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
 
-    // Cập nhật lại Role từ bảng profiles trên web Supabase
+    // Cập nhật lại Role và Username từ bảng profiles trên web Supabase
     final profile = await SupabaseService.fetchProfile(serverUser.id);
     final roleStr = SupabaseService.extractRole(serverUser, profile);
     final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
     final displayName = profile?['name'] ?? serverUser.userMetadata?['name'] ?? _currentUser!.name;
+    final username = profile?['username'] ?? serverUser.userMetadata?['username'] ?? _currentUser!.username;
     final avatar = profile?['avatar_url'] ?? _currentUser!.avatarUrl;
 
-    if (_currentUser!.role != newRole || _currentUser!.name != displayName || _currentUser!.avatarUrl != avatar) {
+    if (_currentUser!.role != newRole || _currentUser!.name != displayName || _currentUser!.username != username || _currentUser!.avatarUrl != avatar) {
       _currentUser = AppUser(
         id: _currentUser!.id,
         name: displayName,
+        username: username,
         email: _currentUser!.email,
         role: newRole,
         avatarUrl: avatar,
@@ -94,19 +98,25 @@ class AuthProvider with ChangeNotifier {
     return true;
   }
 
-  /// Đăng ký tài khoản mới lên Supabase Cloud
+  /// Đăng ký tài khoản mới lên Supabase Cloud (Hỗ trợ Username)
   Future<String?> register({
     required String name,
+    required String username,
     required String email,
     required String password,
     String role = 'user',
     bool remember = true,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
+    final cleanUsername = username.trim().toLowerCase().replaceAll('@', '');
     final cleanName = name.trim();
 
-    if (cleanEmail.isEmpty || cleanName.isEmpty || password.isEmpty) {
+    if (cleanEmail.isEmpty || cleanUsername.isEmpty || cleanName.isEmpty || password.isEmpty) {
       return 'Vui lòng điền đầy đủ tất cả các trường thông tin.';
+    }
+
+    if (cleanUsername.length < 3) {
+      return 'Tên đăng nhập (Username) phải có ít nhất 3 ký tự.';
     }
 
     if (password.length < 6) {
@@ -117,6 +127,7 @@ class AuthProvider with ChangeNotifier {
       if (SupabaseService.isConfigured) {
         final res = await SupabaseService.signUp(
           email: cleanEmail,
+          username: cleanUsername,
           password: password,
           name: cleanName,
           role: role,
@@ -126,6 +137,7 @@ class AuthProvider with ChangeNotifier {
           final newUser = AppUser(
             id: res!.user!.id,
             name: cleanName,
+            username: cleanUsername,
             email: cleanEmail,
             role: role == 'admin' ? UserRole.admin : UserRole.user,
           );
@@ -138,35 +150,41 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Supabase signup error: $e');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('unique') || errStr.contains('already exists')) {
+        return 'Email hoặc Tên đăng nhập này đã được sử dụng!';
+      }
       return 'Lỗi đăng ký: ${e.toString().replaceAll('Exception:', '').trim()}';
     }
 
     return 'Không thể kết nối đến máy chủ cơ sở dữ liệu Supabase.';
   }
 
-  /// Đăng nhập (Xác thực trực tiếp 100% với Database Supabase & Bảng profiles)
-  Future<String?> login(String email, String password, {bool remember = true}) async {
-    final cleanEmail = email.trim().toLowerCase();
+  /// Đăng nhập (Hỗ trợ nhập Email HOẶC Username)
+  Future<String?> login(String identifier, String password, {bool remember = true}) async {
+    final cleanIdentifier = identifier.trim();
 
-    if (cleanEmail.isEmpty || password.isEmpty) {
-      return 'Vui lòng nhập đầy đủ Email và Mật khẩu.';
+    if (cleanIdentifier.isEmpty || password.isEmpty) {
+      return 'Vui lòng nhập Email/Tên đăng nhập và Mật khẩu.';
     }
 
     // Đăng nhập trực tiếp với Supabase Cloud
     try {
       if (SupabaseService.isConfigured) {
-        final res = await SupabaseService.signIn(email: cleanEmail, password: password);
+        final res = await SupabaseService.signIn(identifier: cleanIdentifier, password: password);
         final u = res?.user;
         if (u != null) {
           final profile = await SupabaseService.fetchProfile(u.id);
           final roleStr = SupabaseService.extractRole(u, profile);
-          final displayName = profile?['name'] ?? u.userMetadata?['name'] ?? cleanEmail.split('@').first;
+          final displayName = profile?['name'] ?? u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
+          final username = profile?['username'] ?? u.userMetadata?['username'] ?? cleanIdentifier;
           final avatar = profile?['avatar_url'] ?? u.userMetadata?['avatar_url'] ?? '';
 
           _currentUser = AppUser(
             id: u.id,
             name: displayName,
-            email: cleanEmail,
+            username: username,
+            email: u.email ?? cleanIdentifier,
             role: roleStr == 'admin' ? UserRole.admin : UserRole.user,
             avatarUrl: avatar,
           );
@@ -178,8 +196,11 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Supabase login error: $e');
       final errStr = e.toString().toLowerCase();
+      if (errStr.contains('không tồn tại')) {
+        return e.toString().replaceAll('Exception:', '').trim();
+      }
       if (errStr.contains('invalid login credentials') || errStr.contains('user not found')) {
-        return 'Tài khoản không tồn tại hoặc sai mật khẩu!';
+        return 'Tên đăng nhập/Email hoặc mật khẩu không chính xác!';
       }
       return 'Lỗi đăng nhập: ${e.toString().replaceAll('Exception:', '').trim()}';
     }
@@ -209,12 +230,14 @@ class AuthProvider with ChangeNotifier {
     return null;
   }
 
-  /// Cập nhật Họ tên và Email bền vững
+  /// Cập nhật Họ tên, Username và Email bền vững
   Future<String?> updateProfile({
     required String newName,
+    required String newUsername,
     required String newEmail,
   }) async {
     final cleanName = newName.trim();
+    final cleanUsername = newUsername.trim().toLowerCase().replaceAll('@', '');
     final cleanEmail = newEmail.trim().toLowerCase();
 
     if (cleanName.isEmpty || cleanEmail.isEmpty) {
@@ -226,16 +249,21 @@ class AuthProvider with ChangeNotifier {
     final updatedUser = AppUser(
       id: _currentUser!.id,
       name: cleanName,
+      username: cleanUsername,
       email: cleanEmail,
       role: _currentUser!.role,
       avatarUrl: _currentUser!.avatarUrl,
     );
 
     if (SupabaseService.isConfigured) {
-      await SupabaseService.updateUserProfile(name: cleanName, userId: _currentUser!.id);
+      await SupabaseService.updateUserProfile(
+        name: cleanName,
+        username: cleanUsername,
+        userId: _currentUser!.id,
+      );
     }
 
-    await LocalStorageService.updateSavedProfile(name: cleanName, email: cleanEmail);
+    await LocalStorageService.updateSavedProfile(name: cleanName, username: cleanUsername, email: cleanEmail);
     _currentUser = updatedUser;
     notifyListeners();
     return null;
@@ -248,6 +276,7 @@ class AuthProvider with ChangeNotifier {
     final updatedUser = AppUser(
       id: _currentUser!.id,
       name: _currentUser!.name,
+      username: _currentUser!.username,
       email: _currentUser!.email,
       role: _currentUser!.role,
       avatarUrl: newAvatarUrl,

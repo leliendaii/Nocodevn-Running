@@ -355,9 +355,16 @@ class _MainShellState extends State<MainShell> {
                 user?.name ?? 'Người dùng',
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
+              if (user?.username != null && user!.username.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  '@${user.username}',
+                  style: const TextStyle(color: AppTheme.secondaryNeon, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+              ],
               Text(
                 user?.email ?? '',
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 8),
               Container(
@@ -680,6 +687,7 @@ class _MainShellState extends State<MainShell> {
 
   void _showEditProfileDialog(BuildContext context, AuthProvider auth) {
     final nameController = TextEditingController(text: auth.currentUser?.name ?? '');
+    final usernameController = TextEditingController(text: auth.currentUser?.username ?? '');
     final emailController = TextEditingController(text: auth.currentUser?.email ?? '');
 
     showDialog(
@@ -694,7 +702,7 @@ class _MainShellState extends State<MainShell> {
           children: [
             Icon(Icons.edit_note_rounded, color: AppTheme.primaryNeon),
             SizedBox(width: 10),
-            Text('Đổi Tên & Email', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Đổi Thông Tin Cá Nhân', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
@@ -704,8 +712,17 @@ class _MainShellState extends State<MainShell> {
               controller: nameController,
               style: const TextStyle(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
-                labelText: 'Họ và tên mới',
+                labelText: 'Họ và tên',
                 prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryNeon),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: usernameController,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Tên đăng nhập (Username)',
+                prefixIcon: Icon(Icons.alternate_email_rounded, color: AppTheme.secondaryNeon),
               ),
             ),
             const SizedBox(height: 14),
@@ -714,7 +731,7 @@ class _MainShellState extends State<MainShell> {
               keyboardType: TextInputType.emailAddress,
               style: const TextStyle(color: AppTheme.textPrimary),
               decoration: const InputDecoration(
-                labelText: 'Email mới',
+                labelText: 'Email',
                 prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
               ),
             ),
@@ -728,9 +745,10 @@ class _MainShellState extends State<MainShell> {
           ElevatedButton(
             onPressed: () async {
               final n = nameController.text.trim();
+              final u = usernameController.text.trim();
               final e = emailController.text.trim();
 
-              final error = await auth.updateProfile(newName: n, newEmail: e);
+              final error = await auth.updateProfile(newName: n, newUsername: u, newEmail: e);
               if (error != null) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -743,7 +761,7 @@ class _MainShellState extends State<MainShell> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       backgroundColor: AppTheme.success,
-                      content: Text('✅ Đã cập nhật Tên và Email thành công!'),
+                      content: Text('✅ Đã cập nhật thông tin thành công!'),
                     ),
                   );
                 }
