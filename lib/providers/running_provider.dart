@@ -202,8 +202,52 @@ class RunningProvider with ChangeNotifier {
   List<RunPoint> get currentRoute => List.unmodifiable(_currentRoute);
   List<RunSession> get allSessions => List.unmodifiable(_sessions);
 
+  // Giả lập tốc độ chạy / đi bộ để test tính năng trên máy tính & điện thoại
+  bool _isSimulating = false;
+  double _simulatedSpeedKmh = 0.0;
+  Timer? _simulationTimer;
+
+  bool get isSimulating => _isSimulating;
+  double get simulatedSpeedKmh => _simulatedSpeedKmh;
+
+  /// Bắt đầu giả lập chạy / đi bộ với tốc độ km/h tùy chọn
+  void startSpeedSimulation(double speedKmh) {
+    _simulatedSpeedKmh = speedKmh;
+    _isSimulating = true;
+
+    if (_state != TrackingState.running) {
+      _state = TrackingState.running;
+      _runStartTime ??= DateTime.now();
+    }
+
+    _simulationTimer?.cancel();
+    _simulationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_state == TrackingState.running && _isSimulating) {
+        _durationSeconds += 1;
+        // Mỗi giây cộng thêm (speedKmh / 3600) km
+        _distanceKm += (_simulatedSpeedKmh / 3600.0);
+        _calories = CalorieCalculator.calculate(
+          distanceKm: _distanceKm,
+          durationSeconds: _durationSeconds,
+        );
+        notifyListeners();
+      }
+    });
+    notifyListeners();
+  }
+
+  /// Dừng giả lập tốc độ
+  void stopSpeedSimulation() {
+    _isSimulating = false;
+    _simulatedSpeedKmh = 0.0;
+    _simulationTimer?.cancel();
+    _simulationTimer = null;
+    notifyListeners();
+  }
+
   /// Vận tốc trung bình hiện tại (km/h)
   double get currentSpeedKmh {
+    if (_isSimulating && _simulatedSpeedKmh > 0) return _simulatedSpeedKmh;
     if (_distanceKm <= 0.005 || _durationSeconds <= 0) return 0.0;
     final double hours = _durationSeconds / 3600.0;
     return (_distanceKm / hours).clamp(0.0, 35.0);
@@ -457,6 +501,7 @@ class RunningProvider with ChangeNotifier {
   }
 
   void resetTracking() {
+    stopSpeedSimulation();
     _timer?.cancel();
     _timer = null;
     _positionStream?.cancel();
@@ -472,6 +517,14 @@ class RunningProvider with ChangeNotifier {
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    stopSpeedSimulation();
+    _timer?.cancel();
+    _positionStream?.cancel();
+    super.dispose();
   }
 
   // Quản trị viên cập nhật KM & thời gian
@@ -672,12 +725,5 @@ class RunningProvider with ChangeNotifier {
     }
 
     return points;
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _positionStream?.cancel();
-    super.dispose();
   }
 }
