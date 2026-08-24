@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/run_session.dart';
+import 'calorie_calculator.dart';
 
 class SupabaseService {
   // Thông tin Supabase Cloud chính thức của bạn
@@ -395,7 +396,10 @@ class SupabaseService {
       final Map<String, dynamic> updateData = {
         'distance_km': newDistanceKm,
         'duration_seconds': newDurationSeconds,
-        'calories': (newDistanceKm * 62).round(),
+        'calories': CalorieCalculator.calculate(
+          distanceKm: newDistanceKm,
+          durationSeconds: newDurationSeconds,
+        ),
       };
       if (newNotes != null) {
         updateData['notes'] = newNotes;

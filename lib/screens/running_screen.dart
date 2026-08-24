@@ -342,6 +342,32 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                                 ),
                               ),
                             ),
+                            if (running.isRunning || running.isPaused) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.directions_walk_rounded, size: 14, color: AppTheme.secondaryNeon),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      running.currentActivityType,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.secondaryNeon,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

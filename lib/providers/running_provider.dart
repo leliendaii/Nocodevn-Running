@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import '../models/run_session.dart';
 import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
+import '../services/calorie_calculator.dart';
 
 enum TrackingState { idle, running, paused, finished }
 
@@ -201,6 +202,19 @@ class RunningProvider with ChangeNotifier {
   List<RunPoint> get currentRoute => List.unmodifiable(_currentRoute);
   List<RunSession> get allSessions => List.unmodifiable(_sessions);
 
+  /// Vận tốc trung bình hiện tại (km/h)
+  double get currentSpeedKmh {
+    if (_distanceKm <= 0.005 || _durationSeconds <= 0) return 0.0;
+    final double hours = _durationSeconds / 3600.0;
+    return (_distanceKm / hours).clamp(0.0, 35.0);
+  }
+
+  /// Trạng thái hoạt động thể chất nhận diện tự động (Đi bộ, Đi đều, Đi nhanh, Jogging, Chạy bộ, Nước rút)
+  String get currentActivityType {
+    if (_state != TrackingState.running) return 'Sẵn sàng';
+    return CalorieCalculator.getActivityType(speedKmh: currentSpeedKmh);
+  }
+
   String get currentPace {
     if (_distanceKm <= 0.01 || _durationSeconds <= 0) return '0:00';
     final double pace = (_durationSeconds / 60.0) / _distanceKm;
@@ -237,6 +251,12 @@ class RunningProvider with ChangeNotifier {
       final now = DateTime.now();
       final elapsed = now.difference(_runStartTime!).inSeconds;
       _durationSeconds = (elapsed - _totalPausedSeconds).clamp(0, 99999999);
+
+      // CẬP NHẬT CALORIES THEO CHUẨN ACSM KHI THỜI GIAN TRÔI QUA
+      _calories = CalorieCalculator.calculate(
+        distanceKm: _distanceKm,
+        durationSeconds: _durationSeconds,
+      );
 
       // KIỂM TRA TỰ ĐỘNG CHỐT KHI QUA GIỜ CÀI ĐẶT (CHỐNG QUÊN)
       if (_autoEndEnabled) {
@@ -336,7 +356,10 @@ class RunningProvider with ChangeNotifier {
             // 2. Lọc nhiễu đứng yên (> 2.0m) & Lọc bước nhảy ảo (> 11.5 m/s ~ 41.4 km/h)
             if (distanceInMeters >= 2.0 && speedMps < 11.5) {
               _distanceKm += distanceInMeters / 1000.0;
-              _calories = (_distanceKm * 62).round();
+              _calories = CalorieCalculator.calculate(
+                distanceKm: _distanceKm,
+                durationSeconds: _durationSeconds,
+              );
               _currentRoute.add(RunPoint(position.longitude, position.latitude));
               _lastPosition = position;
               _lastPositionTime = now;
