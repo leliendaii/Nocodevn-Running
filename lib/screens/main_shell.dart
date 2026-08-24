@@ -6,12 +6,13 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
-import '../widgets/dialogs/edit_profile_dialog.dart';
-import '../widgets/dialogs/change_password_dialog.dart';
 import '../widgets/dialogs/avatar_picker_dialog.dart';
 import 'running_screen.dart';
 import 'history_screen.dart';
 import 'admin_dashboard_screen.dart';
+import 'auto_end_schedule_screen.dart';
+import 'account_info_screen.dart';
+import 'security_settings_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -23,7 +24,6 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   TimeFilter _personalFilter = TimeFilter.week;
-  String _activeProfileGroup = 'schedule'; // 'schedule', 'profile', 'security', 'admin', or ''
 
   @override
   void initState() {
@@ -389,602 +389,99 @@ class _MainShellState extends State<MainShell> {
               ),
               const SizedBox(height: 16),
 
+              const SizedBox(height: 24),
+
+              // ==========================================
+              // KHỐI 1: ⏰ CÀI ĐẶT CHẠY BỘ
+              // ==========================================
+              _buildSettingsSectionHeader('CÀI ĐẶT CHẠY BỘ'),
+              const SizedBox(height: 8),
+              Consumer<RunningProvider>(
+                builder: (context, running, _) {
+                  final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
+                  final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
+                  final subtitle = running.autoEndEnabled
+                      ? 'Đang bật: $startStr ➔ $endStr (Chống quên)'
+                      : 'Đang tắt tự động chốt';
+
+                  return _buildSettingsMenuTile(
+                    icon: Icons.timer_off_outlined,
+                    iconColor: AppTheme.primaryNeon,
+                    title: 'Khung Giờ Tự Động Chốt',
+                    subtitle: subtitle,
+                    statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
+                    statusColor: running.autoEndEnabled ? AppTheme.secondaryNeon : AppTheme.textMuted,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (ctx) => const AutoEndScheduleScreen()),
+                      );
+                    },
+                  );
+                },
+              ),
               const SizedBox(height: 20),
 
               // ==========================================
-              // NHÓM 1: ⏰ KHUNG GIỜ CHẠY & TỰ ĐỘNG CHỐT (CHỐNG QUÊN)
+              // KHỐI 2: 👤 TÀI KHOẢN & BẢO MẬT
               // ==========================================
-              Consumer<RunningProvider>(
-                builder: (context, running, _) {
-                  final isExpanded = _activeProfileGroup == 'schedule';
-                  final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
-                  final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isExpanded ? AppTheme.primaryNeon : AppTheme.divider,
-                        width: isExpanded ? 1.5 : 1.0,
-                      ),
-                      boxShadow: isExpanded
-                          ? [
-                              BoxShadow(
-                                color: AppTheme.primaryNeon.withValues(alpha: 0.12),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
+              _buildSettingsSectionHeader('TÀI KHOẢN & BẢO MẬT'),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Column(
+                  children: [
+                    _buildSettingsRowTile(
+                      icon: Icons.person_outline_rounded,
+                      iconColor: AppTheme.primaryNeon,
+                      title: 'Thông Tin Tài Khoản',
+                      subtitle: '${user?.name ?? ''} (@${user?.username ?? ''})',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (ctx) => const AccountInfoScreen()),
+                        );
+                      },
                     ),
-                    child: Column(
-                      children: [
-                        // Header Nhóm
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _activeProfileGroup = isExpanded ? '' : 'schedule';
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.timer_off_outlined, color: AppTheme.primaryNeon, size: 22),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Khung Giờ Chạy & Tự Động Chốt',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        running.autoEndEnabled
-                                            ? 'Đang bật: $startStr ➔ $endStr (Chống quên)'
-                                            : 'Đang tắt tự động chốt',
-                                        style: TextStyle(
-                                          color: running.autoEndEnabled ? AppTheme.secondaryNeon : AppTheme.textMuted,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                AnimatedRotation(
-                                  turns: isExpanded ? 0.5 : 0.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textMuted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Nội dung chi tiết (Chỉ mở khi bấm)
-                        if (isExpanded) ...[
-                          const Divider(color: AppTheme.divider, height: 1),
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Tự động kết thúc khi qua giờ',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                    Switch(
-                                      value: running.autoEndEnabled,
-                                      activeThumbColor: AppTheme.primaryNeon,
-                                      onChanged: (val) {
-                                        running.updateAutoEndSchedule(
-                                          enabled: val,
-                                          startHour: running.autoStartHour,
-                                          startMinute: running.autoStartMinute,
-                                          endHour: running.autoEndHour,
-                                          endMinute: running.autoEndMinute,
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                                if (running.autoEndEnabled) ...[
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      // Giờ Bắt đầu
-                                      Expanded(
-                                        child: InkWell(
-                                          onTap: () async {
-                                            final picked = await showTimePicker(
-                                              context: context,
-                                              initialTime: TimeOfDay(hour: running.autoStartHour, minute: running.autoStartMinute),
-                                              builder: (context, child) {
-                                                return Theme(
-                                                  data: ThemeData.dark().copyWith(
-                                                    colorScheme: const ColorScheme.dark(
-                                                      primary: AppTheme.primaryNeon,
-                                                      surface: AppTheme.surface,
-                                                    ),
-                                                  ),
-                                                  child: child!,
-                                                );
-                                              },
-                                            );
-                                            if (picked != null) {
-                                              running.updateAutoEndSchedule(
-                                                enabled: true,
-                                                startHour: picked.hour,
-                                                startMinute: picked.minute,
-                                                endHour: running.autoEndHour,
-                                                endMinute: running.autoEndMinute,
-                                              );
-                                            }
-                                          },
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.surfaceLight,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: AppTheme.divider),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                const Icon(Icons.wb_sunny_outlined, size: 16, color: Colors.orangeAccent),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  'Bắt đầu: $startStr',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // Giờ Kết thúc
-                                      Expanded(
-                                        child: InkWell(
-                                          onTap: () async {
-                                            final picked = await showTimePicker(
-                                              context: context,
-                                              initialTime: TimeOfDay(hour: running.autoEndHour, minute: running.autoEndMinute),
-                                              builder: (context, child) {
-                                                return Theme(
-                                                  data: ThemeData.dark().copyWith(
-                                                    colorScheme: const ColorScheme.dark(
-                                                      primary: AppTheme.primaryNeon,
-                                                      surface: AppTheme.surface,
-                                                    ),
-                                                  ),
-                                                  child: child!,
-                                                );
-                                              },
-                                            );
-                                            if (picked != null) {
-                                              running.updateAutoEndSchedule(
-                                                enabled: true,
-                                                startHour: running.autoStartHour,
-                                                startMinute: running.autoStartMinute,
-                                                endHour: picked.hour,
-                                                endMinute: picked.minute,
-                                              );
-                                            }
-                                          },
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.surfaceLight,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: AppTheme.primaryNeon, width: 1.2),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                const Icon(Icons.flag_circle_outlined, size: 16, color: AppTheme.primaryNeon),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  'Chốt lúc: $endStr',
-                                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppTheme.primaryNeon),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primaryNeon.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.info_outline_rounded, size: 15, color: AppTheme.primaryNeon),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'Nếu quên bấm kết thúc, qua $endStr hệ thống sẽ tự động chốt và lưu kết quả lên Cloud.',
-                                            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+                    _buildSettingsRowTile(
+                      icon: Icons.lock_reset_rounded,
+                      iconColor: AppTheme.secondaryNeon,
+                      title: 'Bảo Mật & Mật Khẩu',
+                      subtitle: 'Đổi mật khẩu đăng nhập',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (ctx) => const SecuritySettingsScreen()),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
+              const SizedBox(height: 20),
 
               // ==========================================
-              // NHÓM 2: 👤 THÔNG TIN CÁ NHÂN & TÀI KHOẢN
+              // KHỐI 3: 🛡️ DÀNH CHO QUẢN TRỊ VIÊN (NẾU LÀ ADMIN)
               // ==========================================
-              Builder(
-                builder: (context) {
-                  final isExpanded = _activeProfileGroup == 'profile';
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isExpanded ? AppTheme.primaryNeon : AppTheme.divider,
-                        width: isExpanded ? 1.5 : 1.0,
-                      ),
-                      boxShadow: isExpanded
-                          ? [
-                              BoxShadow(
-                                color: AppTheme.primaryNeon.withValues(alpha: 0.12),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      children: [
-                        // Header Nhóm
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _activeProfileGroup = isExpanded ? '' : 'profile';
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.person_pin_rounded, color: AppTheme.primaryNeon, size: 22),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Thông Tin Cá Nhân',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        user?.name ?? 'Chưa cập nhật',
-                                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                AnimatedRotation(
-                                  turns: isExpanded ? 0.5 : 0.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textMuted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Nội dung chi tiết (Chỉ mở khi bấm)
-                        if (isExpanded) ...[
-                          const Divider(color: AppTheme.divider, height: 1),
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              children: [
-                                _buildProfileDetailRow(Icons.badge_outlined, 'Họ và tên', user?.name ?? 'Chưa đặt'),
-                                const SizedBox(height: 10),
-                                _buildProfileDetailRow(Icons.alternate_email_rounded, 'Tên đăng nhập', '@${user?.username ?? ''} (Cố định)'),
-                                const SizedBox(height: 10),
-                                _buildProfileDetailRow(Icons.email_outlined, 'Email', user?.email ?? 'Chưa có'),
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primaryNeon,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                    onPressed: () => EditProfileDialog.show(context, auth),
-                                    icon: const Icon(Icons.edit_note_rounded, size: 18),
-                                    label: const Text('CHỈNH SỬA THÔNG TIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              // ==========================================
-              // NHÓM 3: 🔒 BẢO MẬT & MẬT KHẨU
-              // ==========================================
-              Builder(
-                builder: (context) {
-                  final isExpanded = _activeProfileGroup == 'security';
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isExpanded ? AppTheme.secondaryNeon : AppTheme.divider,
-                        width: isExpanded ? 1.5 : 1.0,
-                      ),
-                      boxShadow: isExpanded
-                          ? [
-                              BoxShadow(
-                                color: AppTheme.secondaryNeon.withValues(alpha: 0.12),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      children: [
-                        // Header Nhóm
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _activeProfileGroup = isExpanded ? '' : 'security';
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.lock_reset_rounded, color: AppTheme.secondaryNeon, size: 22),
-                                ),
-                                const SizedBox(width: 14),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Bảo Mật & Mật Khẩu',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'Thay đổi mật khẩu đăng nhập',
-                                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                AnimatedRotation(
-                                  turns: isExpanded ? 0.5 : 0.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textMuted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Nội dung chi tiết (Chỉ mở khi bấm)
-                        if (isExpanded) ...[
-                          const Divider(color: AppTheme.divider, height: 1),
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Để bảo vệ tài khoản tốt nhất, hãy đặt mật khẩu có ít nhất 6 ký tự.',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
-                                ),
-                                const SizedBox(height: 14),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.secondaryNeon,
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                    onPressed: () => ChangePasswordDialog.show(context, auth),
-                                    icon: const Icon(Icons.key_rounded, size: 18),
-                                    label: const Text('ĐỔI MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              // ==========================================
-              // NHÓM 4: 🛡️ QUẢN TRỊ TOÀN HỆ THỐNG (CHỈ ADMIN)
-              // ==========================================
-              if (user?.isAdmin == true)
-                Builder(
-                  builder: (context) {
-                    final isExpanded = _activeProfileGroup == 'admin';
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isExpanded ? AppTheme.secondaryNeon : AppTheme.divider,
-                          width: isExpanded ? 1.5 : 1.0,
-                        ),
-                        boxShadow: isExpanded
-                            ? [
-                                BoxShadow(
-                                  color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Column(
-                        children: [
-                          // Header Nhóm
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _activeProfileGroup = isExpanded ? '' : 'admin';
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.secondaryNeon.withValues(alpha: 0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.admin_panel_settings_rounded, color: AppTheme.secondaryNeon, size: 22),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  const Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Trang Quản Trị Hệ Thống',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.secondaryNeon),
-                                        ),
-                                        SizedBox(height: 2),
-                                        Text(
-                                          'Dành riêng cho Quản Trị Viên',
-                                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  AnimatedRotation(
-                                    turns: isExpanded ? 0.5 : 0.0,
-                                    duration: const Duration(milliseconds: 200),
-                                    child: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.secondaryNeon),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // Nội dung chi tiết (Chỉ mở khi bấm)
-                          if (isExpanded) ...[
-                            const Divider(color: AppTheme.divider, height: 1),
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Toàn quyền quản lý danh sách runner, theo dõi tổng KM chạy và chỉnh sửa số liệu buổi chạy.',
-                                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.secondaryNeon,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                      onPressed: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(builder: (ctx) => const AdminDashboardScreen()),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
-                                      label: const Text('MỞ TRANG QUẢN TRỊ', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+              if (user?.isAdmin == true) ...[
+                _buildSettingsSectionHeader('DÀNH CHO QUẢN TRỊ VIÊN'),
+                const SizedBox(height: 8),
+                _buildSettingsMenuTile(
+                  icon: Icons.admin_panel_settings_rounded,
+                  iconColor: AppTheme.secondaryNeon,
+                  title: 'Trang Quản Trị Hệ Thống',
+                  subtitle: 'Quản lý runner & chỉnh sửa số liệu',
+                  isHighlighted: true,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (ctx) => const AdminDashboardScreen()),
                     );
                   },
                 ),
-
-              const SizedBox(height: 16),
+                const SizedBox(height: 20),
+              ],
 
               // ==========================================
               // NÚT ĐĂNG XUẤT
@@ -998,7 +495,7 @@ class _MainShellState extends State<MainShell> {
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppTheme.danger),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ),
@@ -1010,29 +507,143 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildProfileDetailRow(IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.divider),
+  Widget _buildSettingsSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.0,
+          color: AppTheme.textMuted,
+        ),
       ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppTheme.primaryNeon),
-          const SizedBox(width: 10),
-          Text('$label:', style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-              overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _buildSettingsMenuTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    String? statusText,
+    Color? statusColor,
+    bool isHighlighted = false,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isHighlighted ? iconColor.withValues(alpha: 0.8) : AppTheme.divider,
+          width: isHighlighted ? 1.5 : 1.0,
+        ),
+        boxShadow: isHighlighted
+            ? [
+                BoxShadow(
+                  color: iconColor.withValues(alpha: 0.15),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isHighlighted ? iconColor : AppTheme.textPrimary)),
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                if (statusText != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (statusColor ?? AppTheme.textMuted).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: statusColor ?? AppTheme.textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.textMuted, size: 14),
+              ],
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsRowTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12), overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.textMuted, size: 14),
+            ],
+          ),
+        ),
       ),
     );
   }
