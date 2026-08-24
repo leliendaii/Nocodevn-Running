@@ -311,4 +311,56 @@ class LocalStorageService {
       debugPrint('Lỗi xóa phiên: $e');
     }
   }
+
+  // ==========================================
+  // CẤU HÌNH KHUNG GIỜ TỰ ĐỘNG KẾT THÚC (CHỐNG QUÊN)
+  // ==========================================
+  static const String _keyAutoEndEnabled = 'auto_end_enabled';
+  static const String _keyAutoStartHour = 'auto_start_hour';
+  static const String _keyAutoStartMinute = 'auto_start_minute';
+  static const String _keyAutoEndHour = 'auto_end_hour';
+  static const String _keyAutoEndMinute = 'auto_end_minute';
+
+  /// Lưu cấu hình khung giờ chạy và giờ tự động chốt
+  static Future<void> saveAutoEndSchedule({
+    required bool enabled,
+    required int startHour,
+    required int startMinute,
+    required int endHour,
+    required int endMinute,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyAutoEndEnabled, enabled);
+      await prefs.setInt(_keyAutoStartHour, startHour);
+      await prefs.setInt(_keyAutoStartMinute, startMinute);
+      await prefs.setInt(_keyAutoEndHour, endHour);
+      await prefs.setInt(_keyAutoEndMinute, endMinute);
+    } catch (e) {
+      debugPrint('Lỗi lưu cấu hình auto end schedule: $e');
+    }
+  }
+
+  /// Tải cấu hình khung giờ chạy (Mặc định: 05:00 -> 07:30 sáng)
+  static Future<Map<String, dynamic>> loadAutoEndSchedule() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'enabled': prefs.getBool(_keyAutoEndEnabled) ?? true,
+        'startHour': prefs.getInt(_keyAutoStartHour) ?? 5,
+        'startMinute': prefs.getInt(_keyAutoStartMinute) ?? 0,
+        'endHour': prefs.getInt(_keyAutoEndHour) ?? 7,
+        'endMinute': prefs.getInt(_keyAutoEndMinute) ?? 30,
+      };
+    } catch (e) {
+      return {
+        'enabled': true,
+        'startHour': 5,
+        'startMinute': 0,
+        'endHour': 7,
+        'endMinute': 30,
+      };
+    }
+  }
 }
+

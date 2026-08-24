@@ -138,6 +138,20 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
 
+    if (running.wasAutoFinished) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          TopSyncToast.show(
+            context,
+            message: '⏰ Đã tự động chốt & lưu buổi chạy theo khung giờ cài đặt của bạn!',
+            isSuccess: true,
+            duration: const Duration(seconds: 5),
+          );
+          running.clearAutoFinishedFlag();
+        }
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('NOCODE RUNNING'),

@@ -495,6 +495,221 @@ class _MainShellState extends State<MainShell> {
               ),
               const SizedBox(height: 10),
 
+              // KHUNG GIỜ CHẠY & TỰ ĐỘNG CHỐT (CHỐNG QUÊN)
+              Consumer<RunningProvider>(
+                builder: (context, running, _) {
+                  final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
+                  final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: running.autoEndEnabled
+                            ? AppTheme.primaryNeon.withValues(alpha: 0.5)
+                            : AppTheme.divider,
+                        width: running.autoEndEnabled ? 1.5 : 1.0,
+                      ),
+                      boxShadow: running.autoEndEnabled
+                          ? [
+                              BoxShadow(
+                                color: AppTheme.primaryNeon.withValues(alpha: 0.1),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.timer_off_outlined, color: AppTheme.primaryNeon, size: 22),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tự động chốt buổi chạy',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  Text(
+                                    'Chống quên kết thúc khi chạy',
+                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: running.autoEndEnabled,
+                              activeThumbColor: AppTheme.primaryNeon,
+                              onChanged: (val) {
+                                running.updateAutoEndSchedule(
+                                  enabled: val,
+                                  startHour: running.autoStartHour,
+                                  startMinute: running.autoStartMinute,
+                                  endHour: running.autoEndHour,
+                                  endMinute: running.autoEndMinute,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        if (running.autoEndEnabled) ...[
+                          const SizedBox(height: 14),
+                          const Divider(color: AppTheme.divider, height: 1),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Khung giờ chạy buổi sáng của bạn:',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              // Chọn giờ Bắt đầu
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () async {
+                                    final picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay(hour: running.autoStartHour, minute: running.autoStartMinute),
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: ThemeData.dark().copyWith(
+                                            colorScheme: const ColorScheme.dark(
+                                              primary: AppTheme.primaryNeon,
+                                              surface: AppTheme.surface,
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+                                    if (picked != null) {
+                                      running.updateAutoEndSchedule(
+                                        enabled: true,
+                                        startHour: picked.hour,
+                                        startMinute: picked.minute,
+                                        endHour: running.autoEndHour,
+                                        endMinute: running.autoEndMinute,
+                                      );
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surfaceLight,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppTheme.divider),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.wb_sunny_outlined, size: 16, color: Colors.orangeAccent),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Bắt đầu: $startStr',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              // Chọn giờ Tự động kết thúc
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () async {
+                                    final picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay(hour: running.autoEndHour, minute: running.autoEndMinute),
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: ThemeData.dark().copyWith(
+                                            colorScheme: const ColorScheme.dark(
+                                              primary: AppTheme.primaryNeon,
+                                              surface: AppTheme.surface,
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+                                    if (picked != null) {
+                                      running.updateAutoEndSchedule(
+                                        enabled: true,
+                                        startHour: running.autoStartHour,
+                                        startMinute: running.autoStartMinute,
+                                        endHour: picked.hour,
+                                        endMinute: picked.minute,
+                                      );
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surfaceLight,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppTheme.primaryNeon, width: 1.2),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.flag_circle_outlined, size: 16, color: AppTheme.primaryNeon),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Chốt lúc: $endStr',
+                                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppTheme.primaryNeon),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryNeon.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.primaryNeon),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Nếu bạn quên bấm kết thúc, qua $endStr hệ thống sẽ tự động chốt số KM và lưu kết quả lên Cloud.',
+                                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+
               // Nút Đổi mật khẩu
               Container(
                 padding: const EdgeInsets.all(16),

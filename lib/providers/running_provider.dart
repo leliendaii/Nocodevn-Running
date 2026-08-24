@@ -36,12 +36,55 @@ class RunningProvider with ChangeNotifier {
   DateTime? _lastPositionTime;
   StreamSubscription<Position>? _positionStream;
 
+  // Cấu hình Khung giờ chạy & Tự động kết thúc (Chống quên)
+  bool _autoEndEnabled = true;
+  int _autoStartHour = 5;
+  int _autoStartMinute = 0;
+  int _autoEndHour = 7;
+  int _autoEndMinute = 30;
+  bool _wasAutoFinished = false;
+
   // Danh sách toàn bộ lịch sử các buổi chạy
   final List<RunSession> _sessions = [];
 
   RunningProvider() {
     _initMockData();
     _loadInitialSessions();
+    _loadAutoEndConfig();
+  }
+
+  /// Tải cấu hình khung giờ chạy
+  Future<void> _loadAutoEndConfig() async {
+    final schedule = await LocalStorageService.loadAutoEndSchedule();
+    _autoEndEnabled = schedule['enabled'] ?? true;
+    _autoStartHour = schedule['startHour'] ?? 5;
+    _autoStartMinute = schedule['startMinute'] ?? 0;
+    _autoEndHour = schedule['endHour'] ?? 7;
+    _autoEndMinute = schedule['endMinute'] ?? 30;
+    notifyListeners();
+  }
+
+  /// Cập nhật khung giờ chạy và giờ tự động chốt
+  Future<void> updateAutoEndSchedule({
+    required bool enabled,
+    required int startHour,
+    required int startMinute,
+    required int endHour,
+    required int endMinute,
+  }) async {
+    _autoEndEnabled = enabled;
+    _autoStartHour = startHour;
+    _autoStartMinute = startMinute;
+    _autoEndHour = endHour;
+    _autoEndMinute = endMinute;
+    await LocalStorageService.saveAutoEndSchedule(
+      enabled: enabled,
+      startHour: startHour,
+      startMinute: startMinute,
+      endHour: endHour,
+      endMinute: endMinute,
+    );
+    notifyListeners();
   }
 
   /// Tải dữ liệu kết hợp Offline Cache & Supabase Cloud
@@ -112,10 +155,38 @@ class RunningProvider with ChangeNotifier {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  // Getters cho cấu hình khung giờ tự động kết thúc (Chống quên)
+  bool get autoEndEnabled => _autoEndEnabled;
+  int get autoStartHour => _autoStartHour;
+  int get autoStartMinute => _autoStartMinute;
+  int get autoEndHour => _autoEndHour;
+  int get autoEndMinute => _autoEndMinute;
+  bool get wasAutoFinished => _wasAutoFinished;
+
+  void clearAutoFinishedFlag() {
+    _wasAutoFinished = false;
+    notifyListeners();
+  }
+
   void _updateDurationFromWallClock() {
     if (_state == TrackingState.running && _runStartTime != null) {
-      final elapsed = DateTime.now().difference(_runStartTime!).inSeconds;
+      final now = DateTime.now();
+      final elapsed = now.difference(_runStartTime!).inSeconds;
       _durationSeconds = (elapsed - _totalPausedSeconds).clamp(0, 99999999);
+
+      // KIỂM TRA TỰ ĐỘNG CHỐT KHI QUA GIỜ CÀI ĐẶT (CHỐNG QUÊN)
+      if (_autoEndEnabled) {
+        final cutoffToday = DateTime(now.year, now.month, now.day, _autoEndHour, _autoEndMinute);
+        if (now.isAfter(cutoffToday) && _runStartTime!.isBefore(cutoffToday)) {
+          debugPrint('⏰ [AUTO-FINISH] Đã qua mốc giờ $_autoEndHour:$_autoEndMinute, tự động chốt buổi chạy!');
+          _wasAutoFinished = true;
+          stopAndSaveTracking(
+            userId: 'current_user',
+            userName: 'Người chạy',
+            notes: 'Tự động chốt lúc ${_autoEndHour.toString().padLeft(2, '0')}:${_autoEndMinute.toString().padLeft(2, '0')} (Chống quên)',
+          );
+        }
+      }
     }
   }
 
