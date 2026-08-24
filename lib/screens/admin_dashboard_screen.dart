@@ -6,6 +6,7 @@ import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
+import '../widgets/user_avatar.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -525,6 +526,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 itemBuilder: (context, index) {
                   final session = allSessions[index];
                   final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+                  final realName = running.getUserRealName(session.userId, session.userName);
+                  final realAvatar = running.getUserRealAvatar(session.userId);
+                  final isAdmin = running.isUserAdmin(session.userId);
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -534,21 +538,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                         children: [
                           Row(
                             children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: AppTheme.surfaceLight,
-                                child: Text(
-                                  session.userName.isNotEmpty ? session.userName[0] : 'U',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryNeon),
-                                ),
+                              UserAvatar(
+                                avatarUrl: realAvatar,
+                                name: realName,
+                                radius: 20,
+                                isAdmin: isAdmin,
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      session.userName,
+                                      realName,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                     ),
                                     Text(

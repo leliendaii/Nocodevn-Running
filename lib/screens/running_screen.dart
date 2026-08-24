@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
+import '../widgets/user_avatar.dart';
 
 class RunningScreen extends StatefulWidget {
   const RunningScreen({super.key});
@@ -178,25 +178,11 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                 ),
                 child: Row(
                   children: [
-                    ClipOval(
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        color: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                        child: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
-                            ? (user.avatarUrl.startsWith('data:image')
-                                ? Image.memory(
-                                    base64Decode(user.avatarUrl.split(',').last),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22),
-                                  )
-                                : Image.network(
-                                    user.avatarUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22),
-                                  ))
-                            : const Icon(Icons.person, color: AppTheme.primaryNeon, size: 22),
-                      ),
+                    UserAvatar(
+                      avatarUrl: user?.avatarUrl,
+                      name: user?.name ?? 'Người chạy',
+                      radius: 20,
+                      isAdmin: user?.isAdmin == true,
                     ),
                     const SizedBox(width: 12),
                     Expanded(

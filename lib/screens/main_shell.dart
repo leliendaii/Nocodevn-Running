@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +6,7 @@ import '../providers/running_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dialogs/avatar_picker_dialog.dart';
+import '../widgets/user_avatar.dart';
 import 'running_screen.dart';
 import 'history_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -312,27 +312,12 @@ class _MainShellState extends State<MainShell> {
               Center(
                 child: Stack(
                   children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.surfaceLight,
-                        border: Border.all(
-                          color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-                          width: 3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon).withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: _buildAvatarImage(user?.avatarUrl ?? '', user?.isAdmin == true),
-                      ),
+                    UserAvatar(
+                      avatarUrl: user?.avatarUrl,
+                      name: user?.name ?? 'Người dùng',
+                      radius: 50,
+                      isAdmin: user?.isAdmin == true,
+                      onTap: () => AvatarPickerDialog.show(context, auth),
                     ),
                     Positioned(
                       bottom: 0,
@@ -645,40 +630,6 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildAvatarImage(String avatarUrl, bool isAdmin) {
-    if (avatarUrl.startsWith('data:image')) {
-      try {
-        final base64Data = avatarUrl.split(',').last;
-        return Image.memory(
-          base64Decode(base64Data),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Icon(
-            Icons.person,
-            size: 55,
-            color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-          ),
-        );
-      } catch (e) {
-        debugPrint('Lỗi decode base64 avatar: $e');
-      }
-    } else if (avatarUrl.startsWith('http')) {
-      return Image.network(
-        avatarUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Icon(
-          Icons.person,
-          size: 55,
-          color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-        ),
-      );
-    }
-    return Icon(
-      Icons.person,
-      size: 55,
-      color: isAdmin ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
     );
   }
 }

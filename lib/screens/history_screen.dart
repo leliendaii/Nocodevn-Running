@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
+import '../widgets/user_avatar.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -124,6 +125,10 @@ class HistoryScreen extends StatelessWidget {
 
   Widget _buildSessionCard(BuildContext context, RunSession session) {
     final dateFormat = DateFormat('dd/MM/yyyy • HH:mm');
+    final running = context.read<RunningProvider>();
+    final realName = running.getUserRealName(session.userId, session.userName);
+    final realAvatar = running.getUserRealAvatar(session.userId);
+    final isAdmin = running.isUserAdmin(session.userId);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -140,20 +145,18 @@ class HistoryScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.directions_run_rounded, color: AppTheme.primaryNeon, size: 20),
+                      UserAvatar(
+                        avatarUrl: realAvatar,
+                        name: realName,
+                        radius: 20,
+                        isAdmin: isAdmin,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            session.userName,
+                            realName,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                           Text(

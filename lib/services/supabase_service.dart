@@ -125,6 +125,22 @@ class SupabaseService {
     }
   }
 
+  /// Lấy toàn bộ danh sách hồ sơ người dùng (profiles) từ Supabase Cloud
+  static Future<List<Map<String, dynamic>>?> fetchAllProfiles() async {
+    final supa = client;
+    if (supa == null) return null;
+    try {
+      final res = await supa
+          .from('profiles')
+          .select()
+          .timeout(const Duration(seconds: 4));
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('Lỗi fetchAllProfiles: $e');
+      return null;
+    }
+  }
+
   /// Lấy vai trò (role) chính xác từ Supabase DB
   static String extractRole(User user, [Map<String, dynamic>? profile]) {
     if (profile != null && profile['role'] != null) {

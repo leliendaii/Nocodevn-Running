@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/dialogs/avatar_picker_dialog.dart';
+import '../widgets/user_avatar.dart';
 
 class AccountInfoScreen extends StatefulWidget {
   const AccountInfoScreen({super.key});
@@ -87,32 +88,12 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
             Center(
               child: Stack(
                 children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.surfaceLight,
-                      border: Border.all(
-                        color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon).withValues(alpha: 0.25),
-                          blurRadius: 20,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: (user?.avatarUrl != null && user!.avatarUrl.isNotEmpty)
-                          ? Image.network(
-                              user.avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const Icon(Icons.person, size: 50, color: AppTheme.textMuted),
-                            )
-                          : const Icon(Icons.person, size: 50, color: AppTheme.textMuted),
-                    ),
+                  UserAvatar(
+                    avatarUrl: user?.avatarUrl,
+                    name: user?.name ?? 'Người dùng',
+                    radius: 50,
+                    isAdmin: user?.isAdmin == true,
+                    onTap: () => AvatarPickerDialog.show(context, auth),
                   ),
                   Positioned(
                     bottom: 0,

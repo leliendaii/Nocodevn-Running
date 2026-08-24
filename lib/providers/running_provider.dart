@@ -47,11 +47,75 @@ class RunningProvider with ChangeNotifier {
   // Danh sách toàn bộ lịch sử các buổi chạy
   final List<RunSession> _sessions = [];
 
+  // Cache hồ sơ thật của tất cả người dùng trong hệ thống
+  final Map<String, Map<String, dynamic>> _userProfiles = {};
+
   RunningProvider() {
-    _initMockData();
     _loadInitialSessions();
+    _loadUserProfiles();
     _loadAutoEndConfig();
   }
+
+  /// Tải danh sách profile thật của tất cả user từ Cloud
+  Future<void> _loadUserProfiles() async {
+    final list = await SupabaseService.fetchAllProfiles();
+    if (list != null && list.isNotEmpty) {
+      _userProfiles.clear();
+      for (final p in list) {
+        final id = p['id']?.toString() ?? '';
+        if (id.isNotEmpty) {
+          _userProfiles[id] = p;
+        }
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Làm mới toàn bộ profile và buổi chạy từ Cloud
+  Future<void> refreshAllData() async {
+    await Future.wait([
+      _loadInitialSessions(),
+      _loadUserProfiles(),
+    ]);
+  }
+
+  /// Lấy Tên Thật của User theo ID (Nếu chưa có thì dùng tên lưu trong session)
+  String getUserRealName(String userId, [String fallbackName = '']) {
+    final p = _userProfiles[userId];
+    if (p != null && p['name'] != null && (p['name'] as String).trim().isNotEmpty) {
+      return (p['name'] as String).trim();
+    }
+    return fallbackName.isNotEmpty ? fallbackName : 'Người chạy';
+  }
+
+  /// Lấy Avatar Thật của User theo ID
+  String getUserRealAvatar(String userId) {
+    final p = _userProfiles[userId];
+    if (p != null && p['avatar_url'] != null) {
+      return (p['avatar_url'] as String).trim();
+    }
+    return '';
+  }
+
+  /// Lấy Username Thật của User theo ID
+  String getUserRealUsername(String userId) {
+    final p = _userProfiles[userId];
+    if (p != null && p['username'] != null) {
+      return (p['username'] as String).trim();
+    }
+    return '';
+  }
+
+  /// Kiểm tra User có phải Admin hay không
+  bool isUserAdmin(String userId) {
+    final p = _userProfiles[userId];
+    if (p != null && p['role'] != null) {
+      return (p['role'] as String).toLowerCase() == 'admin';
+    }
+    return false;
+  }
+
+  Map<String, Map<String, dynamic>> get allUserProfiles => _userProfiles;
 
   /// Tải cấu hình khung giờ chạy
   Future<void> _loadAutoEndConfig() async {
@@ -585,34 +649,6 @@ class RunningProvider with ChangeNotifier {
     }
 
     return points;
-  }
-
-  void _initMockData() {
-    final now = DateTime.now();
-    _sessions.addAll([
-      RunSession(
-        id: 'mock_1',
-        userId: 'admin_01',
-        userName: 'Nguyễn Văn Admin',
-        startTime: now.subtract(const Duration(days: 1, hours: 2)),
-        endTime: now.subtract(const Duration(days: 1, hours: 1, minutes: 25)),
-        durationSeconds: 2100,
-        distanceKm: 5.2,
-        calories: 320,
-        notes: 'Chạy buổi chiều công viên',
-      ),
-      RunSession(
-        id: 'mock_2',
-        userId: 'user_02',
-        userName: 'Trần Runner Pro',
-        startTime: now.subtract(const Duration(days: 2, hours: 5)),
-        endTime: now.subtract(const Duration(days: 2, hours: 4)),
-        durationSeconds: 3600,
-        distanceKm: 10.0,
-        calories: 620,
-        notes: 'Chạy dài 10K cuối tuần',
-      ),
-    ]);
   }
 
   @override
