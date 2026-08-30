@@ -33,6 +33,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final double _totalPathLength;
   late final int _zoomLevel;
 
+  // Bảng tra cứu tọa độ đều 1.500 điểm (Zero Jitter - Trượt êm tuyệt đối 100%)
+  late final List<Offset> _sampledPositions;
+  late final List<double> _sampledHeadings;
+  late final Offset _startPinPixel;
+  late final Offset _finishPinPixel;
+
   // Cache ảnh map tiles Google Maps
   final Map<String, ui.Image> _tileCache = {};
   final Set<String> _loadingTiles = {};
@@ -73,12 +79,30 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
     _totalPathLength = _pathMetric.length > 0 ? _pathMetric.length : 1.0;
 
+    // 6. Tiền tính toán bảng nội suy 1.500 điểm đều nhau (Triệt tiêu 100% rung lắc micro-jitter)
+    const int sampleCount = 1500;
+    _sampledPositions = List.generate(sampleCount, (i) {
+      final double dist = _totalPathLength * (i / (sampleCount - 1));
+      final tangent = _pathMetric.getTangentForOffset(dist);
+      return tangent?.position ?? _cachedRoutePixels.first;
+    });
+
+    _sampledHeadings = List.generate(sampleCount, (i) {
+      final double dist = _totalPathLength * (i / (sampleCount - 1));
+      final tangent = _pathMetric.getTangentForOffset(dist);
+      return tangent != null ? math.atan2(tangent.vector.dy, tangent.vector.dx) : 0.0;
+    });
+
+    // Vị trí chuẩn xác 100% của Điểm Bắt Đầu và Điểm Kết Thúc
+    _startPinPixel = _sampledPositions.first;
+    _finishPinPixel = _sampledPositions.last;
+
     _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute, _cachedRoutePixels);
 
-    // 6. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM (Chống giật lag)
+    // 7. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM (Chống giật lag)
     _precacheRouteMapTiles();
 
-    // 7. Khởi tạo AnimationController
+    // 8. Khởi tạo AnimationController
     _controller = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: (18000 / _playbackSpeed).round()),
@@ -93,11 +117,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _controller.forward();
   }
 
+  void _handleExit() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _controller.stop();
+    _loadingTiles.clear();
+    Navigator.of(context).pop();
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
     _controller.stop();
     _controller.dispose();
+    _loadingTiles.clear();
     super.dispose();
   }
 
@@ -190,7 +223,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     } else {
       // Tuyến đường thực tế bám 100% theo tim đường & vỉa hè các đại lộ lớn
       basePoints = const [
-        GeoPoint(10.77665, 106.70085), // 1. Đầu Phố Đi Bộ Nguyễn Huệ (Trước UBND TP)
+        GeoPoint(10.77665, 106.70085), // 1. BẮT ĐẦU: Trước UBND TP (Đầu Phố Đi Bộ Nguyễn Huệ)
         GeoPoint(10.77490, 106.70225), // 2. Thẳng theo Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
         GeoPoint(10.77350, 106.70340), // 3. Thẳng theo Phố Đi Bộ Nguyễn Huệ giao Ngô Đức Kế
         GeoPoint(10.77195, 106.70465), // 4. Cuối Phố Đi Bộ Nguyễn Huệ giao Tôn Đức Thắng
@@ -199,7 +232,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         GeoPoint(10.77395, 106.70220), // 7. Thẳng theo Hàm Nghi giao Pasteur
         GeoPoint(10.77525, 106.70080), // 8. Rẽ phải vào đường Pasteur giao Lê Lợi
         GeoPoint(10.77655, 106.69940), // 9. Thẳng theo Pasteur giao Lê Thánh Tôn
-        GeoPoint(10.77665, 106.70085), // 10. Rẽ phải theo Lê Thánh Tôn về lại UBND TP (Điểm xuất phát)
+        GeoPoint(10.77690, 106.70050), // 10. KẾT THÚC: Về đích trước Công viên Tượng đài Bác Hồ
       ];
     }
 
@@ -246,7 +279,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   }
 
   void _loadMapTile(int z, int x, int y) {
-    if (_isDisposed) return;
+    if (_isDisposed || !mounted) return;
     final key = '$z/$x/$y';
     if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
 
@@ -381,231 +414,241 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      key: _previewKey,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
-        body: SafeArea(
-          child: Stack(
-            children: [
-              // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục bằng PathMetric, Chữ luôn thẳng đứng)
-              Positioned.fill(
-                child: _cachedRoutePixels.isEmpty
-                    ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
-                    : AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, _) {
-                          return CustomPaint(
-                            painter: Real3DFlyoverPainter(
-                              pixels: _cachedRoutePixels,
-                              fullPath: _fullVectorPath,
-                              pathMetric: _pathMetric,
-                              totalLength: _totalPathLength,
-                              milestones: _milestones,
-                              progress: _controller.value,
-                              tileCache: _tileCache,
-                              zoom: _zoomLevel,
-                              onTileRequested: _loadMapTile,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          _isDisposed = true;
+          _controller.stop();
+        }
+      },
+      child: RepaintBoundary(
+        key: _previewKey,
+        child: Scaffold(
+          backgroundColor: const Color(0xFF0F172A),
+          body: SafeArea(
+            child: Stack(
+              children: [
+                // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục 1.500 điểm đều nhau, Zero Jitter)
+                Positioned.fill(
+                  child: _cachedRoutePixels.isEmpty
+                      ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
+                      : AnimatedBuilder(
+                          animation: _controller,
+                          builder: (context, _) {
+                            return CustomPaint(
+                              painter: Real3DFlyoverPainter(
+                                pixels: _cachedRoutePixels,
+                                fullPath: _fullVectorPath,
+                                sampledPositions: _sampledPositions,
+                                sampledHeadings: _sampledHeadings,
+                                startPinPixel: _startPinPixel,
+                                finishPinPixel: _finishPinPixel,
+                                pathMetric: _pathMetric,
+                                totalLength: _totalPathLength,
+                                milestones: _milestones,
+                                progress: _controller.value,
+                                tileCache: _tileCache,
+                                zoom: _zoomLevel,
+                                onTileRequested: _loadMapTile,
+                              ),
+                            );
+                          },
+                        ),
+                ),
+
+                // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG
+                Positioned(
+                  top: 12,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.divider, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, _) {
+                        final runProgress = (_controller.value / 0.78).clamp(0.0, 1.0);
+                        final currentDistance = (_effectiveDistanceKm * runProgress).toStringAsFixed(2);
+                        final elapsedSec = (_effectiveDurationSec * runProgress).toInt();
+                        final int minutes = elapsedSec ~/ 60;
+                        final int seconds = elapsedSec % 60;
+                        final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: _handleExit,
                             ),
-                          );
-                        },
-                      ),
-              ),
-
-              // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG
-              Positioned(
-                top: 12,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.divider, width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, _) {
-                      final runProgress = (_controller.value / 0.78).clamp(0.0, 1.0);
-                      final currentDistance = (_effectiveDistanceKm * runProgress).toStringAsFixed(2);
-                      final elapsedSec = (_effectiveDurationSec * runProgress).toInt();
-                      final int minutes = elapsedSec ~/ 60;
-                      final int seconds = elapsedSec % 60;
-                      final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () {
-                              _controller.stop();
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('QUÃNG ĐƯỜNG', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                              Text('$currentDistance km', style: const TextStyle(fontSize: 17, color: AppTheme.primaryNeon, fontWeight: FontWeight.w900)),
-                            ],
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('PACE', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                              Text('$_effectivePace /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
-                            ],
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('THỜI GIAN', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                              Text(elapsedFormatted, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w900)),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.file_download_outlined, color: AppTheme.secondaryNeon, size: 22),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: _handleDownloadVideo,
-                          ),
-                        ],
-                      );
-                    },
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('QUÃNG ĐƯỜNG', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                                Text('$currentDistance km', style: const TextStyle(fontSize: 17, color: AppTheme.primaryNeon, fontWeight: FontWeight.w900)),
+                              ],
+                            ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('PACE', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                                Text('$_effectivePace /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
+                              ],
+                            ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('THỜI GIAN', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                                Text(elapsedFormatted, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w900)),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.file_download_outlined, color: AppTheme.secondaryNeon, size: 22),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: _handleDownloadVideo,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
 
-              // 3. BOTTOM CONTROL BAR: BỘ ĐIỀU KHIỂN FLYCAM
-              Positioned(
-                bottom: 16,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface.withValues(alpha: 0.94),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppTheme.divider, width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, _) {
-                          return SliderTheme(
-                            data: SliderThemeData(
-                              trackHeight: 4,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                              activeTrackColor: AppTheme.primaryNeon,
-                              inactiveTrackColor: AppTheme.surfaceLight,
-                              thumbColor: Colors.white,
+                // 3. BOTTOM CONTROL BAR: BỘ ĐIỀU KHIỂN FLYCAM
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: AppTheme.divider, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedBuilder(
+                          animation: _controller,
+                          builder: (context, _) {
+                            return SliderTheme(
+                              data: SliderThemeData(
+                                trackHeight: 4,
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                                activeTrackColor: AppTheme.primaryNeon,
+                                inactiveTrackColor: AppTheme.surfaceLight,
+                                thumbColor: Colors.white,
+                              ),
+                              child: Slider(
+                                value: _controller.value,
+                                onChanged: (val) {
+                                  if (_isDisposed) return;
+                                  setState(() {
+                                    _controller.value = val;
+                                    if (_isPlaying) _controller.stop();
+                                    _isPlaying = false;
+                                  });
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                backgroundColor: AppTheme.surfaceLight,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: const Size(60, 32),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppTheme.secondaryNeon),
+                              label: Text(
+                                '${_playbackSpeed}x',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
+                              ),
+                              onPressed: _openSpeedSelectorModal,
                             ),
-                            child: Slider(
-                              value: _controller.value,
-                              onChanged: (val) {
-                                if (_isDisposed) return;
-                                setState(() {
-                                  _controller.value = val;
-                                  if (_isPlaying) _controller.stop();
-                                  _isPlaying = false;
-                                });
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              backgroundColor: AppTheme.surfaceLight,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              minimumSize: const Size(60, 32),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppTheme.secondaryNeon),
-                            label: Text(
-                              '${_playbackSpeed}x',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
-                            ),
-                            onPressed: _openSpeedSelectorModal,
-                          ),
-                          AnimatedBuilder(
-                            animation: _controller,
-                            builder: (context, _) {
-                              final isCompleted = _controller.value >= 0.98;
-                              return Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                                      blurRadius: 14,
-                                    ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryNeon,
-                                    foregroundColor: Colors.white,
-                                    shape: const CircleBorder(),
-                                    padding: const EdgeInsets.all(12),
+                            AnimatedBuilder(
+                              animation: _controller,
+                              builder: (context, _) {
+                                final isCompleted = _controller.value >= 0.98;
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                                        blurRadius: 14,
+                                      ),
+                                    ],
                                   ),
-                                  onPressed: _togglePlayPause,
-                                  child: Icon(
-                                    isCompleted
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryNeon,
+                                      foregroundColor: Colors.white,
+                                      shape: const CircleBorder(),
+                                      padding: const EdgeInsets.all(12),
+                                    ),
+                                    onPressed: _togglePlayPause,
+                                    child: Icon(
+                                      isCompleted
                                         ? Icons.replay_rounded
                                         : (_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                                    size: 26,
+                                      size: 26,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                          AnimatedBuilder(
-                            animation: _controller,
-                            builder: (context, _) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surfaceLight,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '${(_controller.value * 100).toInt()}%',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                                );
+                              },
+                            ),
+                            AnimatedBuilder(
+                              animation: _controller,
+                              builder: (context, _) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceLight,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${(_controller.value * 100).toInt()}%',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -632,6 +675,10 @@ class MilestoneData {
 class Real3DFlyoverPainter extends CustomPainter {
   final List<Offset> pixels;
   final Path fullPath;
+  final List<Offset> sampledPositions;
+  final List<double> sampledHeadings;
+  final Offset startPinPixel;
+  final Offset finishPinPixel;
   final ui.PathMetric pathMetric;
   final double totalLength;
   final List<MilestoneData> milestones;
@@ -645,6 +692,10 @@ class Real3DFlyoverPainter extends CustomPainter {
   Real3DFlyoverPainter({
     required this.pixels,
     required this.fullPath,
+    required this.sampledPositions,
+    required this.sampledHeadings,
+    required this.startPinPixel,
+    required this.finishPinPixel,
     required this.pathMetric,
     required this.totalLength,
     required this.milestones,
@@ -656,18 +707,19 @@ class Real3DFlyoverPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (pixels.isEmpty) return;
+    if (pixels.isEmpty || sampledPositions.isEmpty) return;
 
-    // 1. TIẾN ĐỘ CHẠY & NỘI SUY TANGENT BẰNG PATHMETRIC (Trượt siêu êm ái 60-120 FPS)
+    // 1. TIẾN ĐỘ CHẠY & NỘI SUY BẰNG BẢNG SAMPLING ĐỀU (Zero Jitter - Lướt êm 60-120 FPS)
     final double runProgress = (progress / 0.78).clamp(0.0, 1.0);
     final double currentDist = totalLength * runProgress;
 
-    final ui.Tangent? tangent = pathMetric.getTangentForOffset(currentDist);
-    final Offset currentPixel = tangent?.position ?? pixels.first;
-    // Góc xoay chuẩn theo vector tiếp tuyến của hướng chạy
-    final double runnerHeading = tangent != null
-        ? math.atan2(tangent.vector.dy, tangent.vector.dx)
-        : 0.0;
+    final double fIndex = (sampledPositions.length - 1) * runProgress;
+    final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
+    final int nextIdx = math.min(baseIdx + 1, sampledPositions.length - 1);
+    final double subFrac = fIndex - baseIdx;
+
+    final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
+    final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
     // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
     double minX = 99999999, maxX = -99999999;
@@ -683,13 +735,14 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double spanW = (maxX - minX).abs();
     final double spanH = (maxY - minY).abs();
 
-    final double targetScaleX = (size.width * 0.54) / (spanW > 10 ? spanW : 100);
-    final double targetScaleY = (size.height * 0.38) / (spanH > 10 ? spanH : 100);
-    final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.18, 1.0);
+    // Hệ số Zoom Out lớn hơn (to hơn 25%) để lộ trình to rõ, đẹp mắt
+    final double targetScaleX = (size.width * 0.76) / (spanW > 10 ? spanW : 100);
+    final double targetScaleY = (size.height * 0.54) / (spanH > 10 ? spanH : 100);
+    final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.24, 1.0);
 
     // Hiệu ứng Zoom Out mượt mà khi kết thúc (Từ 78% -> 100%)
     final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
-    final double outroT = Curves.easeInOutCubic.transform(outroRaw);
+    final double outroT = Curves.fastOutSlowIn.transform(outroRaw);
 
     final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
@@ -697,7 +750,7 @@ class Real3DFlyoverPainter extends CustomPainter {
 
     // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GRAB/GOOGLE MAPS (Trượt êm như nhung, không rung lắc)
     final double screenCenterX = size.width / 2;
-    final double screenCenterY = ui.lerpDouble(size.height * 0.58, size.height * 0.50, outroT)!;
+    final double screenCenterY = ui.lerpDouble(size.height * 0.56, size.height * 0.50, outroT)!;
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
@@ -827,17 +880,15 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 9. VẼ ĐIỂM XUẤT PHÁT (🟢 BẮT ĐẦU) & ĐIỂM VỀ ĐÍCH (🏁 KẾT THÚC)
-    final startPt = pixels.first;
-    final finishPt = pixels.last;
-    final bool isLoop = (startPt - finishPt).distance < 45.0;
+    // 9. VẼ ĐIỂM XUẤT PHÁT (🟢 BẮT ĐẦU) & ĐIỂM VỀ ĐÍCH (🏁 KẾT THÚC) TẠI ĐÚNG VỊ TRÍ TUYẾN ĐƯỜNG
+    final bool isLoop = (startPinPixel - finishPinPixel).distance < 45.0;
 
     final Offset startOffset = isLoop ? const Offset(-30, 0) : Offset.zero;
     final Offset finishOffset = isLoop ? const Offset(30, 0) : Offset.zero;
 
-    // Điểm Bắt Đầu 🟢
+    // Điểm Bắt Đầu 🟢 (Đặt chính xác tại điểm khởi đầu cung đường)
     canvas.save();
-    canvas.translate(startPt.dx + startOffset.dx, startPt.dy + startOffset.dy);
+    canvas.translate(startPinPixel.dx + startOffset.dx, startPinPixel.dy + startOffset.dy);
 
     canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
     canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
@@ -855,10 +906,10 @@ class Real3DFlyoverPainter extends CustomPainter {
     startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
     canvas.restore();
 
-    // Điểm Kết Thúc 🏁
+    // Điểm Kết Thúc 🏁 (Đặt chính xác tại điểm cán đích của người chạy)
     if (outroT > 0.05) {
       canvas.save();
-      canvas.translate(finishPt.dx + finishOffset.dx, finishPt.dy + finishOffset.dy);
+      canvas.translate(finishPinPixel.dx + finishOffset.dx, finishPinPixel.dy + finishOffset.dy);
       canvas.scale(outroT, outroT);
 
       canvas.drawCircle(
@@ -887,19 +938,31 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 10. VẼ ICON ĐỊNH VỊ GPS CAO CẤP CHUẨN GRAB/BE/STRAVA (Có sóng Radar lan tỏa & Mũi tên điều hướng 3D)
+    // 10. VẼ CON TRỎ ĐỊNH VỊ GPS HIỆN ĐẠI BẬC NHẤT (Sóng Radar Kép + Đĩa Bay Thể Thao Cao Cấp)
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
-    // Sóng Radar lan tỏa (Pulsing Radar Wave)
-    final double pulse = (progress * 18.0) % 1.0;
+    // Sóng Radar Kép Lan Tỏa (Double Pulsing Wave)
+    final double pulse1 = (progress * 16.0) % 1.0;
+    final double pulse2 = ((progress * 16.0) + 0.5) % 1.0;
+
     canvas.drawCircle(
       Offset.zero,
-      12 + pulse * 22,
+      10 + pulse1 * 26,
       Paint()
         ..isAntiAlias = true
-        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35 * (1.0 - pulse) * (1.0 - outroT))
-        ..style = PaintingStyle.fill,
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35 * (1.0 - pulse1) * (1.0 - outroT))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0,
+    );
+    canvas.drawCircle(
+      Offset.zero,
+      10 + pulse2 * 26,
+      Paint()
+        ..isAntiAlias = true
+        ..color = const Color(0xFF00B0FF).withValues(alpha: 0.25 * (1.0 - pulse2) * (1.0 - outroT))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
     );
 
     canvas.rotate(runnerHeading); // Xoay 100% chuẩn xác theo hướng tiếp tuyến di chuyển
@@ -907,62 +970,63 @@ class Real3DFlyoverPainter extends CustomPainter {
     // Đèn pha dẫn đường chiếu về phía trước (Hướng di chuyển +X)
     final beamPath = Path()
       ..moveTo(0, 0)
-      ..lineTo(46, -20)
-      ..lineTo(46, 20)
+      ..lineTo(52, -22)
+      ..lineTo(52, 22)
       ..close();
 
     final beamPaint = Paint()
       ..isAntiAlias = true
       ..shader = ui.Gradient.linear(
         const Offset(0, 0),
-        const Offset(46, 0),
+        const Offset(52, 0),
         [
-          const Color(0xFF00E5FF).withValues(alpha: 0.50 * (1.0 - outroT)),
+          const Color(0xFF00E5FF).withValues(alpha: 0.55 * (1.0 - outroT)),
           const Color(0xFF00E5FF).withValues(alpha: 0.0),
         ],
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    // Bóng đổ icon định vị
-    final arrowPath = Path()
-      ..moveTo(14, 0)
-      ..lineTo(-10, -9)
-      ..lineTo(-5, 0)
-      ..lineTo(-10, 9)
+    // Bóng đổ của phi thuyền
+    final jetBody = Path()
+      ..moveTo(15, 0)
+      ..lineTo(-9, -10)
+      ..lineTo(-3, 0)
+      ..lineTo(-9, 10)
       ..close();
 
     canvas.drawPath(
-      arrowPath.shift(const Offset(0, 2)),
+      jetBody.shift(const Offset(0, 2.5)),
       Paint()
         ..isAntiAlias = true
-        ..color = Colors.black38,
+        ..color = Colors.black45,
     );
 
-    // Mũi tên phi thuyền định vị cao cấp (Gradient Xanh Cyan -> Xanh Lục)
-    final arrowPaint = Paint()
+    // Thân phi thuyền phủ Gradient Xanh Cyan Thể Thao
+    final jetPaint = Paint()
       ..isAntiAlias = true
       ..shader = ui.Gradient.linear(
-        const Offset(-10, 0),
-        const Offset(14, 0),
+        const Offset(-9, 0),
+        const Offset(15, 0),
         [
-          const Color(0xFF00B0FF),
-          const Color(0xFF00E5FF),
+          const Color(0xFF007AFF), // Xanh Apple
+          const Color(0xFF00E5FF), // Xanh Neon Cyan
         ],
       );
-    canvas.drawPath(arrowPath, arrowPaint);
+    canvas.drawPath(jetBody, jetPaint);
 
-    // Viền trắng bóng bẩy
+    // Viền trắng bóng bẩy kim cương
     canvas.drawPath(
-      arrowPath,
+      jetBody,
       Paint()
         ..isAntiAlias = true
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
+        ..strokeWidth = 2.2
         ..color = Colors.white,
     );
 
-    // Tâm tròn phát sáng giữa mũi tên
-    canvas.drawCircle(Offset.zero, 3.5, Paint()..color = Colors.white);
+    // Tâm định vị phát quang rực rỡ
+    canvas.drawCircle(Offset.zero, 4.0, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset.zero, 2.2, Paint()..color = const Color(0xFF00E5FF));
 
     canvas.restore();
 
