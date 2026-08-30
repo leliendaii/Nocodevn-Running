@@ -476,9 +476,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: user?.isAdmin == true
-                                ? AppTheme.secondaryNeon
-                                : AppTheme.primaryNeon,
+                            color: AppTheme.primaryNeon,
                             border: Border.all(
                               color: AppTheme.background,
                               width: 2,
@@ -528,26 +526,23 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: user?.isAdmin == true
-                      ? AppTheme.secondaryNeon.withValues(alpha: 0.15)
-                      : AppTheme.primaryNeon.withValues(alpha: 0.15),
+                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppTheme.primaryNeon.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   user?.isAdmin == true
                       ? '🛡️ QUẢN TRỊ VIÊN'
                       : '🏃 VẬN ĐỘNG VIÊN',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
-                    color: user?.isAdmin == true
-                        ? AppTheme.secondaryNeon
-                        : AppTheme.primaryNeon,
+                    color: AppTheme.primaryNeon,
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-
               const SizedBox(height: 24),
 
               // ==========================================
@@ -572,7 +567,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     subtitle: subtitle,
                     statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
                     statusColor: running.autoEndEnabled
-                        ? AppTheme.secondaryNeon
+                        ? AppTheme.primaryNeon
                         : AppTheme.textMuted,
                     onTap: () {
                       Navigator.of(context).push(
@@ -620,7 +615,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                     _buildSettingsRowTile(
                       icon: Icons.lock_reset_rounded,
-                      iconColor: AppTheme.secondaryNeon,
+                      iconColor: AppTheme.primaryNeon,
                       title: 'Bảo Mật & Mật Khẩu',
                       subtitle: 'Đổi mật khẩu đăng nhập',
                       onTap: () {
@@ -644,7 +639,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 const SizedBox(height: 8),
                 _buildSettingsMenuTile(
                   icon: Icons.admin_panel_settings_rounded,
-                  iconColor: AppTheme.secondaryNeon,
+                  iconColor: AppTheme.primaryNeon,
                   title: 'Trang Quản Trị Hệ Thống',
                   subtitle: 'Quản lý runner & chỉnh sửa số liệu',
                   isHighlighted: true,
