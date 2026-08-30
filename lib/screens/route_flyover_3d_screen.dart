@@ -748,18 +748,21 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
 
-    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GRAB/GOOGLE MAPS (Trượt êm như nhung, không rung lắc)
+    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS / GRAB (Khóa cứng Pixel - Triệt tiêu 100% rung lắc)
     final double screenCenterX = size.width / 2;
     final double screenCenterY = ui.lerpDouble(size.height * 0.56, size.height * 0.50, outroT)!;
+
+    final double renderCamX = camX.roundToDouble();
+    final double renderCamY = camY.roundToDouble();
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
     canvas.scale(camScale, camScale);
-    canvas.translate(-camX, -camY);
+    canvas.translate(-renderCamX, -renderCamY);
 
     // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Gối mép 0.75px - Triệt tiêu 100% đường kẻ bàn cờ)
-    final int centerTileX = (camX / tileSize).floor();
-    final int centerTileY = (camY / tileSize).floor();
+    final int centerTileX = (renderCamX / tileSize).floor();
+    final int centerTileY = (renderCamY / tileSize).floor();
     final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
     final int tileRadiusY = (3.4 / camScale).ceil().clamp(3, 7);
 
@@ -880,153 +883,135 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 9. VẼ ĐIỂM XUẤT PHÁT (🟢 BẮT ĐẦU) & ĐIỂM VỀ ĐÍCH (🏁 KẾT THÚC) TẠI ĐÚNG VỊ TRÍ TUYẾN ĐƯỜNG
-    final bool isLoop = (startPinPixel - finishPinPixel).distance < 45.0;
+    // 9. VẼ CỘT MỐC BẮT ĐẦU VÀ KẾT THÚC CẮM CHUẨN XÁC 100% NGAY ĐẦU MÚT TUYẾN ĐƯỜNG
+    final bool isLoop = (startPinPixel - finishPinPixel).distance < 20.0;
 
-    final Offset startOffset = isLoop ? const Offset(-30, 0) : Offset.zero;
-    final Offset finishOffset = isLoop ? const Offset(30, 0) : Offset.zero;
-
-    // Điểm Bắt Đầu 🟢 (Đặt chính xác tại điểm khởi đầu cung đường)
-    canvas.save();
-    canvas.translate(startPinPixel.dx + startOffset.dx, startPinPixel.dy + startOffset.dy);
-
-    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
-    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
-      Paint()..color = const Color(0xFF10B981),
-    );
-    final startText = TextPainter(
-      text: const TextSpan(
-        text: '🟢 BẮT ĐẦU',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
-      ),
-      textDirection: ui.TextDirection.ltr,
-    )..layout();
-    startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
-    canvas.restore();
-
-    // Điểm Kết Thúc 🏁 (Đặt chính xác tại điểm cán đích của người chạy)
-    if (outroT > 0.05) {
+    if (isLoop && outroT > 0.05) {
+      // Khi về đích cung đường khép kín: Hiển thị Huy hiệu Về Đích Hoàng Kim ngay vị trí kết thúc
       canvas.save();
-      canvas.translate(finishPinPixel.dx + finishOffset.dx, finishPinPixel.dy + finishOffset.dy);
-      canvas.scale(outroT, outroT);
+      canvas.translate(finishPinPixel.dx, finishPinPixel.dy);
 
-      canvas.drawCircle(
-        const Offset(0, -28),
-        26,
-        Paint()
-          ..color = AppTheme.secondaryNeon.withValues(alpha: 0.3)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3,
-      );
-
-      canvas.drawCircle(const Offset(0, 0), 7, Paint()..color = Colors.black54);
+      canvas.drawCircle(const Offset(0, -28), 26, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35)..style = PaintingStyle.stroke..strokeWidth = 3);
+      canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black54);
       canvas.drawLine(const Offset(0, 0), const Offset(0, -26), Paint()..color = Colors.black87..strokeWidth = 2.5);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(const Rect.fromLTWH(-42, -52, 84, 26), const Radius.circular(13)),
+        RRect.fromRectAndRadius(const Rect.fromLTWH(-48, -52, 96, 26), const Radius.circular(13)),
         Paint()..color = const Color(0xFFEF4444),
       );
       final finishText = TextPainter(
         text: const TextSpan(
-          text: '🏁 KẾT THÚC',
-          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+          text: '🏁 HOÀN THÀNH',
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
         ),
         textDirection: ui.TextDirection.ltr,
       )..layout();
       finishText.paint(canvas, Offset(-finishText.width / 2, -52 + (26 - finishText.height) / 2));
       canvas.restore();
+    } else {
+      // 🟢 Điểm Bắt Đầu: Chân cột cắm CHÍNH XÁC tại startPinPixel (Không bị lệch đi đâu)
+      canvas.save();
+      canvas.translate(startPinPixel.dx, startPinPixel.dy);
+
+      canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
+      canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
+        Paint()..color = const Color(0xFF10B981),
+      );
+      final startText = TextPainter(
+        text: const TextSpan(
+          text: '🟢 BẮT ĐẦU',
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
+      canvas.restore();
+
+      // 🏁 Điểm Kết Thúc: Cắm CHÍNH XÁC tại finishPinPixel khi về đích
+      if (outroT > 0.05) {
+        canvas.save();
+        canvas.translate(finishPinPixel.dx, finishPinPixel.dy);
+        canvas.scale(outroT, outroT);
+
+        canvas.drawCircle(const Offset(0, -28), 26, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.3)..style = PaintingStyle.stroke..strokeWidth = 3);
+        canvas.drawCircle(const Offset(0, 0), 7, Paint()..color = Colors.black54);
+        canvas.drawLine(const Offset(0, 0), const Offset(0, -26), Paint()..color = Colors.black87..strokeWidth = 2.5);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(-42, -52, 84, 26), const Radius.circular(13)),
+          Paint()..color = const Color(0xFFEF4444),
+        );
+        final finishText = TextPainter(
+          text: const TextSpan(
+            text: '🏁 KẾT THÚC',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+          ),
+          textDirection: ui.TextDirection.ltr,
+        )..layout();
+        finishText.paint(canvas, Offset(-finishText.width / 2, -52 + (26 - finishText.height) / 2));
+        canvas.restore();
+      }
     }
 
-    // 10. VẼ CON TRỎ ĐỊNH VỊ GPS HIỆN ĐẠI BẬC NHẤT (Sóng Radar Kép + Đĩa Bay Thể Thao Cao Cấp)
+    // 10. VẼ CON TRỎ ĐỊNH VỊ GPS THỂ THAO NIKE/APPLE ATHLETIC BEACON (Sóng Neon + Đĩa Tròn Phát Quang)
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
-    // Sóng Radar Kép Lan Tỏa (Double Pulsing Wave)
-    final double pulse1 = (progress * 16.0) % 1.0;
-    final double pulse2 = ((progress * 16.0) + 0.5) % 1.0;
-
+    // Sóng Radar tỏa tròn nhịp nhàng
+    final double pulse = (progress * 18.0) % 1.0;
     canvas.drawCircle(
       Offset.zero,
-      10 + pulse1 * 26,
+      12 + pulse * 24,
       Paint()
         ..isAntiAlias = true
-        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35 * (1.0 - pulse1) * (1.0 - outroT))
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.40 * (1.0 - pulse) * (1.0 - outroT))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0,
-    );
-    canvas.drawCircle(
-      Offset.zero,
-      10 + pulse2 * 26,
-      Paint()
-        ..isAntiAlias = true
-        ..color = const Color(0xFF00B0FF).withValues(alpha: 0.25 * (1.0 - pulse2) * (1.0 - outroT))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = 2.2,
     );
 
-    canvas.rotate(runnerHeading); // Xoay 100% chuẩn xác theo hướng tiếp tuyến di chuyển
+    // Đèn pha dẫn đường chiếu về phía trước (Xoay 100% theo hướng chạy)
+    canvas.save();
+    canvas.rotate(runnerHeading);
 
-    // Đèn pha dẫn đường chiếu về phía trước (Hướng di chuyển +X)
     final beamPath = Path()
       ..moveTo(0, 0)
-      ..lineTo(52, -22)
-      ..lineTo(52, 22)
+      ..lineTo(48, -20)
+      ..lineTo(48, 20)
       ..close();
 
     final beamPaint = Paint()
       ..isAntiAlias = true
       ..shader = ui.Gradient.linear(
         const Offset(0, 0),
-        const Offset(52, 0),
+        const Offset(48, 0),
         [
-          const Color(0xFF00E5FF).withValues(alpha: 0.55 * (1.0 - outroT)),
+          const Color(0xFF00E5FF).withValues(alpha: 0.50 * (1.0 - outroT)),
           const Color(0xFF00E5FF).withValues(alpha: 0.0),
         ],
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    // Bóng đổ của phi thuyền
-    final jetBody = Path()
-      ..moveTo(15, 0)
-      ..lineTo(-9, -10)
-      ..lineTo(-3, 0)
-      ..lineTo(-9, 10)
+    // Vành đai kính phát sáng (Halo Ring)
+    canvas.drawCircle(Offset.zero, 13, Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.6));
+    canvas.drawCircle(
+      Offset.zero,
+      13,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = const Color(0xFF00E5FF),
+    );
+
+    // Mũi tên định hướng thể thao tinh tế
+    final navArrow = Path()
+      ..moveTo(9, 0)
+      ..lineTo(-5, -6)
+      ..lineTo(-2, 0)
+      ..lineTo(-5, 6)
       ..close();
 
-    canvas.drawPath(
-      jetBody.shift(const Offset(0, 2.5)),
-      Paint()
-        ..isAntiAlias = true
-        ..color = Colors.black45,
-    );
-
-    // Thân phi thuyền phủ Gradient Xanh Cyan Thể Thao
-    final jetPaint = Paint()
-      ..isAntiAlias = true
-      ..shader = ui.Gradient.linear(
-        const Offset(-9, 0),
-        const Offset(15, 0),
-        [
-          const Color(0xFF007AFF), // Xanh Apple
-          const Color(0xFF00E5FF), // Xanh Neon Cyan
-        ],
-      );
-    canvas.drawPath(jetBody, jetPaint);
-
-    // Viền trắng bóng bẩy kim cương
-    canvas.drawPath(
-      jetBody,
-      Paint()
-        ..isAntiAlias = true
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2
-        ..color = Colors.white,
-    );
-
-    // Tâm định vị phát quang rực rỡ
-    canvas.drawCircle(Offset.zero, 4.0, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset.zero, 2.2, Paint()..color = const Color(0xFF00E5FF));
+    canvas.drawPath(navArrow, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset.zero, 2.5, Paint()..color = const Color(0xFF00E5FF));
 
     canvas.restore();
 
