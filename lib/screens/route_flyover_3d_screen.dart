@@ -44,7 +44,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   final Set<String> _loadingTiles = {};
   final GlobalKey _previewKey = GlobalKey();
 
-  static const List<double> _speedOptions = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
+  static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
   static const int _baseDurationMs = 9000; // Tốc độ cơ bản nhanh gấp đôi (9 giây thay vì 18 giây)
