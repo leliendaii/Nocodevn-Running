@@ -5,7 +5,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/dialogs/otp_dialog.dart';
-import '../widgets/dialogs/forgot_password_dialog.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -185,17 +185,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Hiển thị Popup Quên Mật Khẩu (Khôi phục qua OTP Email)
-  void _showForgotPasswordModal() {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => ForgotPasswordDialog(
-        initialIdentifier: _loginIdentifierController.text.trim(),
-        onSuccess: (emailOrUser) {
-          setState(() {
-            _loginIdentifierController.text = emailOrUser;
-          });
-        },
+  // Chuyển sang Trang Khôi Phục Mật Khẩu (Gửi link an toàn về Email)
+  void _openForgotPasswordScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ForgotPasswordScreen(
+          initialIdentifier: _loginIdentifierController.text.trim(),
+        ),
       ),
     );
   }
@@ -401,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                           visualDensity: VisualDensity.compact,
                         ),
-                        onPressed: _showForgotPasswordModal,
+                        onPressed: _openForgotPasswordScreen,
                         child: const Text(
                           'Quên mật khẩu?',
                           style: TextStyle(
