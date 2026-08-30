@@ -326,7 +326,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Email hoặc Tên đăng nhập',
-                      hintText: 'Nhập username hoặc email',
+                      hintText: 'Nhập tên đăng nhập hoặc email',
                       prefixIcon: Icon(
                         Icons.alternate_email_rounded,
                         color: AppTheme.primaryNeon,
