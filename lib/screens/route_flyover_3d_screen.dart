@@ -1192,22 +1192,15 @@ class Real3DFlyoverPainter extends CustomPainter {
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
-    // 2. TÍNH TOÁN ZOOM DYNAMIC CHO QUÃNG ĐƯỜNG NGẮN / DÀI (Sử dụng Bounding Box đã tính trước)
-    final double targetScaleX = (size.width * 0.74) / (spanW > 10 ? spanW : 80);
-    final double targetScaleY = (size.height * 0.52) / (spanH > 10 ? spanH : 80);
-    final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
+    // 2. TÍNH TOÁN ZOOM CÂN ĐỐI CHÍNH GIỮA (100% CỐ ĐỊNH TÂM - TRIỆT TIÊU 100% LẮC QUA TRÁI PHẢI VÀ GIẬT ZOOM)
+    // Giữ toàn bộ cung đường, điểm Bắt đầu và Kết thúc luôn hiển thị rõ ràng, cân đối ngay giữa màn hình
+    final double targetScaleX = (size.width * 0.76) / (spanW > 10 ? spanW : 80);
+    final double targetScaleY = (size.height * 0.54) / (spanH > 10 ? spanH : 80);
+    final double camScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
 
-    // Tỉ lệ camera bám người chạy (Quãng đường ngắn phóng cận cảnh to hơn)
-    final double initialScale = targetScale > 1.2 ? 1.35 : 1.0;
-
-    // Hiệu ứng Zoom Out nhanh gọn, dứt khoát khi về đích (Từ 88% -> 100%)
-    final double outroRaw = ((progress - 0.88) / 0.12).clamp(0.0, 1.0);
-    final double outroT = Curves.easeOutCubic.transform(outroRaw);
-
-    // Khóa camera bám thẳng vào người chạy trong suốt quá trình chạy (Triệt tiêu 100% lắc ngang)
-    final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
-    final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
-    final double camScale = ui.lerpDouble(initialScale, targetScale, outroT)!;
+    final double camX = routeCenterX;
+    final double camY = routeCenterY;
+    final double outroT = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
 
     // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS (Cố định tâm khung nhìn 100% không rung lắc)
     final double screenCenterX = size.width / 2;
