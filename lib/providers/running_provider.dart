@@ -628,6 +628,45 @@ class RunningProvider with ChangeNotifier {
     super.dispose();
   }
 
+  // Quản trị viên tạo mới một buổi chạy thủ công cho bất kỳ User nào
+  Future<RunSession> adminCreateRunSession({
+    required String userId,
+    required String userName,
+    required DateTime startTime,
+    required double distanceKm,
+    required int durationSeconds,
+    String notes = 'Do Quản trị viên tạo',
+  }) async {
+    final newSession = RunSession(
+      id: 'run_${DateTime.now().millisecondsSinceEpoch}',
+      userId: userId,
+      userName: userName,
+      startTime: startTime,
+      endTime: startTime.add(Duration(seconds: durationSeconds)),
+      durationSeconds: durationSeconds,
+      distanceKm: distanceKm,
+      calories: CalorieCalculator.calculate(
+        distanceKm: distanceKm,
+        durationSeconds: durationSeconds,
+      ),
+      notes: notes,
+      routePoints: const [],
+    );
+
+    _sessions.insert(0, newSession);
+    notifyListeners();
+
+    // 1. Lưu Offline Cache
+    await LocalStorageService.cacheAllRunSessions(_sessions);
+
+    // 2. Đẩy lên Supabase Cloud
+    if (SupabaseService.isConfigured) {
+      await SupabaseService.insertRunSession(newSession);
+    }
+
+    return newSession;
+  }
+
   // Quản trị viên cập nhật KM & thời gian
   void editRunSession(
     String sessionId, {
@@ -669,10 +708,18 @@ class RunningProvider with ChangeNotifier {
     SupabaseService.deleteRunSession(sessionId);
   }
 
-  // Lọc dữ liệu thống kê
-  List<RunSession> getSessionsByTimeFilter(TimeFilter filter) {
+  // ==========================================================
+  // HỆ THỐNG LỌC THỐNG KÊ ĐA CHIỀU (TẤT CẢ HOẶC TỪNG USER CỤ THỂ)
+  // ==========================================================
+  List<RunSession> getFilteredSessions({
+    required TimeFilter filter,
+    String? targetUserId,
+  }) {
     final now = DateTime.now();
     return _sessions.where((session) {
+      if (targetUserId != null && targetUserId.isNotEmpty && session.userId != targetUserId) {
+        return false;
+      }
       switch (filter) {
         case TimeFilter.day:
           return session.startTime.year == now.year &&
@@ -690,23 +737,28 @@ class RunningProvider with ChangeNotifier {
     }).toList();
   }
 
-  double getTotalDistance(TimeFilter filter) {
-    return getSessionsByTimeFilter(filter)
+  double getFilteredTotalDistance(TimeFilter filter, [String? targetUserId]) {
+    return getFilteredSessions(filter: filter, targetUserId: targetUserId)
         .fold(0.0, (sum, item) => sum + item.distanceKm);
   }
 
-  int getTotalDuration(TimeFilter filter) {
-    return getSessionsByTimeFilter(filter)
+  int getFilteredTotalDurationSeconds(TimeFilter filter, [String? targetUserId]) {
+    return getFilteredSessions(filter: filter, targetUserId: targetUserId)
         .fold(0, (sum, item) => sum + item.durationSeconds);
   }
 
-  int getTotalCalories(TimeFilter filter) {
-    return getSessionsByTimeFilter(filter)
+  int getFilteredTotalCalories(TimeFilter filter, [String? targetUserId]) {
+    return getFilteredSessions(filter: filter, targetUserId: targetUserId)
         .fold(0, (sum, item) => sum + item.calories);
   }
 
-  List<ChartDataPoint> getChartData(TimeFilter filter) {
-    final sessions = getSessionsByTimeFilter(filter);
+  int getFilteredUniqueAthletesCount(TimeFilter filter, [String? targetUserId]) {
+    final list = getFilteredSessions(filter: filter, targetUserId: targetUserId);
+    return list.map((s) => s.userId).toSet().length;
+  }
+
+  List<ChartDataPoint> getFilteredChartData(TimeFilter filter, [String? targetUserId]) {
+    final sessions = getFilteredSessions(filter: filter, targetUserId: targetUserId);
     final now = DateTime.now();
     final List<ChartDataPoint> points = [];
 
@@ -761,13 +813,15 @@ class RunningProvider with ChangeNotifier {
     return points;
   }
 
-  // Alias cho Admin Dashboard
-  List<RunSession> getSessionsByFilter(TimeFilter filter) => getSessionsByTimeFilter(filter);
-  int getTotalDurationSeconds(TimeFilter filter) => getTotalDuration(filter);
-
-  int getUniqueAthletesCount(TimeFilter filter) {
-    return getSessionsByTimeFilter(filter).map((s) => s.userId).toSet().length;
-  }
+  // Alias tương thích cũ
+  List<RunSession> getSessionsByTimeFilter(TimeFilter filter) => getFilteredSessions(filter: filter);
+  double getTotalDistance(TimeFilter filter) => getFilteredTotalDistance(filter);
+  int getTotalDuration(TimeFilter filter) => getFilteredTotalDurationSeconds(filter);
+  int getTotalDurationSeconds(TimeFilter filter) => getFilteredTotalDurationSeconds(filter);
+  int getTotalCalories(TimeFilter filter) => getFilteredTotalCalories(filter);
+  int getUniqueAthletesCount(TimeFilter filter) => getFilteredUniqueAthletesCount(filter);
+  List<ChartDataPoint> getChartData(TimeFilter filter) => getFilteredChartData(filter);
+  List<RunSession> getSessionsByFilter(TimeFilter filter) => getFilteredSessions(filter: filter);
 
   // Lấy danh sách buổi chạy của riêng một User
   List<RunSession> getUserSessions(String userId) {
@@ -775,61 +829,8 @@ class RunningProvider with ChangeNotifier {
   }
 
   // Lấy dữ liệu biểu đồ cho riêng một User
-  List<ChartDataPoint> getUserChartData(String userId, TimeFilter filter) {
-    final userSessions = getUserSessions(userId);
-    final now = DateTime.now();
-    final List<ChartDataPoint> points = [];
-
-    switch (filter) {
-      case TimeFilter.day:
-        for (int i = 0; i < 24; i += 4) {
-          final hourSessions = userSessions.where((s) => s.startTime.hour >= i && s.startTime.hour < i + 4);
-          final dist = hourSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
-          final dur = hourSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: '${i}h', distanceKm: dist, durationMinutes: dur));
-        }
-        break;
-
-      case TimeFilter.week:
-        const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-        for (int i = 6; i >= 0; i--) {
-          final targetDay = now.subtract(Duration(days: i));
-          final daySessions = userSessions.where((s) =>
-              s.startTime.year == targetDay.year &&
-              s.startTime.month == targetDay.month &&
-              s.startTime.day == targetDay.day);
-          final dist = daySessions.fold(0.0, (sum, s) => sum + s.distanceKm);
-          final dur = daySessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(
-            label: weekdays[targetDay.weekday - 1],
-            distanceKm: dist,
-            durationMinutes: dur,
-          ));
-        }
-        break;
-
-      case TimeFilter.month:
-        for (int w = 1; w <= 4; w++) {
-          final weekSessions = userSessions.where((s) => ((s.startTime.day - 1) ~/ 7) + 1 == w);
-          final dist = weekSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
-          final dur = weekSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: 'Tuần $w', distanceKm: dist, durationMinutes: dur));
-        }
-        break;
-
-      case TimeFilter.year:
-        const months = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
-        for (int m = 1; m <= 12; m++) {
-          final mSessions = userSessions.where((s) => s.startTime.month == m);
-          final dist = mSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
-          final dur = mSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;
-          points.add(ChartDataPoint(label: months[m - 1], distanceKm: dist, durationMinutes: dur));
-        }
-        break;
-    }
-
-    return points;
-  }
+  List<ChartDataPoint> getUserChartData(String userId, TimeFilter filter) =>
+      getFilteredChartData(filter, userId);
 
   // Danh sách tất cả buổi chạy
   List<RunSession> get sessions => List.unmodifiable(_sessions);
