@@ -22,6 +22,8 @@
 	<string>Ứng dụng cần quyền vị trí để tiếp tục tính km khi bạn tắt màn hình hoặc chạy ngầm.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập thư viện ảnh để bạn tải lên ảnh đại diện.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Ứng dụng cần quyền lưu video lộ trình 3D Flyover vào Thư viện Ảnh (Camera Roll) của bạn.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng cần quyền camera để bạn chụp ảnh đại diện mới.</string>
 	<key>UIBackgroundModes</key>
