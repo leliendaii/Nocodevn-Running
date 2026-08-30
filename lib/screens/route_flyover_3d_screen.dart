@@ -221,15 +221,16 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     }
   }
 
-  // Tải Map Tiles từ CDN siêu tốc của ArcGIS World Street Map (Miễn phí 100%, phản hồi < 30ms tại VN)
+  // Tải Map Tiles trực tiếp từ cụm máy chủ Google Maps (mt0 -> mt3) với tiếng Việt có dấu chuẩn 100%
   void _loadMapTile(int z, int x, int y) {
     if (_isDisposed) return;
     final key = '$z/$x/$y';
     if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
 
     _loadingTiles.add(key);
-    // CDN ArcGIS Street Map nhanh nhất thế giới, không rate-limit, tên đường tiếng Việt đầy đủ
-    final url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/$z/$y/$x';
+    // Cân bằng tải xoay vòng qua 4 máy chủ mt0, mt1, mt2, mt3 của Google
+    final int serverId = (x.abs() + y.abs()) % 4;
+    final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z';
 
     final imageStream = NetworkImage(url).resolve(ImageConfiguration.empty);
     imageStream.addListener(
