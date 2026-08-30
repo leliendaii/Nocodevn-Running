@@ -653,9 +653,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   );
                 },
               ),
+              const SizedBox(height: 16),
+
+              // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY TRONG THÁNG (ACTIVITY HEATMAP)
+              Consumer<RunningProvider>(
+                builder: (context, running, _) {
+                  return _buildActivityCalendar(context, running, user);
+                },
+              ),
               const SizedBox(height: 18),
 
-              // 3. KHỐI CÀI ĐẶT HỆ THỐNG GỘP LIỀN MẠCH (KHUNG GIỜ ĐƯA XUỐNG CUỐI)
+              // 4. KHỐI CÀI ĐẶT HỆ THỐNG & TIỆN ÍCH
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
@@ -664,7 +672,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
                 child: Column(
                   children: [
-                    // Mục 1: Tài Khoản & Bảo Mật (Đã gộp thông tin hồ sơ & đổi mật khẩu)
+                    // Mục 1: Tài Khoản & Bảo Mật
                     _buildSettingsRowTile(
                       icon: Icons.person_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
@@ -678,8 +686,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
 
-                    // Mục 2: Dành cho Admin (nếu có)
+                    // Mục 2: Nhắc nhở luyện tập hàng ngày
+                    _buildSettingsRowTile(
+                      icon: Icons.notifications_active_outlined,
+                      iconColor: AppTheme.primaryNeon,
+                      title: 'Nhắc Nhở Luyện Tập',
+                      subtitle: 'Thông báo & giờ chạy mỗi ngày',
+                      onTap: () => _showWorkoutReminderDialog(context),
+                    ),
+
+                    // Mục 3: Dành cho Admin (nếu có)
                     if (user?.isAdmin == true) ...[
                       const Divider(color: AppTheme.divider, height: 1, indent: 56),
                       _buildSettingsRowTile(
@@ -701,7 +719,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
                     const Divider(color: AppTheme.divider, height: 1, indent: 56),
 
-                    // Mục 4: Khung giờ tự động chốt (ĐƯA XUỐNG CUỐI)
+                    // Mục 4: Khung giờ tự động chốt
                     Consumer<RunningProvider>(
                       builder: (context, running, _) {
                         final startStr =
@@ -730,6 +748,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           },
                         );
                       },
+                    ),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+
+                    // Mục 5: Về ứng dụng & Thông tin phiên bản
+                    _buildSettingsRowTile(
+                      icon: Icons.info_outline_rounded,
+                      iconColor: AppTheme.primaryNeon,
+                      title: 'Về Ứng Dụng & Hỗ Trợ',
+                      subtitle: 'NoCode Running v1.2.0 • Bản quyền 2026',
+                      onTap: () => _showAppAboutDialog(context),
                     ),
                   ],
                 ),
@@ -901,6 +929,341 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
         ),
       ),
+    );
+  }
+
+  // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY TRONG THÁNG (ACTIVITY HEATMAP)
+  Widget _buildActivityCalendar(
+    BuildContext context,
+    RunningProvider running,
+    AppUser? user,
+  ) {
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final firstDayWeekday = DateTime(now.year, now.month, 1).weekday; // 1: Mon, 7: Sun
+
+    // Lọc các ngày mà user đã chạy trong tháng hiện tại
+    final userSessionsThisMonth = running.sessions.where((s) {
+      final isSameUser = (user?.id != null && user!.id.isNotEmpty)
+          ? s.userId == user.id
+          : true;
+      return isSameUser &&
+          s.startTime.year == now.year &&
+          s.startTime.month == now.month;
+    }).toList();
+
+    final activeDaysSet = userSessionsThisMonth.map((s) => s.startTime.day).toSet();
+    if (running.isRunning) {
+      activeDaysSet.add(now.day);
+    }
+
+    const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tiêu đề Lịch & Badge số ngày chạy
+          Row(
+            children: [
+              const Icon(Icons.calendar_month_rounded, color: AppTheme.primaryNeon, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'LỊCH CHẠY THÁNG ${now.month}/${now.year}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_fire_department_rounded, size: 12, color: AppTheme.primaryNeon),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${activeDaysSet.length} NGÀY',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryNeon,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Hàng thứ trong tuần (T2 -> CN)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: weekdays.map((w) {
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    w,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+
+          // Lưới ngày trong tháng
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: (firstDayWeekday - 1) + daysInMonth,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 1.0,
+            ),
+            itemBuilder: (context, index) {
+              if (index < firstDayWeekday - 1) {
+                return const SizedBox.shrink();
+              }
+              final day = index - (firstDayWeekday - 1) + 1;
+              final hasRun = activeDaysSet.contains(day);
+              final isToday = day == now.day;
+
+              Color bgColor;
+              Color textColor;
+              BoxBorder? border;
+
+              if (hasRun) {
+                bgColor = AppTheme.primaryNeon;
+                textColor = Colors.white;
+                border = Border.all(color: AppTheme.primaryNeon, width: 1.5);
+              } else if (isToday) {
+                bgColor = AppTheme.surfaceLight;
+                textColor = AppTheme.primaryNeon;
+                border = Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.8), width: 1.5);
+              } else {
+                bgColor = AppTheme.surfaceLight.withValues(alpha: 0.4);
+                textColor = day > now.day ? AppTheme.textMuted.withValues(alpha: 0.4) : AppTheme.textMuted;
+              }
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                  border: border,
+                  boxShadow: hasRun
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.primaryNeon.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    '$day',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: (hasRun || isToday) ? FontWeight.w900 : FontWeight.w600,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+
+          // Chú thích nhỏ bên dưới
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primaryNeon,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Đã chạy',
+                style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.primaryNeon, width: 1.2),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Hôm nay',
+                style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Dialog Cài đặt Nhắc nhở Luyện tập
+  void _showWorkoutReminderDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: const [
+                  Icon(Icons.notifications_active_outlined, color: AppTheme.primaryNeon, size: 24),
+                  SizedBox(width: 10),
+                  Text(
+                    'Nhắc Nhở Luyện Tập',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Đặt thông báo nhắc nhở xỏ giày chạy bộ mỗi sáng để duy trì ngọn lửa thói quen luyện tập!',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.alarm_rounded, color: AppTheme.secondaryNeon, size: 22),
+                    SizedBox(width: 12),
+                    Text(
+                      'Giờ nhắc nhở:',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                    ),
+                    Spacer(),
+                    Text(
+                      '05:30 Sáng',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.primaryNeon),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryNeon,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    TopSyncToast.show(context, message: 'Đã bật nhắc nhở luyện tập 05:30 sáng!', isSuccess: true);
+                  },
+                  child: const Text('BẬT NHẮC NHỞ HÀNG NGÀY', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Dialog Thông tin Ứng dụng & Hỗ trợ
+  void _showAppAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: const [
+              Icon(Icons.directions_run_rounded, color: AppTheme.primaryNeon, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'NoCode Running',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Phiên bản: 1.2.0 (Build 2026)', style: TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+              SizedBox(height: 12),
+              Text(
+                'Ứng dụng theo dõi chạy bộ chuyên nghiệp kết nối GPS thời gian thực, đồng bộ đám mây Supabase và tự động lưu phiên chạy khi sập nguồn.',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+              ),
+              SizedBox(height: 14),
+              Text('Phát triển bởi: Liên Đài', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryNeon)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('ĐÓNG', style: TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
     );
   }
 }
