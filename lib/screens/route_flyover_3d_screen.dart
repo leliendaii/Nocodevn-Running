@@ -110,7 +110,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _startPinPixel = _sampledPositions.first;
     _finishPinPixel = _sampledPositions.last;
 
-    _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute, _cachedRoutePixels);
+    _milestones = _generateMilestonePins(_effectiveDistanceKm, _pathMetric, _totalPathLength, _smoothRoute);
 
     // 7. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM (Chống giật lag)
     _precacheRouteMapTiles();
@@ -252,16 +252,18 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     return basePoints;
   }
 
-  List<MilestoneData> _generateMilestonePins(double totalKm, List<GeoPoint> route, List<Offset> pixels) {
+  List<MilestoneData> _generateMilestonePins(double totalKm, ui.PathMetric pathMetric, double totalLength, List<GeoPoint> route) {
     final List<MilestoneData> pins = [];
-    if (route.isEmpty || pixels.isEmpty) return pins;
     final int totalPins = totalKm.floor();
-    if (totalPins <= 0) return pins;
+    if (totalPins <= 0 || totalLength <= 1.0) return pins;
 
     for (int i = 1; i <= totalPins; i++) {
       final double frac = (i / totalKm).clamp(0.0, 1.0);
-      final int idx = ((pixels.length - 1) * frac).toInt().clamp(0, pixels.length - 1);
-      pins.add(MilestoneData(km: i, point: route[idx], pixel: pixels[idx]));
+      final double targetOffset = totalLength * frac;
+      final tangent = pathMetric.getTangentForOffset(targetOffset);
+      final pixel = tangent?.position ?? _cachedRoutePixels.first;
+      final routeIdx = ((route.length - 1) * frac).toInt().clamp(0, route.length - 1);
+      pins.add(MilestoneData(km: i, point: route[routeIdx], pixel: pixel));
     }
     return pins;
   }
@@ -510,6 +512,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         final int minutes = elapsedSec ~/ 60;
                         final int seconds = elapsedSec % 60;
                         final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+                        final isFinished = _controller.value >= 0.78;
 
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -520,24 +523,52 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               constraints: const BoxConstraints(),
                               onPressed: _handleExit,
                             ),
+                            // Trạng thái & Quãng đường
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text('QUÃNG ĐƯỜNG', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: isFinished ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isFinished ? 'HOÀN THÀNH' : 'ĐANG CHẠY',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        color: isFinished ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
                                 Text('$currentDistance km', style: const TextStyle(fontSize: 17, color: AppTheme.primaryNeon, fontWeight: FontWeight.w900)),
                               ],
                             ),
+                            // Pace
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Text('PACE', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
                                 Text('$_effectivePace /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
                               ],
                             ),
+                            // Thời gian
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Text('THỜI GIAN', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
                                 Text(elapsedFormatted, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w900)),
                               ],
                             ),
