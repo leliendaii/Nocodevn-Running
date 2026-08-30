@@ -17,13 +17,26 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
   int _reminderHour = 5;
   int _reminderMinute = 30;
   late final TextEditingController _reminderMsgController;
+  bool _isControllerInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _reminderMsgController = TextEditingController(
-      text: 'Đã đến giờ chạy rùi {Tên} ơi, dậy mà xỏ giầy vào mà chạy đi mày, đừng có ngủ "Trương thây" nữa !!!',
-    );
+    _reminderMsgController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isControllerInitialized) {
+      final user = context.read<AuthProvider>().currentUser;
+      final userName = (user?.name.isNotEmpty == true)
+          ? user!.name
+          : (user?.username.isNotEmpty == true ? user!.username : 'bạn');
+      _reminderMsgController.text =
+          'Đã đến giờ chạy rùi $userName ơi, dậy mà xỏ giầy vào mà chạy đi mày, đừng có ngủ "Trương thây" nữa !!!';
+      _isControllerInitialized = true;
+    }
   }
 
   @override
@@ -37,9 +50,6 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
     final userId = user?.id ?? 'default_user';
-    final userName = (user?.name.isNotEmpty == true)
-        ? user!.name
-        : (user?.username.isNotEmpty == true ? user!.username : 'bạn');
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -61,10 +71,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
           final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
           final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
           final reminderStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
-          final formattedReminderMsg = _reminderMsgController.text
-              .replaceAll('{Tên}', userName)
-              .replaceAll('{tên}', userName)
-              .replaceAll('{name}', userName);
+          final formattedReminderMsg = _reminderMsgController.text.trim();
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
@@ -496,7 +503,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                                 maxLines: 2,
                                 style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, height: 1.4),
                                 decoration: InputDecoration(
-                                  hintText: 'Nhập nội dung nhắc nhở (dùng {Tên} để chèn tên)...',
+                                  hintText: 'Nhập câu nhắc nhở luyện tập...',
                                   hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
                                   filled: true,
                                   fillColor: AppTheme.surface,
