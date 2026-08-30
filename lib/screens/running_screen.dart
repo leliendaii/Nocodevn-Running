@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -30,6 +31,23 @@ class _RunningScreenState extends State<RunningScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Đăng ký thông báo Rung Haptic & Chúc mừng mỗi khi hoàn thành 1 KM (Giống Strava / Nike Run Club)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final running = context.read<RunningProvider>();
+        running.onKilometerMilestone = (int kmCount, String pace) {
+          HapticFeedback.heavyImpact();
+          if (mounted) {
+            TopSyncToast.show(
+              context,
+              message: '🎯 Tuyệt vời! Bạn vừa hoàn thành KM thứ $kmCount! (Pace: $pace /km)',
+              isSuccess: true,
+            );
+          }
+        };
+      }
+    });
   }
 
   @override
@@ -40,6 +58,67 @@ class _RunningScreenState extends State<RunningScreen>
 
   // Hộp thoại lưu buổi chạy sau khi hoàn thành
   void _showSaveRunDialog(
+    BuildContext context,
+    RunningProvider running,
+    String userId,
+    String userName,
+  ) {
+    // 🛡️ CHỐNG BẤM NHẦM / BUỔI CHẠY QUÁ NGẮN (< 50m & < 20 giây - Giống Strava / NRC)
+    if (running.distanceKm < 0.05 && running.durationSeconds < 20) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppTheme.danger, width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 24),
+              SizedBox(width: 8),
+              Text('Buổi chạy quá ngắn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Quãng đường ghi nhận dưới 50m. Bạn có muốn HỦY để tránh lưu dữ liệu rác không?',
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('TIẾP TỤC CHẠY', style: TextStyle(color: AppTheme.textMuted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                running.resetTracking();
+                Navigator.of(ctx).pop();
+                TopSyncToast.show(context, message: 'Đã hủy buổi chạy ngắn!', isSuccess: false);
+              },
+              child: const Text('HỦY BỎ'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _openSaveRunDialogModal(context, running, userId, userName);
+              },
+              child: const Text('VẪN LƯU', style: TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    _openSaveRunDialogModal(context, running, userId, userName);
+  }
+
+  void _openSaveRunDialogModal(
     BuildContext context,
     RunningProvider running,
     String userId,

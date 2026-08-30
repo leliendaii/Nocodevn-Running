@@ -47,6 +47,10 @@ class RunningProvider with ChangeNotifier {
   int _autoEndMinute = 30;
   bool _wasAutoFinished = false;
 
+  // Haptic & Milestone callback cho mỗi 1 KM hoàn thành (giống Nike Run Club / Strava)
+  int _lastMilestoneKm = 0;
+  void Function(int kmCount, String pace)? onKilometerMilestone;
+
   // Danh sách toàn bộ lịch sử các buổi chạy
   final List<RunSession> _sessions = [];
 
@@ -328,6 +332,7 @@ class RunningProvider with ChangeNotifier {
     _currentRoute.clear();
     _lastPosition = null;
     _lastPositionTime = null;
+    _lastMilestoneKm = 0;
 
     // Lưu ngay checkpoint điểm xuất phát
     saveActiveCheckpointNow();
@@ -426,6 +431,13 @@ class RunningProvider with ChangeNotifier {
               _currentRoute.add(RunPoint(position.longitude, position.latitude));
               _lastPosition = position;
               _lastPositionTime = now;
+
+              // KIỂM TRA MỐC KM ĐẠT ĐƯỢC (1.0km, 2.0km, 3.0km...) ĐỂ KÍCH HOẠT RUNG & THÔNG BÁO
+              final int currentKm = _distanceKm.floor();
+              if (currentKm > _lastMilestoneKm && currentKm > 0) {
+                _lastMilestoneKm = currentKm;
+                onKilometerMilestone?.call(currentKm, currentPace);
+              }
             } else if (!isAbnormalJump && distanceInMeters >= 3.0) {
               // Cập nhật mốc tọa độ liên tục để không bị kẹt lũy kế
               _lastPosition = position;
@@ -549,6 +561,7 @@ class RunningProvider with ChangeNotifier {
     _runStartTime = null;
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
+    _lastMilestoneKm = 0;
     LocalStorageService.clearActiveTrackingCheckpoint();
     notifyListeners();
   }
