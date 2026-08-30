@@ -997,9 +997,9 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double targetScaleY = (size.height * 0.56) / (spanH > 10 ? spanH : 100);
     final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.24, 1.0);
 
-    // Hiệu ứng Zoom Out mượt mà khi kết thúc (Từ 78% -> 100%)
-    final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
-    final double outroT = Curves.easeInOutCubic.transform(outroRaw);
+    // Hiệu ứng Zoom Out nhanh gọn, dứt khoát khi về đích (Từ 88% -> 100%)
+    final double outroRaw = ((progress - 0.88) / 0.12).clamp(0.0, 1.0);
+    final double outroT = Curves.easeOutCubic.transform(outroRaw);
 
     // Khóa camera bám thẳng vào người chạy trong suốt quá trình chạy (Triệt tiêu 100% lắc ngang)
     // Khi về đích: Camera chuyển động tịnh tiến thẳng từ vạch đích về tâm toàn cảnh
