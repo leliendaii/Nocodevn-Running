@@ -13,7 +13,6 @@ import 'history_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'auto_end_schedule_screen.dart';
 import 'account_info_screen.dart';
-import 'security_settings_screen.dart';
 import '../widgets/top_sync_toast.dart';
 
 class MainShell extends StatefulWidget {
@@ -665,12 +664,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
                 child: Column(
                   children: [
-                    // Mục 1: Thông tin tài khoản
+                    // Mục 1: Tài Khoản & Bảo Mật (Đã gộp thông tin hồ sơ & đổi mật khẩu)
                     _buildSettingsRowTile(
                       icon: Icons.person_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
-                      title: 'Thông Tin Tài Khoản',
-                      subtitle: 'Họ tên & email cá nhân',
+                      title: 'Tài Khoản & Bảo Mật',
+                      subtitle: 'Họ tên, email & đổi mật khẩu',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -679,24 +678,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
 
-                    // Mục 2: Bảo mật & Mật khẩu
-                    _buildSettingsRowTile(
-                      icon: Icons.lock_reset_rounded,
-                      iconColor: AppTheme.primaryNeon,
-                      title: 'Bảo Mật & Mật Khẩu',
-                      subtitle: 'Đổi mật khẩu tài khoản',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (ctx) => const SecuritySettingsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-
-                    // Mục 3: Dành cho Admin (nếu có)
+                    // Mục 2: Dành cho Admin (nếu có)
                     if (user?.isAdmin == true) ...[
                       const Divider(color: AppTheme.divider, height: 1, indent: 56),
                       _buildSettingsRowTile(

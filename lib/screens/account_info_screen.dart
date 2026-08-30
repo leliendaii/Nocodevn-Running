@@ -16,6 +16,13 @@ class AccountInfoScreen extends StatefulWidget {
 class _AccountInfoScreenState extends State<AccountInfoScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
+  final TextEditingController _oldPassController = TextEditingController();
+  final TextEditingController _newPassController = TextEditingController();
+  final TextEditingController _confirmPassController = TextEditingController();
+
+  bool _obscureOld = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
   bool _isSaving = false;
 
   @override
@@ -30,12 +37,18 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _oldPassController.dispose();
+    _newPassController.dispose();
+    _confirmPassController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
     final n = _nameController.text.trim();
     final e = _emailController.text.trim();
+    final oldP = _oldPassController.text;
+    final newP = _newPassController.text;
+    final confirmP = _confirmPassController.text;
     final auth = context.read<AuthProvider>();
 
     if (n.isEmpty) {
@@ -43,21 +56,57 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
       return;
     }
 
+    // Nếu người dùng nhập mật khẩu mới, kiểm tra tính hợp lệ
+    final hasPasswordInput = oldP.isNotEmpty || newP.isNotEmpty || confirmP.isNotEmpty;
+    if (hasPasswordInput) {
+      if (oldP.isEmpty) {
+        TopSyncToast.show(context, message: 'Vui lòng nhập mật khẩu hiện tại!', isSuccess: false);
+        return;
+      }
+      if (newP.length < 6) {
+        TopSyncToast.show(context, message: 'Mật khẩu mới phải có ít nhất 6 ký tự!', isSuccess: false);
+        return;
+      }
+      if (newP != confirmP) {
+        TopSyncToast.show(context, message: 'Mật khẩu xác nhận không trùng khớp!', isSuccess: false);
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
-    final error = await auth.updateProfile(
+
+    // 1. Cập nhật Profile (Họ tên, email)
+    final profileError = await auth.updateProfile(
       newName: n,
       newUsername: auth.currentUser?.username ?? '',
       newEmail: e.isNotEmpty ? e : (auth.currentUser?.email ?? ''),
     );
+
+    if (profileError != null) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      TopSyncToast.show(context, message: profileError, isSuccess: false);
+      return;
+    }
+
+    // 2. Cập nhật Mật khẩu (nếu có yêu cầu đổi)
+    if (hasPasswordInput) {
+      final passError = await auth.changePassword(
+        currentPassword: oldP,
+        newPassword: newP,
+      );
+      if (passError != null) {
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        TopSyncToast.show(context, message: passError, isSuccess: false);
+        return;
+      }
+    }
+
     if (!mounted) return;
     setState(() => _isSaving = false);
-
-    if (error != null) {
-      TopSyncToast.show(context, message: error, isSuccess: false);
-    } else {
-      TopSyncToast.show(context, message: 'Đã lưu thông tin tài khoản thành công!', isSuccess: true);
-      Navigator.of(context).pop();
-    }
+    TopSyncToast.show(context, message: 'Đã lưu thông tin tài khoản & bảo mật thành công!', isSuccess: true);
+    Navigator.of(context).pop();
   }
 
   @override
@@ -75,7 +124,7 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Thông Tin Tài Khoản',
+          'Tài Khoản & Bảo Mật',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
         ),
         centerTitle: true,
@@ -84,14 +133,14 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // Avatar trung tâm
+            // 1. Avatar trung tâm
             Center(
               child: Stack(
                 children: [
                   UserAvatar(
                     avatarUrl: user?.avatarUrl,
                     name: user?.name ?? 'Người dùng',
-                    radius: 50,
+                    radius: 46,
                     isAdmin: user?.isAdmin == true,
                     onTap: () => AvatarPickerDialog.show(context, auth),
                   ),
@@ -101,41 +150,58 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                     child: GestureDetector(
                       onTap: () => AvatarPickerDialog.show(context, auth),
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                          color: AppTheme.primaryNeon,
                           border: Border.all(color: AppTheme.background, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+                        child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               user?.isAdmin == true ? '🛡️ Quản Trị Viên' : '🏃 Vận Động Viên',
-              style: TextStyle(
-                fontSize: 13,
+              style: const TextStyle(
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                color: AppTheme.primaryNeon,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // Khối Form nhập liệu
+            // 2. KHỐI 1: THÔNG TIN HỒ SƠ
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: AppTheme.divider),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.person_outline_rounded, size: 18, color: AppTheme.primaryNeon),
+                      SizedBox(width: 8),
+                      Text(
+                        'THÔNG TIN HỒ SƠ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: AppTheme.divider, height: 24),
+
                   const Text('HỌ VÀ TÊN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
                   const SizedBox(height: 6),
                   TextField(
@@ -143,10 +209,10 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                     style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
                     decoration: const InputDecoration(
                       hintText: 'Nhập họ và tên...',
-                      prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryNeon),
+                      prefixIcon: Icon(Icons.badge_outlined, color: AppTheme.primaryNeon),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   const Text('TÊN ĐĂNG NHẬP (USERNAME)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
                   const SizedBox(height: 6),
@@ -159,8 +225,8 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.lock_outline_rounded, color: AppTheme.textMuted, size: 20),
-                        const SizedBox(width: 12),
+                        const Icon(Icons.alternate_email_rounded, color: AppTheme.textMuted, size: 18),
+                        const SizedBox(width: 10),
                         Text(
                           '@${user?.username ?? ''}',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
@@ -170,7 +236,7 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   const Text('EMAIL LIÊN HỆ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
                   const SizedBox(height: 6),
@@ -181,6 +247,88 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                     decoration: const InputDecoration(
                       hintText: 'Nhập địa chỉ email...',
                       prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryNeon),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // 3. KHỐI 2: ĐỔI MẬT KHẨU (BẢO MẬT)
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: AppTheme.divider),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.lock_outline_rounded, size: 18, color: AppTheme.primaryNeon),
+                      SizedBox(width: 8),
+                      Text(
+                        'ĐỔI MẬT KHẨU ĐĂNG NHẬP',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: AppTheme.divider, height: 24),
+
+                  const Text('MẬT KHẨU HIỆN TẠI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _oldPassController,
+                    obscureText: _obscureOld,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Để trống nếu không đổi...',
+                      prefixIcon: const Icon(Icons.lock_open_rounded, color: AppTheme.primaryNeon),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureOld ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: AppTheme.textMuted, size: 20),
+                        onPressed: () => setState(() => _obscureOld = !_obscureOld),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('MẬT KHẨU MỚI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _newPassController,
+                    obscureText: _obscureNew,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Tối thiểu 6 ký tự...',
+                      prefixIcon: const Icon(Icons.key_rounded, color: AppTheme.primaryNeon),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureNew ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: AppTheme.textMuted, size: 20),
+                        onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('XÁC NHẬN MẬT KHẨU MỚI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _confirmPassController,
+                    obscureText: _obscureConfirm,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Nhập lại mật khẩu mới...',
+                      prefixIcon: const Icon(Icons.check_circle_outline_rounded, color: AppTheme.primaryNeon),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: AppTheme.textMuted, size: 20),
+                        onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      ),
                     ),
                   ),
                 ],
@@ -197,6 +345,7 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 6,
                 ),
                 onPressed: _isSaving ? null : _handleSave,
                 child: _isSaving
@@ -204,6 +353,7 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                     : const Text('LƯU THAY ĐỔI', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
               ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
