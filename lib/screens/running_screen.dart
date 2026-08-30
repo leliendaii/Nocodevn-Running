@@ -220,108 +220,165 @@ class _RunningScreenState extends State<RunningScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         backgroundColor: AppTheme.surface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.primaryNeon, width: 1.2),
         ),
-        title: const Row(
-          children: [
-            Icon(
-              Icons.emoji_events_rounded,
-              color: AppTheme.primaryNeon,
-              size: 28,
-            ),
-            SizedBox(width: 10),
-            Text(
-              'HOÀN THÀNH!',
-              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.0),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '🎉 Chúc mừng bạn đã hoàn thành buổi chạy!',
-              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceLight,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
                 children: [
-                  _buildSummaryItem(
-                    'QUÃNG ĐƯỜNG',
-                    '${running.distanceKm.toStringAsFixed(2)} km',
-                    AppTheme.primaryNeon,
+                  Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppTheme.primaryNeon,
+                    size: 20,
                   ),
-                  Container(width: 1, height: 36, color: AppTheme.divider),
-                  _buildSummaryItem(
-                    'THỜI GIAN',
-                    running.formattedCurrentDuration,
-                    AppTheme.textPrimary,
-                  ),
-                  Container(width: 1, height: 36, color: AppTheme.divider),
-                  _buildSummaryItem(
-                    'CALO',
-                    '${running.calories} kcal',
-                    AppTheme.secondaryNeon,
+                  SizedBox(width: 8),
+                  Text(
+                    'HOÀN THÀNH!',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: notesController,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              decoration: const InputDecoration(
-                labelText: 'Ghi chú buổi chạy',
-                hintText: 'Cảm giác chạy, thời tiết...',
-                prefixIcon: Icon(
-                  Icons.note_alt_outlined,
-                  color: AppTheme.primaryNeon,
+              const SizedBox(height: 6),
+              const Text(
+                '🎉 Chúc mừng bạn đã hoàn thành buổi chạy!',
+                style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              // BẢNG TỔNG KẾT NHỎ GỌN
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildSummaryItem(
+                      'QUÃNG ĐƯỜNG',
+                      '${running.distanceKm.toStringAsFixed(2)} km',
+                      AppTheme.primaryNeon,
+                    ),
+                    Container(width: 1, height: 28, color: AppTheme.divider),
+                    _buildSummaryItem(
+                      'THỜI GIAN',
+                      running.formattedCurrentDuration,
+                      AppTheme.textPrimary,
+                    ),
+                    Container(width: 1, height: 28, color: AppTheme.divider),
+                    _buildSummaryItem(
+                      'CALO',
+                      '${running.calories} kcal',
+                      AppTheme.secondaryNeon,
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              // Ô NHẬP GHI CHÚ GỌN GÀNG
+              TextField(
+                controller: notesController,
+                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: 'Ghi chú buổi chạy',
+                  hintText: 'Cảm giác chạy, thời tiết...',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  prefixIcon: Icon(
+                    Icons.note_alt_outlined,
+                    color: AppTheme.primaryNeon,
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // 2 NÚT NẰM TRÊN 1 HÀNG (ĐỎ & XANH)
+              Row(
+                children: [
+                  // 1. NÚT ĐỎ: BỎ QUA
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.danger,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          running.resetTracking();
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text(
+                          'BỎ QUA',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // 2. NÚT XANH: LƯU THÀNH TÍCH
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.secondaryNeon,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          running.stopAndSaveTracking(
+                            userId: userId,
+                            userName: userName,
+                            notes: notesController.text.trim().isEmpty
+                                ? 'Buổi chạy ngoài trời'
+                                : notesController.text.trim(),
+                          );
+                          Navigator.of(ctx).pop();
+                          TopSyncToast.show(
+                            context,
+                            message: 'Đã lưu & đồng bộ lên Cloud!',
+                          );
+                        },
+                        child: const Text(
+                          'LƯU THÀNH TÍCH',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              running.resetTracking();
-              Navigator.of(ctx).pop();
-            },
-            child: const Text(
-              'BỎ QUA',
-              style: TextStyle(color: AppTheme.textMuted),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              running.stopAndSaveTracking(
-                userId: userId,
-                userName: userName,
-                notes: notesController.text.trim().isEmpty
-                    ? 'Buổi chạy ngoài trời'
-                    : notesController.text.trim(),
-              );
-              Navigator.of(ctx).pop();
-              TopSyncToast.show(
-                context,
-                message: 'Đã lưu & đồng bộ lên Cloud!',
-              );
-            },
-            child: const Text('LƯU THÀNH TÍCH'),
-          ),
-        ],
       ),
     );
   }
