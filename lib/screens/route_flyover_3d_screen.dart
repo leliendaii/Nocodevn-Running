@@ -317,6 +317,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     );
   }
 
+  String _formatSpeed(double speed) {
+    if (speed == speed.roundToDouble()) {
+      return '${speed.toInt()}x';
+    }
+    return '${speed}x';
+  }
+
   void _openSpeedSelectorModal() {
     showModalBottomSheet(
       context: context,
@@ -347,7 +354,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   runSpacing: 10,
                   alignment: WrapAlignment.center,
                   children: _speedOptions.map((speed) {
-                    final isSelected = _playbackSpeed == speed;
+                    final isSelected = (_playbackSpeed - speed).abs() < 0.01;
                     return SizedBox(
                       width: 72,
                       height: 44,
@@ -370,7 +377,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           _setPlaybackSpeed(speed);
                         },
                         child: Text(
-                          '${speed}x',
+                          _formatSpeed(speed),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
@@ -393,10 +400,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     if (_isDisposed) return;
     setState(() {
       _playbackSpeed = speed;
-      final currentProgress = _controller.value;
       _controller.duration = Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round());
-      if (_isPlaying) {
-        _controller.forward(from: currentProgress);
+      if (_controller.value >= 0.98 || _controller.status == AnimationStatus.completed) {
+        _controller.reset();
+        _controller.forward();
+        _isPlaying = true;
+      } else if (_isPlaying) {
+        _controller.forward(from: _controller.value);
       }
     });
   }
@@ -422,7 +432,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   Future<void> _handleDownloadVideo() async {
     TopSyncToast.show(
       context,
-      message: '🎬 Đã lưu clip Flyover (Tốc độ ${_playbackSpeed}x) thành công vào thư viện!',
+      message: '🎬 Đã lưu clip Flyover (Tốc độ ${_formatSpeed(_playbackSpeed)}) thành công vào thư viện!',
       isSuccess: true,
     );
   }
@@ -603,7 +613,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               ),
                               icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppTheme.secondaryNeon),
                               label: Text(
-                                '${_playbackSpeed}x',
+                                _formatSpeed(_playbackSpeed),
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
                               ),
                               onPressed: _openSpeedSelectorModal,
