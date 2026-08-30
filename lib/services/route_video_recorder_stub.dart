@@ -11,17 +11,10 @@ class VideoSaveResult {
 class RealtimeVideoSession {
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {}
   Future<bool> finishRecording() async => true;
-  Future<VideoSaveResult> saveToPhotos(String filename) async {
+  Future<VideoSaveResult> downloadVideo(String filename) async {
     return const VideoSaveResult(
       isSuccess: true,
-      message: '👉 Hãy chọn "Lưu video" trên bảng chia sẻ để lưu vào Album Ảnh.',
-    );
-  }
-
-  Future<VideoSaveResult> downloadToFiles(String filename) async {
-    return const VideoSaveResult(
-      isSuccess: true,
-      message: '📁 Đã tải video vào thư mục Tệp / Downloads!',
+      message: '🎉 Đã tải video thành công!',
     );
   }
 }

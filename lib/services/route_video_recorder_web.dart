@@ -25,7 +25,7 @@ class RealtimeVideoSession {
     required this.completer,
   });
 
-  /// Đẩy khung hình raw GPU (RGBA) trực tiếp vào Canvas trong 1ms (Zero Lag, chuẩn 60 FPS)
+  /// Đẩy khung hình raw GPU (RGBA) trực tiếp vào Canvas trong 1ms
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
     try {
       final imgData = ctx.createImageData(frameWidth, frameHeight);
@@ -61,63 +61,42 @@ class RealtimeVideoSession {
     return false;
   }
 
-  /// 1. LƯU VÀO ALBUM ẢNH (CAMERA ROLL TRÊN IPHONE)
-  Future<VideoSaveResult> saveToPhotos(String filename) async {
+  /// TẢI VỀ: Tự động lưu vào Album Ảnh (trên iPhone) hoặc Tải file MP4 về máy
+  Future<VideoSaveResult> downloadVideo(String filename) async {
     final blob = finalBlob;
     if (blob == null || blob.size == 0) {
       return const VideoSaveResult(
         isSuccess: false,
-        message: 'Chưa có dữ liệu video để lưu. Vui lòng bấm xuất lại video!',
+        message: 'Chưa có dữ liệu video. Hãy thử bấm xuất lại!',
       );
     }
 
     try {
+      final userAgent = html.window.navigator.userAgent.toLowerCase();
+      final isIOS = userAgent.contains('iphone') || userAgent.contains('ipad') || userAgent.contains('ipod');
       final fileMime = blob.type.isNotEmpty ? blob.type : 'video/mp4';
-      final file = html.File([blob], filename, {'type': fileMime});
-      final dynamic nav = html.window.navigator;
 
-      // Gọi Web Share API chính thức của Apple trên iOS Safari
-      if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
-        await nav.share({
-          'files': [file],
-          'title': 'Video 3D Flyover Chạy Bộ',
-          'text': 'Lộ trình chạy bộ 3D Flyover của tôi',
-        });
-        return const VideoSaveResult(
-          isSuccess: true,
-          message: '👉 Trên bảng chia sẻ vừa hiện, hãy bấm "Lưu video" để lưu vào Thư viện Ảnh nhé!',
-        );
-      } else {
-        // Fallback: Mở tab video riêng của Safari để chạm giữ "Lưu vào Ảnh"
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.window.open(url, '_blank');
-        return const VideoSaveResult(
-          isSuccess: true,
-          message: '🎬 Đã mở video! Bạn chạm giữ vào video 1 giây rồi chọn "Lưu vào Ảnh".',
-        );
+      // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để bấm "Lưu video" vào Album Ảnh
+      if (isIOS) {
+        try {
+          final file = html.File([blob], filename, {'type': fileMime});
+          final dynamic nav = html.window.navigator;
+          if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
+            await nav.share({
+              'files': [file],
+              'title': 'Video 3D Flyover',
+            });
+            return const VideoSaveResult(
+              isSuccess: true,
+              message: '🎉 Đã mở bảng chia sẻ của iPhone! Hãy chọn "Lưu video" để lưu vào Album Ảnh.',
+            );
+          }
+        } catch (shareErr) {
+          debugPrint('iOS Share error: $shareErr');
+        }
       }
-    } catch (e) {
-      debugPrint('Lỗi lưu vào ảnh: $e');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.window.open(url, '_blank');
-      return const VideoSaveResult(
-        isSuccess: true,
-        message: '🎬 Đã mở video! Chạm giữ vào video và chọn "Lưu vào Ảnh".',
-      );
-    }
-  }
 
-  /// 2. TẢI VÀO THƯ MỤC TỆP (FILES / DOWNLOADS)
-  Future<VideoSaveResult> downloadToFiles(String filename) async {
-    final blob = finalBlob;
-    if (blob == null || blob.size == 0) {
-      return const VideoSaveResult(
-        isSuccess: false,
-        message: 'Chưa có dữ liệu video để tải. Vui lòng xuất lại video!',
-      );
-    }
-
-    try {
+      // 2. Kích hoạt tải file trực tiếp về máy
       final url = html.Url.createObjectUrlFromBlob(blob);
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download', filename)
@@ -128,10 +107,10 @@ class RealtimeVideoSession {
 
       return const VideoSaveResult(
         isSuccess: true,
-        message: '📁 Đã tải video vào thư mục Tệp (Downloads) của iPhone!',
+        message: '🎉 Đã tải video thành công!',
       );
     } catch (e) {
-      return VideoSaveResult(isSuccess: false, message: 'Lỗi tải tệp: $e');
+      return VideoSaveResult(isSuccess: false, message: 'Lỗi tải video: $e');
     }
   }
 }
@@ -143,7 +122,7 @@ RealtimeVideoSession startRealtimeVideoSession({
 }) {
   final canvas = html.CanvasElement(width: width, height: height);
 
-  // QUAN TRỌNG CHO IOS SAFARI: Canvas PHẢI nằm trong DOM tree để WebKit Render Thread kích hoạt captureStream
+  // Canvas gắn vào DOM để WebKit kích hoạt captureStream
   canvas.style.position = 'fixed';
   canvas.style.left = '-9999px';
   canvas.style.top = '-9999px';
@@ -155,7 +134,6 @@ RealtimeVideoSession startRealtimeVideoSession({
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Thu thập luồng thời gian thực
   dynamic stream;
   try {
     stream = (canvas as dynamic).captureStream(fps.toInt());
@@ -200,7 +178,7 @@ RealtimeVideoSession startRealtimeVideoSession({
     if (!completer.isCompleted) completer.complete();
   });
 
-  mediaRecorder.start(100); // 100ms buffer chunking tối ưu nhất cho iOS WebKit
+  mediaRecorder.start(100);
 
   return RealtimeVideoSession(
     canvas: canvas,

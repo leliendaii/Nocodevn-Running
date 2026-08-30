@@ -539,62 +539,55 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
               Future.microtask(() async {
                 try {
-                  // 1. Reset animation về đầu và đặt thời lượng quay thực tế (6.5 giây mượt mà)
                   _controller.reset();
-                  _controller.duration = const Duration(milliseconds: 6500);
 
-                  // 2. Chụp khung hình ban đầu để tạo Canvas chuẩn kích thước
+                  // 1. Chụp khung hình ban đầu để tạo Canvas chuẩn kích thước
                   final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
                   if (boundary == null) throw Exception('Không tìm thấy khung hình 3D.');
 
-                  final firstImg = await boundary.toImage(pixelRatio: 1.5);
+                  final firstImg = await boundary.toImage(pixelRatio: 1.2);
                   final session = RouteVideoRecorder.startSession(
                     width: firstImg.width,
                     height: firstImg.height,
-                    fps: 60.0,
+                    fps: 30.0,
                   );
                   activeSession = session;
 
-                  // 3. Lắng nghe từng nhịp chuyển động VSync của Flutter (60 lần/giây, Zero Stepping)
-                  bool isCapturing = false;
-                  void onTick() async {
-                    if (isCapturing || _isDisposed || !mounted) return;
-                    isCapturing = true;
-                    try {
-                      final b = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-                      if (b != null) {
-                        final img = await b.toImage(pixelRatio: 1.5);
-                        final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-                        if (raw != null) {
-                          session.pushRawFrame(raw.buffer.asUint8List(), img.width, img.height);
-                        }
-                      }
-                    } catch (_) {}
-                    isCapturing = false;
+                  // 2. Quay từng khung hình tuần tự (Deterministic Stepping) - 100% ổn định trên iOS Safari
+                  const int totalSteps = 45;
+                  for (int step = 0; step <= totalSteps; step++) {
+                    if (_isDisposed || !mounted) break;
+                    final double t = step / totalSteps;
+                    _controller.value = t;
 
                     setDialogState(() {
-                      progress = _controller.value * 0.90;
-                      status = '🎥 Đang quay video 60 FPS (${(progress * 100).toInt()}%)...';
+                      progress = (step / totalSteps) * 0.90;
+                      status = '🎥 Đang quay video (${(progress * 100).toInt()}%)...';
                     });
+
+                    await Future.delayed(const Duration(milliseconds: 35));
+
+                    final b = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+                    if (b != null) {
+                      final img = await b.toImage(pixelRatio: 1.2);
+                      final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+                      if (raw != null) {
+                        session.pushRawFrame(raw.buffer.asUint8List(), img.width, img.height);
+                      }
+                    }
                   }
-
-                  _controller.addListener(onTick);
-
-                  // Chạy animation liên tục ở 60 FPS thật
-                  await _controller.forward();
-                  _controller.removeListener(onTick);
 
                   setDialogState(() {
                     progress = 0.95;
-                    status = '💎 Đang tối ưu hóa định dạng MP4 60 FPS...';
+                    status = '💎 Đang đóng gói video MP4...';
                   });
 
-                  // 4. Kết thúc đóng gói video
+                  // 3. Kết thúc đóng gói video
                   await session.finishRecording();
 
                   setDialogState(() {
                     progress = 1.0;
-                    status = '🎉 Video đã sẵn sàng! Bấm nút bên dưới để lưu vào máy.';
+                    status = '🎉 Video đã sẵn sàng tải về!';
                     isDone = true;
                   });
 
@@ -658,7 +651,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Tốc độ: ${_formatSpeed(_playbackSpeed)} • Chất lượng: Full HD 60 FPS',
+                      'Tốc độ: ${_formatSpeed(_playbackSpeed)} • Chất lượng: HD MP4',
                       style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                     const SizedBox(height: 20),
@@ -702,43 +695,11 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // Hướng dẫn chi tiết lưu vào Album Ảnh trên iPhone
-                    if (isDone)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.photo_library_outlined, color: AppTheme.secondaryNeon, size: 18),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Lưu vào Thư viện Ảnh (Camera Roll):',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Bấm nút bên dưới rồi chọn "Lưu video" trên bảng của iPhone để video vào thẳng Album Ảnh của Camera!',
-                              style: TextStyle(fontSize: 11.5, color: AppTheme.textPrimary.withValues(alpha: 0.9), height: 1.4),
-                            ),
-                          ],
-                        ),
-                      ),
-
                     if (isDone) ...[
-                      // Nút duy nhất: Lưu vào Album Ảnh (Camera Roll)
+                      // Nút TẢI VỀ ngắn gọn chuẩn màu xanh nước biển
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
+                        height: 48,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.secondaryNeon,
@@ -751,7 +712,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           ),
                           onPressed: () async {
                             if (activeSession != null) {
-                              final result = await activeSession!.saveToPhotos(filename);
+                              final result = await activeSession!.downloadVideo(filename);
                               if (!ctx.mounted) return;
                               if (mounted) {
                                 TopSyncToast.show(
@@ -765,15 +726,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.photo_library_rounded, size: 22, color: Color(0xFF0F172A)),
+                              Icon(Icons.download_rounded, size: 22, color: Color(0xFF0F172A)),
                               SizedBox(width: 8),
                               Text(
-                                'LƯU VÀO ALBUM ẢNH (CAMERA)',
+                                'TẢI VỀ',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A),
-                                  letterSpacing: 0.5,
+                                  letterSpacing: 1.0,
                                 ),
                               ),
                             ],
@@ -789,7 +750,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         child: TextButton(
                           onPressed: () => Navigator.of(ctx).pop(),
                           child: const Text(
-                            'HOÀN TẤT / ĐÓNG',
+                            'ĐÓNG',
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                           ),
                         ),
