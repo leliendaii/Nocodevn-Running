@@ -451,7 +451,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       hintText: 'Nhập tên đăng nhập',
                       prefixIcon: Icon(
                         Icons.alternate_email_rounded,
-                        color: AppTheme.secondaryNeon,
+                        color: AppTheme.primaryNeon,
                       ),
                     ),
                   ),
