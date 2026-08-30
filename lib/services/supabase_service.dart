@@ -60,10 +60,10 @@ class SupabaseService {
           .ilike('username', cleanUsername)
           .limit(1)
           .maybeSingle()
-          .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
       return res?['email'] as String?;
     } catch (e) {
-      debugPrint('Lỗi tìm email theo username: $e');
+      debugPrint('Tìm email theo username (offline fallback): $e');
       return null;
     }
   }
@@ -74,7 +74,7 @@ class SupabaseService {
     if (supa == null) return null;
 
     try {
-      final res = await supa.auth.getUser().timeout(const Duration(milliseconds: 2500));
+      final res = await supa.auth.getUser().timeout(const Duration(seconds: 8));
       return res.user;
     } catch (e) {
       return null;
@@ -99,10 +99,10 @@ class SupabaseService {
           .or(orFilters.join(','))
           .limit(1)
           .maybeSingle()
-          .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
       return res;
     } catch (e) {
-      debugPrint('Lỗi fetch profiles: $e');
+      debugPrint('Fetch profiles (offline fallback): $e');
       return null;
     }
   }
@@ -135,10 +135,10 @@ class SupabaseService {
       final res = await supa
           .from('profiles')
           .select()
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 12));
       return List<Map<String, dynamic>>.from(res);
     } catch (e) {
-      debugPrint('Lỗi fetchAllProfiles: $e');
+      debugPrint('FetchAllProfiles (dùng cache): $e');
       return null;
     }
   }
@@ -390,7 +390,7 @@ class SupabaseService {
           .from('run_sessions')
           .select()
           .order('start_time', ascending: false)
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 12));
 
       final List<RunSession> list = [];
       for (final item in data) {
@@ -420,7 +420,7 @@ class SupabaseService {
       }
       return list;
     } catch (e) {
-      debugPrint('Lỗi tải dữ liệu Supabase: $e');
+      debugPrint('Tải dữ liệu Supabase (dùng cache): $e');
       return null;
     }
   }
