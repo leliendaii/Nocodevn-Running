@@ -32,6 +32,7 @@ class SupabaseService {
       try {
         await Supabase.initialize(
           url: supabaseUrl,
+          // ignore: deprecated_member_use
           anonKey: supabaseAnonKey,
         );
         debugPrint('✅ Đã kết nối Supabase Cloud thành công!');

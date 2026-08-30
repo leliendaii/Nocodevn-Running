@@ -29,7 +29,11 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AuthProvider>().refreshProfileFromServer();
+      final auth = context.read<AuthProvider>();
+      auth.refreshProfileFromServer();
+      if (auth.currentUser != null) {
+        context.read<RunningProvider>().loadAutoEndConfigForUser(auth.currentUser!.id);
+      }
     });
   }
 

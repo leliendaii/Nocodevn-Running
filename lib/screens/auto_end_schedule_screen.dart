@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
@@ -9,6 +10,9 @@ class AutoEndScheduleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final userId = auth.currentUser?.id ?? 'default_user';
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -92,6 +96,7 @@ class AutoEndScheduleScreen extends StatelessWidget {
                             activeThumbColor: AppTheme.primaryNeon,
                             onChanged: (val) {
                               running.updateAutoEndSchedule(
+                                userId: userId,
                                 enabled: val,
                                 startHour: running.autoStartHour,
                                 startMinute: running.autoStartMinute,
@@ -144,6 +149,7 @@ class AutoEndScheduleScreen extends StatelessWidget {
                       );
                       if (picked != null) {
                         running.updateAutoEndSchedule(
+                          userId: userId,
                           enabled: true,
                           startHour: picked.hour,
                           startMinute: picked.minute,
@@ -222,6 +228,7 @@ class AutoEndScheduleScreen extends StatelessWidget {
                       );
                       if (picked != null) {
                         running.updateAutoEndSchedule(
+                          userId: userId,
                           enabled: true,
                           startHour: running.autoStartHour,
                           startMinute: running.autoStartMinute,

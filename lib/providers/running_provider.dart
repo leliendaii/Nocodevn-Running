@@ -28,6 +28,7 @@ class RunningProvider with ChangeNotifier {
   int _durationSeconds = 0;
   double _distanceKm = 0.0;
   int _calories = 0;
+  double _instantSpeedKmh = 0.0; // Vận tốc tức thời thời gian thực (phản hồi tức thì)
   DateTime? _runStartTime;
   DateTime? _pauseStartTime;
   int _totalPausedSeconds = 0;
@@ -37,7 +38,8 @@ class RunningProvider with ChangeNotifier {
   DateTime? _lastPositionTime;
   StreamSubscription<Position>? _positionStream;
 
-  // Cấu hình Khung giờ chạy & Tự động kết thúc (Chống quên)
+  // Cấu hình Khung giờ chạy & Tự động kết thúc (Chống quên) - Theo từng User
+  String? _activeUserId;
   bool _autoEndEnabled = true;
   int _autoStartHour = 5;
   int _autoStartMinute = 0;
@@ -54,7 +56,6 @@ class RunningProvider with ChangeNotifier {
   RunningProvider() {
     _loadInitialSessions();
     _loadUserProfiles();
-    _loadAutoEndConfig();
   }
 
   /// Tải danh sách profile thật của tất cả user từ Cloud
@@ -118,9 +119,10 @@ class RunningProvider with ChangeNotifier {
 
   Map<String, Map<String, dynamic>> get allUserProfiles => _userProfiles;
 
-  /// Tải cấu hình khung giờ chạy
-  Future<void> _loadAutoEndConfig() async {
-    final schedule = await LocalStorageService.loadAutoEndSchedule();
+  /// Tải cấu hình khung giờ chạy của riêng User đang đăng nhập
+  Future<void> loadAutoEndConfigForUser(String userId) async {
+    _activeUserId = userId;
+    final schedule = await LocalStorageService.loadAutoEndSchedule(userId);
     _autoEndEnabled = schedule['enabled'] ?? true;
     _autoStartHour = schedule['startHour'] ?? 5;
     _autoStartMinute = schedule['startMinute'] ?? 0;
@@ -129,20 +131,23 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cập nhật khung giờ chạy và giờ tự động chốt
+  /// Cập nhật khung giờ chạy và giờ tự động chốt cho riêng User đang đăng nhập
   Future<void> updateAutoEndSchedule({
+    required String userId,
     required bool enabled,
     required int startHour,
     required int startMinute,
     required int endHour,
     required int endMinute,
   }) async {
+    _activeUserId = userId;
     _autoEndEnabled = enabled;
     _autoStartHour = startHour;
     _autoStartMinute = startMinute;
     _autoEndHour = endHour;
     _autoEndMinute = endMinute;
     await LocalStorageService.saveAutoEndSchedule(
+      userId: userId,
       enabled: enabled,
       startHour: startHour,
       startMinute: startMinute,
@@ -199,20 +204,23 @@ class RunningProvider with ChangeNotifier {
   int get durationSeconds => _durationSeconds;
   double get distanceKm => _distanceKm;
   int get calories => _calories;
+  double get instantSpeedKmh => _instantSpeedKmh;
   List<RunPoint> get currentRoute => List.unmodifiable(_currentRoute);
   List<RunSession> get allSessions => List.unmodifiable(_sessions);
 
-  /// Vận tốc trung bình hiện tại (km/h)
+  /// Vận tốc trung bình cả buổi (km/h)
   double get currentSpeedKmh {
     if (_distanceKm <= 0.005 || _durationSeconds <= 0) return 0.0;
     final double hours = _durationSeconds / 3600.0;
     return (_distanceKm / hours).clamp(0.0, 35.0);
   }
 
-  /// Trạng thái hoạt động thể chất nhận diện tự động (Đi bộ, Đi đều, Đi nhanh, Jogging, Chạy bộ, Nước rút)
+  /// Trạng thái hoạt động thể chất nhận diện tự động tức thì (Đứng yên, Đi bộ, Chạy bộ, Sprint...)
   String get currentActivityType {
-    if (_state != TrackingState.running) return 'Sẵn sàng';
-    return CalorieCalculator.getActivityType(speedKmh: currentSpeedKmh);
+    if (_state == TrackingState.idle) return 'Sẵn sàng';
+    if (_state == TrackingState.paused) return 'Tạm dừng';
+    if (_state == TrackingState.finished) return 'Hoàn thành';
+    return CalorieCalculator.getActivityType(speedKmh: _instantSpeedKmh);
   }
 
   String get currentPace {
@@ -258,15 +266,23 @@ class RunningProvider with ChangeNotifier {
         durationSeconds: _durationSeconds,
       );
 
-      // KIỂM TRA TỰ ĐỘNG CHỐT KHI QUA GIỜ CÀI ĐẶT (CHỐNG QUÊN)
+      // KIỂM TRA PHÂN RÃ TỐC ĐỘ TỨC THỜI KHI ĐỨNG YÊN (NẾU 2S KHÔNG CÓ TỌA ĐỘ MỚI -> 0 KM/H)
+      if (_lastPositionTime != null) {
+        final secSinceLastPos = now.difference(_lastPositionTime!).inSeconds;
+        if (secSinceLastPos >= 2 && _instantSpeedKmh > 0.0) {
+          _instantSpeedKmh = 0.0;
+        }
+      }
+
+      // KIỂM TRA TỰ ĐỘNG CHỐT KHI QUA GIỜ CÀI ĐẶT CỦA USER (CHỐNG QUÊN)
       if (_autoEndEnabled) {
         final cutoffToday = DateTime(now.year, now.month, now.day, _autoEndHour, _autoEndMinute);
         if (now.isAfter(cutoffToday) && _runStartTime!.isBefore(cutoffToday)) {
-          debugPrint('⏰ [AUTO-FINISH] Đã qua mốc giờ $_autoEndHour:$_autoEndMinute, tự động chốt buổi chạy!');
+          debugPrint('⏰ [AUTO-FINISH] Đã qua mốc giờ $_autoEndHour:$_autoEndMinute, tự động chốt buổi chạy cho user $_activeUserId!');
           _wasAutoFinished = true;
           stopAndSaveTracking(
-            userId: 'current_user',
-            userName: 'Người chạy',
+            userId: _activeUserId ?? 'current_user',
+            userName: getUserRealName(_activeUserId ?? '', 'Người chạy'),
             notes: 'Tự động chốt lúc ${_autoEndHour.toString().padLeft(2, '0')}:${_autoEndMinute.toString().padLeft(2, '0')} (Chống quên)',
           );
         }
@@ -274,12 +290,16 @@ class RunningProvider with ChangeNotifier {
     }
   }
 
-  // Bắt đầu chạy đo GPS thực tế & Bộ lọc nhiễu chính xác (Zero Jitter)
-  Future<void> startTracking() async {
+  // Bắt đầu chạy đo GPS thực tế & Bộ lọc nhiễu chính xác (Zero Jitter & Anti-Drift)
+  Future<void> startTracking([String? userId]) async {
+    if (userId != null && userId.isNotEmpty) {
+      _activeUserId = userId;
+    }
     _state = TrackingState.running;
     _durationSeconds = 0;
     _distanceKm = 0.0;
     _calories = 0;
+    _instantSpeedKmh = 0.0;
     _runStartTime = DateTime.now();
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
@@ -311,7 +331,7 @@ class RunningProvider with ChangeNotifier {
           locationSettings = AppleSettings(
             accuracy: LocationAccuracy.bestForNavigation,
             activityType: ActivityType.fitness,
-            distanceFilter: 3, // Lọc dịch chuyển tối thiểu 3m
+            distanceFilter: 2, // Lọc dịch chuyển tối thiểu 2m
             pauseLocationUpdatesAutomatically: false,
             showBackgroundLocationIndicator: true,
             allowBackgroundLocationUpdates: true,
@@ -319,7 +339,7 @@ class RunningProvider with ChangeNotifier {
         } else {
           locationSettings = const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 3,
+            distanceFilter: 2,
           );
         }
 
@@ -329,15 +349,18 @@ class RunningProvider with ChangeNotifier {
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // Cập nhật lại thời gian chính xác
-          _updateDurationFromWallClock();
-
-          // 1. Lọc bỏ tọa độ kém chính xác (nhiễu nhà cao tầng > 25m)
-          if (position.accuracy > 25.0) {
+          // 1. Lọc bỏ tọa độ kém chính xác (nhiễu nhà cao tầng hoặc GPS chưa ổn định > 15m)
+          if (position.accuracy > 15.0) {
             return;
           }
 
           final now = DateTime.now();
+          _updateDurationFromWallClock();
+
+          // Lấy vận tốc tức thời trực tiếp từ chipset GPS phần cứng (m/s)
+          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 3.0) 
+              ? position.speed 
+              : -1.0;
 
           if (_lastPosition != null) {
             final double distanceInMeters = Geolocator.distanceBetween(
@@ -351,10 +374,26 @@ class RunningProvider with ChangeNotifier {
                 ? now.difference(_lastPositionTime!).inMilliseconds / 1000.0 
                 : 1.0;
 
-            final double speedMps = timeDeltaSec > 0 ? (distanceInMeters / timeDeltaSec) : 0.0;
+            final double calcSpeedMps = timeDeltaSec > 0 ? (distanceInMeters / timeDeltaSec) : 0.0;
+            final double effectiveSpeedMps = hwSpeedMps >= 0.0 ? hwSpeedMps : calcSpeedMps;
+            final double speedKmh = (effectiveSpeedMps * 3.6).clamp(0.0, 35.0);
 
-            // 2. Lọc nhiễu đứng yên (> 2.0m) & Lọc bước nhảy ảo (> 11.5 m/s ~ 41.4 km/h)
-            if (distanceInMeters >= 2.0 && speedMps < 11.5) {
+            // Cập nhật Vận tốc tức thời phản hồi nhanh
+            if (speedKmh < 0.8 || (distanceInMeters < 1.5 && effectiveSpeedMps < 0.3)) {
+              _instantSpeedKmh = 0.0;
+            } else {
+              _instantSpeedKmh = speedKmh;
+            }
+
+            // BỘ LỌC CHỐNG TRÔI GPS & LOẠI BỎ NHIỄU ĐỨNG YÊN (ZERO-VELOCITY FILTER):
+            // - Nếu tốc độ < 0.4 m/s và khoảng cách < 3.5m -> Người dùng đang đứng yên, bỏ qua cộng dồn KM.
+            // - Nếu khoảng cách nhỏ hơn bán kính sai số (accuracy * 0.35) và tốc độ < 0.7 m/s -> Nhiễu trôi, bỏ qua.
+            // - Nếu tốc độ tính toán phi thực tế (> 11.5 m/s ~ 41.4 km/h) hoặc khoảng cách nhảy vọt > 50m -> Điểm ảo.
+            final bool isStationaryNoise = (effectiveSpeedMps < 0.4 && distanceInMeters < 3.5) ||
+                                          (distanceInMeters < (position.accuracy * 0.35) && effectiveSpeedMps < 0.7);
+            final bool isAbnormalJump = calcSpeedMps > 11.5 || distanceInMeters > 50.0;
+
+            if (!isStationaryNoise && !isAbnormalJump && distanceInMeters >= 2.0) {
               _distanceKm += distanceInMeters / 1000.0;
               _calories = CalorieCalculator.calculate(
                 distanceKm: _distanceKm,
@@ -363,11 +402,17 @@ class RunningProvider with ChangeNotifier {
               _currentRoute.add(RunPoint(position.longitude, position.latitude));
               _lastPosition = position;
               _lastPositionTime = now;
+            } else if (!isAbnormalJump && distanceInMeters >= 4.0) {
+              // Cập nhật mốc tọa độ để tránh hiện tượng cộng dồn nhảy bước
+              _lastPosition = position;
+              _lastPositionTime = now;
             }
           } else {
+            // Tọa độ đầu tiên hợp lệ khi vừa bấm chạy
             _currentRoute.add(RunPoint(position.longitude, position.latitude));
             _lastPosition = position;
             _lastPositionTime = now;
+            _instantSpeedKmh = hwSpeedMps > 0.3 ? (hwSpeedMps * 3.6) : 0.0;
           }
 
           notifyListeners();
@@ -383,6 +428,7 @@ class RunningProvider with ChangeNotifier {
   // Tạm dừng chạy
   void pauseTracking() {
     _state = TrackingState.paused;
+    _instantSpeedKmh = 0.0;
     _pauseStartTime = DateTime.now();
     _positionStream?.pause();
     notifyListeners();
@@ -413,6 +459,7 @@ class RunningProvider with ChangeNotifier {
     _positionStream = null;
     _lastPosition = null;
     _lastPositionTime = null;
+    _instantSpeedKmh = 0.0;
 
     final RunSession newSession = RunSession(
       id: 'run_${DateTime.now().millisecondsSinceEpoch}',
@@ -434,6 +481,7 @@ class RunningProvider with ChangeNotifier {
     _durationSeconds = 0;
     _distanceKm = 0.0;
     _calories = 0;
+    _instantSpeedKmh = 0.0;
     _currentRoute.clear();
     _runStartTime = null;
     _pauseStartTime = null;
@@ -467,6 +515,7 @@ class RunningProvider with ChangeNotifier {
     _durationSeconds = 0;
     _distanceKm = 0.0;
     _calories = 0;
+    _instantSpeedKmh = 0.0;
     _currentRoute.clear();
     _runStartTime = null;
     _pauseStartTime = null;

@@ -313,16 +313,16 @@ class LocalStorageService {
   }
 
   // ==========================================
-  // CẤU HÌNH KHUNG GIỜ TỰ ĐỘNG KẾT THÚC (CHỐNG QUÊN)
+  // CẤU HÌNH KHUNG GIỜ TỰ ĐỘNG KẾT THÚC (CHỐNG QUÊN) - THEO TỪNG USER
   // ==========================================
-  static const String _keyAutoEndEnabled = 'auto_end_enabled';
-  static const String _keyAutoStartHour = 'auto_start_hour';
-  static const String _keyAutoStartMinute = 'auto_start_minute';
-  static const String _keyAutoEndHour = 'auto_end_hour';
-  static const String _keyAutoEndMinute = 'auto_end_minute';
+  static String _getAutoEndKey(String prefix, String userId) {
+    final cleanId = userId.trim().isNotEmpty ? userId.trim() : 'default';
+    return '${prefix}_$cleanId';
+  }
 
-  /// Lưu cấu hình khung giờ chạy và giờ tự động chốt
+  /// Lưu cấu hình khung giờ chạy và giờ tự động chốt cho từng User riêng biệt
   static Future<void> saveAutoEndSchedule({
+    required String userId,
     required bool enabled,
     required int startHour,
     required int startMinute,
@@ -331,26 +331,32 @@ class LocalStorageService {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyAutoEndEnabled, enabled);
-      await prefs.setInt(_keyAutoStartHour, startHour);
-      await prefs.setInt(_keyAutoStartMinute, startMinute);
-      await prefs.setInt(_keyAutoEndHour, endHour);
-      await prefs.setInt(_keyAutoEndMinute, endMinute);
+      await prefs.setBool(_getAutoEndKey('auto_end_enabled', userId), enabled);
+      await prefs.setInt(_getAutoEndKey('auto_start_hour', userId), startHour);
+      await prefs.setInt(_getAutoEndKey('auto_start_minute', userId), startMinute);
+      await prefs.setInt(_getAutoEndKey('auto_end_hour', userId), endHour);
+      await prefs.setInt(_getAutoEndKey('auto_end_minute', userId), endMinute);
     } catch (e) {
       debugPrint('Lỗi lưu cấu hình auto end schedule: $e');
     }
   }
 
-  /// Tải cấu hình khung giờ chạy (Mặc định: 05:00 -> 07:30 sáng)
-  static Future<Map<String, dynamic>> loadAutoEndSchedule() async {
+  /// Tải cấu hình khung giờ chạy của từng User (Mặc định: 05:00 -> 07:30 sáng)
+  static Future<Map<String, dynamic>> loadAutoEndSchedule(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final enabledKey = _getAutoEndKey('auto_end_enabled', userId);
+      final startHourKey = _getAutoEndKey('auto_start_hour', userId);
+      final startMinKey = _getAutoEndKey('auto_start_minute', userId);
+      final endHourKey = _getAutoEndKey('auto_end_hour', userId);
+      final endMinKey = _getAutoEndKey('auto_end_minute', userId);
+
       return {
-        'enabled': prefs.getBool(_keyAutoEndEnabled) ?? true,
-        'startHour': prefs.getInt(_keyAutoStartHour) ?? 5,
-        'startMinute': prefs.getInt(_keyAutoStartMinute) ?? 0,
-        'endHour': prefs.getInt(_keyAutoEndHour) ?? 7,
-        'endMinute': prefs.getInt(_keyAutoEndMinute) ?? 30,
+        'enabled': prefs.getBool(enabledKey) ?? true,
+        'startHour': prefs.getInt(startHourKey) ?? 5,
+        'startMinute': prefs.getInt(startMinKey) ?? 0,
+        'endHour': prefs.getInt(endHourKey) ?? 7,
+        'endMinute': prefs.getInt(endMinKey) ?? 30,
       };
     } catch (e) {
       return {

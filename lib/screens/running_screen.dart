@@ -461,7 +461,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton.icon(
-                    onPressed: () => running.startTracking(),
+                    onPressed: () => running.startTracking(user?.id),
                     icon: const Icon(Icons.play_arrow_rounded, size: 32, color: Colors.white),
                     label: const Text(
                       'BẮT ĐẦU CHẠY',
