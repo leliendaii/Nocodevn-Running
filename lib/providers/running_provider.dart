@@ -159,6 +159,9 @@ class RunningProvider with ChangeNotifier {
 
   /// Tải dữ liệu kết hợp Offline Cache & Supabase Cloud
   Future<void> _loadInitialSessions() async {
+    // 0. Kiểm tra và tự động khôi phục ngay buổi chạy bị ngắt đột ngột (nếu có)
+    await recoverUnfinishedRunSession();
+
     // 1. Tải nhanh từ bộ nhớ máy (Offline Cache) để hiển thị tức thì
     final cached = await LocalStorageService.loadCachedRunSessions();
     if (cached.isNotEmpty) {
@@ -274,10 +277,8 @@ class RunningProvider with ChangeNotifier {
         }
       }
 
-      // GHI CHECKPOINT LIÊN TỤC MỖI 3 GIÂY (CHỐNG MẤT DỮ LIỆU KHI TẮT APP ĐỘT NGỘT)
-      if (_durationSeconds % 3 == 0) {
-        saveActiveCheckpointNow();
-      }
+      // GHI CHECKPOINT LIÊN TỤC MỖI GIÂY (CHỐNG MẤT DỮ LIỆU KHI TẮT APP ĐỘT NGỘT)
+      saveActiveCheckpointNow();
 
       // KIỂM TRA TỰ ĐỘNG CHỐT KHI QUA GIỜ CÀI ĐẶT CỦA USER (CHỐNG QUÊN)
       if (_autoEndEnabled) {
@@ -327,6 +328,9 @@ class RunningProvider with ChangeNotifier {
     _currentRoute.clear();
     _lastPosition = null;
     _lastPositionTime = null;
+
+    // Lưu ngay checkpoint điểm xuất phát
+    saveActiveCheckpointNow();
 
     // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
@@ -566,51 +570,51 @@ class RunningProvider with ChangeNotifier {
       // Dọn checkpoint cũ
       await LocalStorageService.clearActiveTrackingCheckpoint();
 
-      // Nếu buổi chạy có ý nghĩa (đã đi > 30m hoặc chạy > 20s) -> Tự động lưu thành tích ngay cho người dùng!
-      if (distanceKm >= 0.03 || durationSec >= 20) {
-        final routePointsData = checkpoint['route_points'] as List<dynamic>? ?? [];
-        final List<RunPoint> routePoints = [];
-        for (final pt in routePointsData) {
-          if (pt is Map) {
-            routePoints.add(RunPoint(
-              (pt['x'] as num?)?.toDouble() ?? 0.0,
-              (pt['y'] as num?)?.toDouble() ?? 0.0,
-            ));
-          }
+      final routePointsData = checkpoint['route_points'] as List<dynamic>? ?? [];
+      final List<RunPoint> routePoints = [];
+      for (final pt in routePointsData) {
+        if (pt is Map) {
+          routePoints.add(RunPoint(
+            (pt['x'] as num?)?.toDouble() ?? 0.0,
+            (pt['y'] as num?)?.toDouble() ?? 0.0,
+          ));
         }
-
-        final recoveredSession = RunSession(
-          id: 'run_${DateTime.now().millisecondsSinceEpoch}',
-          userId: userId,
-          userName: userName,
-          startTime: startTime,
-          endTime: DateTime.now(),
-          durationSeconds: durationSec,
-          distanceKm: distanceKm,
-          calories: (checkpoint['calories'] as num?)?.toInt() ?? CalorieCalculator.calculate(distanceKm: distanceKm, durationSeconds: durationSec),
-          notes: 'Tự động lưu khi thoát app đột ngột',
-          routePoints: routePoints,
-        );
-
-        _sessions.insert(0, recoveredSession);
-        notifyListeners();
-
-        // 1. Lưu Offline Cache & Pending Sync
-        LocalStorageService.cacheAllRunSessions(_sessions);
-        LocalStorageService.savePendingOfflineRun(recoveredSession);
-
-        // 2. Đẩy lên Supabase Cloud
-        if (SupabaseService.isConfigured) {
-          SupabaseService.insertRunSession(recoveredSession).then((success) {
-            if (success) {
-              LocalStorageService.removePendingOfflineRun(recoveredSession.id);
-            }
-          });
-        }
-
-        debugPrint('🛡️ [AUTO-RECOVERY] Đã tự động lưu buổi chạy bị đóng app: ${recoveredSession.distanceKm} km, ${recoveredSession.durationSeconds}s');
-        return recoveredSession;
       }
+
+      final int actualDuration = durationSec > 0 ? durationSec : 1;
+      final recoveredSession = RunSession(
+        id: 'run_${DateTime.now().millisecondsSinceEpoch}',
+        userId: userId,
+        userName: userName,
+        startTime: startTime,
+        endTime: startTime.add(Duration(seconds: actualDuration)),
+        durationSeconds: actualDuration,
+        distanceKm: distanceKm,
+        calories: (checkpoint['calories'] as num?)?.toInt() ?? CalorieCalculator.calculate(distanceKm: distanceKm, durationSeconds: actualDuration),
+        notes: 'Tự động lưu khi thoát app đột ngột',
+        routePoints: routePoints,
+      );
+
+      // Tránh trùng lặp nếu session id đã tồn tại
+      _sessions.removeWhere((s) => s.id == recoveredSession.id);
+      _sessions.insert(0, recoveredSession);
+      notifyListeners();
+
+      // 1. Lưu Offline Cache & Pending Sync
+      await LocalStorageService.cacheAllRunSessions(_sessions);
+      await LocalStorageService.savePendingOfflineRun(recoveredSession);
+
+      // 2. Đẩy lên Supabase Cloud
+      if (SupabaseService.isConfigured) {
+        SupabaseService.insertRunSession(recoveredSession).then((success) {
+          if (success) {
+            LocalStorageService.removePendingOfflineRun(recoveredSession.id);
+          }
+        });
+      }
+
+      debugPrint('🛡️ [AUTO-RECOVERY] Đã tự động lưu buổi chạy bị đóng app: ${recoveredSession.distanceKm} km, ${recoveredSession.durationSeconds}s');
+      return recoveredSession;
     } catch (e) {
       debugPrint('Lỗi phục hồi phiên chạy: $e');
     }
