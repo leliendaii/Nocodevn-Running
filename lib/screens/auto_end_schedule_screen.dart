@@ -16,11 +16,30 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
   bool _reminderEnabled = true;
   int _reminderHour = 5;
   int _reminderMinute = 30;
+  late final TextEditingController _reminderMsgController;
+
+  @override
+  void initState() {
+    super.initState();
+    _reminderMsgController = TextEditingController(
+      text: 'Đã đến giờ chạy rùi {Tên} ơi, dậy mà xỏ giầy vào mà chạy đi mày, đừng có ngủ "Trương thây" nữa !!!',
+    );
+  }
+
+  @override
+  void dispose() {
+    _reminderMsgController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final userId = auth.currentUser?.id ?? 'default_user';
+    final user = auth.currentUser;
+    final userId = user?.id ?? 'default_user';
+    final userName = (user?.name.isNotEmpty == true)
+        ? user!.name
+        : (user?.username.isNotEmpty == true ? user!.username : 'bạn');
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -42,6 +61,10 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
           final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
           final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
           final reminderStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
+          final formattedReminderMsg = _reminderMsgController.text
+              .replaceAll('{Tên}', userName)
+              .replaceAll('{tên}', userName)
+              .replaceAll('{name}', userName);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
@@ -335,6 +358,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                     border: Border.all(color: AppTheme.divider),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -373,7 +397,9 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                               setState(() => _reminderEnabled = val);
                               TopSyncToast.show(
                                 context,
-                                message: val ? 'Đã bật nhắc nhở luyện tập hàng ngày!' : 'Đã tắt nhắc nhở!',
+                                message: val
+                                    ? 'Đã bật nhắc nhở: "$formattedReminderMsg"'
+                                    : 'Đã tắt nhắc nhở!',
                               );
                             },
                           ),
@@ -381,6 +407,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                       ),
                       if (_reminderEnabled) ...[
                         const Divider(color: AppTheme.divider, height: 24),
+                        // Giờ nhắc nhở
                         InkWell(
                           onTap: () async {
                             final picked = await showTimePicker(
@@ -438,6 +465,80 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                                 const Icon(Icons.edit_outlined, size: 14, color: AppTheme.textMuted),
                               ],
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Khối Lời Nhắc Nhở Tạo Động Lực (Hiển thị và chỉnh sửa trực tiếp)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceLight.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppTheme.divider),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: const [
+                                  Icon(Icons.chat_bubble_outline_rounded, color: AppTheme.primaryNeon, size: 16),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Nội dung thông báo gửi đến:',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _reminderMsgController,
+                                maxLines: 2,
+                                style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, height: 1.4),
+                                decoration: InputDecoration(
+                                  hintText: 'Nhập nội dung nhắc nhở (dùng {Tên} để chèn tên)...',
+                                  hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                                  filled: true,
+                                  fillColor: AppTheme.surface,
+                                  contentPadding: const EdgeInsets.all(12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(color: AppTheme.divider),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(color: AppTheme.divider),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(color: AppTheme.primaryNeon),
+                                  ),
+                                ),
+                                onChanged: (_) => setState(() {}),
+                              ),
+                              const SizedBox(height: 8),
+                              // Preview trực tiếp theo tên người dùng
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Xem trước: ',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      '"$formattedReminderMsg"',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        color: AppTheme.primaryNeon,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
