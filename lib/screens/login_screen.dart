@@ -325,9 +325,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _loginIdentifierController,
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
-                      labelText: 'Email hoặc Tên đăng nhập (Username)',
-                      hintText:
-                          'Nhập username (ví dụ: admin, liendai) hoặc email',
+                      labelText: 'Email hoặc Tên đăng nhập',
+                      hintText: 'Nhập username hoặc email',
                       prefixIcon: Icon(
                         Icons.alternate_email_rounded,
                         color: AppTheme.primaryNeon,
@@ -412,8 +411,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _regUsernameController,
                     style: const TextStyle(color: AppTheme.textPrimary),
                     decoration: const InputDecoration(
-                      labelText: 'Tên đăng nhập (Username)',
-                      hintText: 'Ví dụ: liendai, runner01, admin...',
+                      labelText: 'Tên đăng nhập',
+                      hintText: 'Nhập tên đăng nhập',
                       prefixIcon: Icon(
                         Icons.alternate_email_rounded,
                         color: AppTheme.secondaryNeon,

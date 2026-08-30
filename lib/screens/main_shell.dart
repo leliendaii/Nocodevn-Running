@@ -664,7 +664,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 16),
 
-              // 4. KHỐI CÀI ĐẶT & TIỆN ÍCH (GỌN GÀNG, NHÓM HỢP LÝ)
+              // 4. KHỐI CÀI ĐẶT & TIỆN ÍCH (GỒM TÀI KHOẢN, CÀI ĐẶT LUYỆN TẬP, VỀ ỨNG DỤNG)
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
@@ -689,22 +689,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                     const Divider(color: AppTheme.divider, height: 1, indent: 52),
 
-                    // Mục 2: Khung giờ tự động chốt
+                    // Mục 2: Cài Đặt Luyện Tập (Gộp tự động chốt & nhắc nhở)
                     Consumer<RunningProvider>(
                       builder: (context, running, _) {
-                        final startStr =
-                            '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
-                        final endStr =
-                            '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
-                        final subtitle = running.autoEndEnabled
-                            ? '$startStr ➔ $endStr (Chống quên)'
-                            : 'Đang tắt tự động chốt';
-
                         return _buildSettingsRowTile(
-                          icon: Icons.timer_off_outlined,
+                          icon: Icons.tune_rounded,
                           iconColor: AppTheme.primaryNeon,
-                          title: 'Khung Giờ Tự Động Chốt',
-                          subtitle: subtitle,
+                          title: 'Cài Đặt Luyện Tập',
+                          subtitle: 'Tự động lưu phiên & nhắc nhở giờ chạy',
                           statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
                           statusColor: running.autoEndEnabled
                               ? AppTheme.primaryNeon
@@ -721,38 +713,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                     const Divider(color: AppTheme.divider, height: 1, indent: 52),
 
-                    // Mục 3: Nhắc nhở luyện tập hàng ngày
-                    _buildSettingsRowTile(
-                      icon: Icons.notifications_active_outlined,
-                      iconColor: AppTheme.primaryNeon,
-                      title: 'Nhắc Nhở Luyện Tập',
-                      subtitle: 'Thông báo & giờ chạy mỗi ngày',
-                      onTap: () => _showWorkoutReminderDialog(context),
-                    ),
-
-                    // Mục 4: Dành cho Admin (nếu có)
-                    if (user?.isAdmin == true) ...[
-                      const Divider(color: AppTheme.divider, height: 1, indent: 52),
-                      _buildSettingsRowTile(
-                        icon: Icons.admin_panel_settings_rounded,
-                        iconColor: AppTheme.primaryNeon,
-                        title: 'Trang Quản Trị Hệ Thống',
-                        subtitle: 'Quản lý runners & dữ liệu',
-                        statusText: 'ADMIN',
-                        statusColor: AppTheme.primaryNeon,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (ctx) => const AdminDashboardScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-
-                    const Divider(color: AppTheme.divider, height: 1, indent: 52),
-
-                    // Mục 5: Về ứng dụng & Thông tin phiên bản
+                    // Mục 3: Về ứng dụng & Thông tin phiên bản
                     _buildSettingsRowTile(
                       icon: Icons.info_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
@@ -763,6 +724,36 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+
+              // 5. THẺ QUẢN TRỊ HỆ THỐNG DÀNH RIÊNG CHO ADMIN (TÁCH THÀNH 1 CARD RIÊNG BIỆT)
+              if (user?.isAdmin == true) ...[
+                const SizedBox(height: 14),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppTheme.primaryNeon.withValues(alpha: 0.35),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: _buildSettingsRowTile(
+                    icon: Icons.admin_panel_settings_rounded,
+                    iconColor: AppTheme.primaryNeon,
+                    title: 'Trang Quản Trị Hệ Thống',
+                    subtitle: 'Quản lý runners & phân quyền dữ liệu',
+                    statusText: 'ADMIN',
+                    statusColor: AppTheme.primaryNeon,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => const AdminDashboardScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
               const SizedBox(height: 30),
             ],
           ),
@@ -789,11 +780,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 13, color: iconColor),
+            Icon(icon, size: 14, color: iconColor),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
@@ -933,7 +925,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY (CHUYỂN THÁNG, MÀU XANH PHỤ, GỌN GÀNG)
+  // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY (CHUYỂN THÁNG, NÚT HÔM NAY, MÀU XANH PHỤ, GỌN GÀNG)
   Widget _buildActivityCalendar(
     BuildContext context,
     RunningProvider running,
@@ -973,7 +965,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tiêu đề Lịch kèm Nút chuyển tháng trước/sau
+          // Tiêu đề Lịch kèm Nút chuyển tháng trước/sau & Nút Hôm nay
           Row(
             children: [
               // Nút tháng trước
@@ -983,7 +975,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     _calendarMonth = DateTime(year, month - 1);
                   });
                 },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -993,7 +985,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: const Icon(Icons.chevron_left_rounded, color: AppTheme.textPrimary, size: 18),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               Text(
                 'THÁNG $month/$year',
@@ -1004,7 +996,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   color: AppTheme.textPrimary,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Nút tháng sau
               InkWell(
@@ -1015,7 +1007,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           _calendarMonth = DateTime(year, month + 1);
                         });
                       },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -1026,6 +1018,40 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     Icons.chevron_right_rounded,
                     color: isCurrentMonth ? AppTheme.textMuted.withValues(alpha: 0.3) : AppTheme.textPrimary,
                     size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Nút quay về Hôm nay
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _calendarMonth = DateTime(now.year, now.month);
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isCurrentMonth
+                        ? AppTheme.primaryNeon.withValues(alpha: 0.15)
+                        : AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isCurrentMonth
+                          ? AppTheme.primaryNeon.withValues(alpha: 0.5)
+                          : AppTheme.divider,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Text(
+                    'Hôm nay',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: isCurrentMonth ? AppTheme.primaryNeon : AppTheme.textSecondary,
+                    ),
                   ),
                 ),
               ),
@@ -1187,93 +1213,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
         ],
       ),
-    );
-  }
-
-  // Dialog Cài đặt Nhắc nhở Luyện tập
-  void _showWorkoutReminderDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: const [
-                  Icon(Icons.notifications_active_outlined, color: AppTheme.primaryNeon, size: 24),
-                  SizedBox(width: 10),
-                  Text(
-                    'Nhắc Nhở Luyện Tập',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Đặt thông báo nhắc nhở xỏ giày chạy bộ mỗi sáng để duy trì ngọn lửa thói quen luyện tập!',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.divider),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.alarm_rounded, color: AppTheme.secondaryNeon, size: 22),
-                    SizedBox(width: 12),
-                    Text(
-                      'Giờ nhắc nhở:',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                    ),
-                    Spacer(),
-                    Text(
-                      '05:30 Sáng',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.primaryNeon),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryNeon,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    TopSyncToast.show(context, message: 'Đã bật nhắc nhở luyện tập 05:30 sáng!', isSuccess: true);
-                  },
-                  child: const Text('BẬT NHẮC NHỞ HÀNG NGÀY', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
-        );
-      },
     );
   }
 
