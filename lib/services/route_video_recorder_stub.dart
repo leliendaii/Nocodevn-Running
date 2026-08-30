@@ -2,13 +2,15 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-Future<bool> recordAndExportExactFlyoverVideo({
-  required Future<Uint8List?> Function(double t) frameProvider,
-  required int totalFrames,
-  required double speed,
-  required String sessionId,
-  required Function(double progress, String status) onProgress,
-}) async {
-  onProgress(1.0, 'Đã hoàn tất.');
-  return true;
+class RealtimeVideoSession {
+  void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {}
+  Future<void> stopAndDownload(String filename) async {}
+}
+
+RealtimeVideoSession startRealtimeVideoSession({
+  required int width,
+  required int height,
+  double fps = 60.0,
+}) {
+  return RealtimeVideoSession();
 }

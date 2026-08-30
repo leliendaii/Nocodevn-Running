@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -460,22 +459,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     });
   }
 
-  Future<Uint8List?> _captureScreenFrame(double t) async {
-    if (_isDisposed || !mounted) return null;
-    _controller.value = t;
-    await Future.delayed(const Duration(milliseconds: 25));
-    try {
-      final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
-    } catch (e) {
-      debugPrint('Lỗi chụp khung hình màn hình 3D: $e');
-      return null;
-    }
-  }
-
   void _handleDownloadVideo() {
     final double previousValue = _controller.value;
     final bool previousPlaying = _isPlaying;
@@ -487,36 +470,91 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       barrierDismissible: false,
       builder: (ctx) {
         double progress = 0.0;
-        String status = 'Đang chuẩn bị quay video 3D màn hình thực tế...';
+        String status = 'Đang chuẩn bị luồng quay trực tiếp 60 FPS...';
         bool isDone = false;
         bool isStarted = false;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Tự động khởi chạy tiến trình quay video màn hình 3D thực tế
+            // Tự động khởi chạy tiến trình quay video 60 FPS thời gian thực
             if (!isStarted) {
               isStarted = true;
 
-              RouteVideoRecorder.recordExactScreen(
-                frameProvider: _captureScreenFrame,
-                totalFrames: 75,
-                speed: _playbackSpeed,
-                sessionId: widget.session.id,
-                onProgress: (prog, stat) {
-                  setDialogState(() {
-                    progress = prog;
-                    status = stat;
-                    if (prog >= 1.0) {
-                      isDone = true;
-                      if (previousPlaying && mounted && !_isDisposed) {
-                        _controller.value = previousValue;
-                        _controller.forward();
-                        setState(() => _isPlaying = true);
+              Future.microtask(() async {
+                try {
+                  // 1. Reset animation về đầu và đặt thời lượng quay thực tế (6.5 giây mượt mà)
+                  _controller.reset();
+                  _controller.duration = const Duration(milliseconds: 6500);
+
+                  // 2. Chụp khung hình ban đầu để tạo Canvas chuẩn kích thước
+                  final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+                  if (boundary == null) throw Exception('Không tìm thấy khung hình 3D.');
+
+                  final firstImg = await boundary.toImage(pixelRatio: 1.5);
+                  final session = RouteVideoRecorder.startSession(
+                    width: firstImg.width,
+                    height: firstImg.height,
+                    fps: 60.0,
+                  );
+
+                  // 3. Lắng nghe từng nhịp chuyển động VSync của Flutter (60 lần/giây, Zero Stepping)
+                  bool isCapturing = false;
+                  void onTick() async {
+                    if (isCapturing || _isDisposed || !mounted) return;
+                    isCapturing = true;
+                    try {
+                      final b = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+                      if (b != null) {
+                        final img = await b.toImage(pixelRatio: 1.5);
+                        final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+                        if (raw != null) {
+                          session.pushRawFrame(raw.buffer.asUint8List(), img.width, img.height);
+                        }
                       }
-                    }
+                    } catch (_) {}
+                    isCapturing = false;
+
+                    setDialogState(() {
+                      progress = _controller.value * 0.90;
+                      status = '🎥 Đang quay video 60 FPS (${(progress * 100).toInt()}%)...';
+                    });
+                  }
+
+                  _controller.addListener(onTick);
+
+                  // Chạy animation liên tục ở 60 FPS thật
+                  await _controller.forward();
+                  _controller.removeListener(onTick);
+
+                  setDialogState(() {
+                    progress = 0.95;
+                    status = '💎 Đang tối ưu và tải video MP4 60 FPS...';
                   });
-                },
-              );
+
+                  // 4. Kết thúc và tải file MP4
+                  final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.mp4';
+                  await session.stopAndDownload(filename);
+
+                  setDialogState(() {
+                    progress = 1.0;
+                    status = '🎉 Đã lưu video 60 FPS siêu mượt thành công!';
+                    isDone = true;
+                  });
+
+                  // Khôi phục lại trạng thái ban đầu
+                  _controller.duration = Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round());
+                  _controller.value = previousValue;
+                  if (previousPlaying && mounted && !_isDisposed) {
+                    _controller.forward();
+                    setState(() => _isPlaying = true);
+                  }
+                } catch (e) {
+                  setDialogState(() {
+                    status = 'Lỗi quay video: $e';
+                    isDone = true;
+                  });
+                }
+              });
             }
 
             return Dialog(

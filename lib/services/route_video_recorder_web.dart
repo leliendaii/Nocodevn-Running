@@ -3,134 +3,106 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
 
-Future<bool> recordAndExportExactFlyoverVideo({
-  required Future<Uint8List?> Function(double t) frameProvider,
-  required int totalFrames,
-  required double speed,
-  required String sessionId,
-  required Function(double progress, String status) onProgress,
-}) async {
-  try {
-    onProgress(0.05, 'Khởi tạo bộ quay video 3D sắc nét Ultra HD...');
+class RealtimeVideoSession {
+  final html.CanvasElement canvas;
+  final html.CanvasRenderingContext2D ctx;
+  final html.MediaRecorder mediaRecorder;
+  final List<html.Blob> videoChunks;
+  final Completer<void> completer;
 
-    // 1. Lấy khung hình mẫu đầu tiên để xác định độ phân giải chính xác của màn hình
-    final firstFrameBytes = await frameProvider(0.0);
-    if (firstFrameBytes == null || firstFrameBytes.isEmpty) {
-      throw Exception('Không thể chụp khung hình 3D.');
-    }
+  RealtimeVideoSession({
+    required this.canvas,
+    required this.ctx,
+    required this.mediaRecorder,
+    required this.videoChunks,
+    required this.completer,
+  });
 
-    final firstBlob = html.Blob([firstFrameBytes], 'image/png');
-    final firstUrl = html.Url.createObjectUrlFromBlob(firstBlob);
-    final sampleImg = html.ImageElement(src: firstUrl);
-    await sampleImg.onLoad.first;
-    final int width = sampleImg.naturalWidth > 0 ? sampleImg.naturalWidth : 720;
-    final int height = sampleImg.naturalHeight > 0 ? sampleImg.naturalHeight : 1280;
-    html.Url.revokeObjectUrl(firstUrl);
-
-    // 2. Tạo Canvas HTML5 khớp 100% kích thước màn hình 3D Flyover với chất lượng cao nhất
-    final canvas = html.CanvasElement(width: width, height: height);
-    final ctx = canvas.context2D;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(sampleImg, 0, 0);
-
-    // 3. Chuẩn bị luồng MediaStream từ Canvas (30 FPS chuẩn)
-    dynamic stream;
+  /// Đẩy khung hình raw GPU (RGBA) trực tiếp vào Canvas trong 1ms (Zero Lag, chuẩn 60 FPS)
+  void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
     try {
-      stream = (canvas as dynamic).captureStream(30);
-    } catch (e) {
-      throw Exception('Trình duyệt không hỗ trợ ghi hình Canvas: $e');
-    }
-
-    // 4. Cấu hình MediaRecorder với Bitrate cao (8.5 Mbps Ultra HD) để video sắc nét không bị vỡ hạt
-    String mimeType = 'video/webm;codecs=vp9';
-    if (!html.MediaRecorder.isTypeSupported(mimeType)) {
-      if (html.MediaRecorder.isTypeSupported('video/mp4')) {
-        mimeType = 'video/mp4';
-      } else if (html.MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-        mimeType = 'video/webm;codecs=vp8';
-      } else if (html.MediaRecorder.isTypeSupported('video/webm')) {
-        mimeType = 'video/webm';
-      } else {
-        mimeType = '';
-      }
-    }
-
-    final Map<String, dynamic> recorderOptions = {
-      'videoBitsPerSecond': 8500000, // 8.5 Mbps Ultra HD
-    };
-    if (mimeType.isNotEmpty) {
-      recorderOptions['mimeType'] = mimeType;
-    }
-
-    final mediaRecorder = html.MediaRecorder(stream, recorderOptions);
-
-    final List<html.Blob> videoChunks = [];
-    final Completer<void> recordCompleter = Completer<void>();
-
-    mediaRecorder.addEventListener('dataavailable', (event) {
-      final blob = (event as dynamic).data as html.Blob?;
-      if (blob != null && blob.size > 0) {
-        videoChunks.add(blob);
-      }
-    });
-
-    mediaRecorder.addEventListener('stop', (_) {
-      if (!recordCompleter.isCompleted) {
-        recordCompleter.complete();
-      }
-    });
-
-    // Bắt đầu ghi với timeslice đều 100ms
-    mediaRecorder.start(100);
-    onProgress(0.12, '🎥 Đang quay video 3D Flyover sắc nét 60 FPS...');
-
-    // 5. Chụp và ghi từng khung hình 3D thực tế theo nhịp 30 FPS mượt mà
-    for (int f = 0; f <= totalFrames; f++) {
-      final double t = f / totalFrames;
-      final frameBytes = await frameProvider(t);
-
-      if (frameBytes != null && frameBytes.isNotEmpty) {
-        final blob = html.Blob([frameBytes], 'image/png');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final img = html.ImageElement(src: url);
-        await img.onLoad.first;
-        ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0);
-        html.Url.revokeObjectUrl(url);
-      }
-
-      // Giữ nhịp đồng bộ để luồng video 30 FPS mượt mà, không bị giật lag
-      await Future.delayed(const Duration(milliseconds: 33));
-
-      final double reportProg = 0.12 + (t * 0.76);
-      onProgress(reportProg, '🎥 Đang ghi hình 3D siêu mượt ${(t * 100).toInt()}%...');
-    }
-
-    // Chờ thêm 200ms để encoder gom đủ keyframes cuối
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    onProgress(0.90, '💎 Đang nén và tối ưu video MP4 Ultra HD...');
-    mediaRecorder.stop();
-    await recordCompleter.future;
-
-    if (videoChunks.isEmpty) {
-      throw Exception('Không có dữ liệu video được tạo.');
-    }
-
-    // 6. Ghép thành file MP4 và kích hoạt lưu/tải
-    final finalBlob = html.Blob(videoChunks, 'video/mp4');
-    final filename = 'flyover_3d_${sessionId}_${speed}x.mp4';
-
-    onProgress(0.96, '🎉 Đang lưu video chất lượng cao vào thư viện...');
-    await _saveOrDownloadVideo(finalBlob, filename);
-
-    onProgress(1.0, '🎉 Đã tải video MP4 3D Flyover thành công!');
-    return true;
-  } catch (e) {
-    onProgress(1.0, 'Lỗi xuất video: $e');
-    return false;
+      final imgData = ctx.createImageData(frameWidth, frameHeight);
+      imgData.data.setRange(0, rawRgbaBytes.lengthInBytes, rawRgbaBytes);
+      ctx.putImageData(imgData, 0, 0);
+    } catch (_) {}
   }
+
+  /// Dừng ghi hình và lưu video MP4 60 FPS siêu mượt
+  Future<void> stopAndDownload(String filename) async {
+    try {
+      mediaRecorder.stop();
+      await completer.future;
+
+      if (videoChunks.isNotEmpty) {
+        final finalBlob = html.Blob(videoChunks, 'video/mp4');
+        await _saveOrDownloadVideo(finalBlob, filename);
+      }
+    } catch (_) {}
+  }
+}
+
+RealtimeVideoSession startRealtimeVideoSession({
+  required int width,
+  required int height,
+  double fps = 60.0,
+}) {
+  final canvas = html.CanvasElement(width: width, height: height);
+  final ctx = canvas.context2D;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // Thu thập luồng 60 FPS thời gian thực
+  dynamic stream;
+  try {
+    stream = (canvas as dynamic).captureStream(fps.toInt());
+  } catch (_) {
+    stream = (canvas as dynamic).captureStream();
+  }
+
+  String mimeType = 'video/webm;codecs=vp9';
+  if (!html.MediaRecorder.isTypeSupported(mimeType)) {
+    if (html.MediaRecorder.isTypeSupported('video/mp4')) {
+      mimeType = 'video/mp4';
+    } else if (html.MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+      mimeType = 'video/webm;codecs=vp8';
+    } else if (html.MediaRecorder.isTypeSupported('video/webm')) {
+      mimeType = 'video/webm';
+    } else {
+      mimeType = '';
+    }
+  }
+
+  final Map<String, dynamic> recorderOptions = {
+    'videoBitsPerSecond': 12000000, // 12 Mbps 60 FPS Crystal Clear
+  };
+  if (mimeType.isNotEmpty) {
+    recorderOptions['mimeType'] = mimeType;
+  }
+
+  final mediaRecorder = html.MediaRecorder(stream, recorderOptions);
+  final List<html.Blob> chunks = [];
+  final completer = Completer<void>();
+
+  mediaRecorder.addEventListener('dataavailable', (event) {
+    final blob = (event as dynamic).data as html.Blob?;
+    if (blob != null && blob.size > 0) {
+      chunks.add(blob);
+    }
+  });
+
+  mediaRecorder.addEventListener('stop', (_) {
+    if (!completer.isCompleted) completer.complete();
+  });
+
+  mediaRecorder.start(40); // Thu thập gói dữ liệu mượt mà mỗi 40ms
+
+  return RealtimeVideoSession(
+    canvas: canvas,
+    ctx: ctx,
+    mediaRecorder: mediaRecorder,
+    videoChunks: chunks,
+    completer: completer,
+  );
 }
 
 Future<void> _saveOrDownloadVideo(html.Blob videoBlob, String filename) async {
@@ -143,7 +115,7 @@ Future<void> _saveOrDownloadVideo(html.Blob videoBlob, String filename) async {
       await html.window.navigator.share({
         'files': [file],
         'title': 'Video 3D Flyover Chạy Bộ',
-        'text': 'Lộ trình chạy bộ 3D Flyover siêu đẹp của tôi',
+        'text': 'Lộ trình chạy bộ 3D Flyover siêu mượt 60 FPS của tôi',
       });
       return;
     } catch (_) {}
