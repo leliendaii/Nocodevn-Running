@@ -33,9 +33,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final double _totalPathLength;
   late final int _zoomLevel;
 
-  // Bảng tra cứu tọa độ siêu mịn 2.000 điểm kết hợp bộ lọc Damped Camera Tracking
+  // Bảng tra cứu tọa độ siêu mịn 2.000 điểm
   late final List<Offset> _sampledPositions;
-  late final List<Offset> _cameraPositions;
   late final List<double> _sampledHeadings;
   late final Offset _startPinPixel;
   late final Offset _finishPinPixel;
@@ -80,26 +79,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
     _totalPathLength = _pathMetric.length > 0 ? _pathMetric.length : 1.0;
 
-    // 6. Tiền tính toán bảng nội suy 2.000 điểm và bộ lọc làm mượt camera (Damped Camera Tracking)
+    // 6. Tiền tính toán bảng nội suy 2.000 điểm đều nhau
     const int sampleCount = 2000;
     _sampledPositions = List.generate(sampleCount, (i) {
       final double dist = _totalPathLength * (i / (sampleCount - 1));
       final tangent = _pathMetric.getTangentForOffset(dist);
       return tangent?.position ?? _cachedRoutePixels.first;
-    });
-
-    // Làm mượt camera qua các ngã rẽ bằng bộ lọc Moving Average không gian (Window = 40 samples)
-    const int camWindow = 40;
-    _cameraPositions = List.generate(sampleCount, (i) {
-      double sumX = 0, sumY = 0;
-      int count = 0;
-      for (int w = -camWindow; w <= camWindow; w++) {
-        final idx = (i + w).clamp(0, sampleCount - 1);
-        sumX += _sampledPositions[idx].dx;
-        sumY += _sampledPositions[idx].dy;
-        count++;
-      }
-      return Offset(sumX / count, sumY / count);
     });
 
     // Làm mượt góc quay tiếp tuyến (Circular Window = 30 samples)
@@ -467,7 +452,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 pixels: _cachedRoutePixels,
                                 fullPath: _fullVectorPath,
                                 sampledPositions: _sampledPositions,
-                                cameraPositions: _cameraPositions,
                                 sampledHeadings: _sampledHeadings,
                                 startPinPixel: _startPinPixel,
                                 finishPinPixel: _finishPinPixel,
@@ -703,7 +687,6 @@ class Real3DFlyoverPainter extends CustomPainter {
   final List<Offset> pixels;
   final Path fullPath;
   final List<Offset> sampledPositions;
-  final List<Offset> cameraPositions;
   final List<double> sampledHeadings;
   final Offset startPinPixel;
   final Offset finishPinPixel;
@@ -721,7 +704,6 @@ class Real3DFlyoverPainter extends CustomPainter {
     required this.pixels,
     required this.fullPath,
     required this.sampledPositions,
-    required this.cameraPositions,
     required this.sampledHeadings,
     required this.startPinPixel,
     required this.finishPinPixel,
@@ -748,7 +730,6 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double subFrac = fIndex - baseIdx;
 
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
-    final Offset rawCamPos = Offset.lerp(cameraPositions[baseIdx], cameraPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
     // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
@@ -766,21 +747,23 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double spanH = (maxY - minY).abs();
 
     // Hệ số Zoom Out lớn hơn (to hơn 25%) để lộ trình to rõ, đẹp mắt
-    final double targetScaleX = (size.width * 0.76) / (spanW > 10 ? spanW : 100);
-    final double targetScaleY = (size.height * 0.54) / (spanH > 10 ? spanH : 100);
+    final double targetScaleX = (size.width * 0.78) / (spanW > 10 ? spanW : 100);
+    final double targetScaleY = (size.height * 0.56) / (spanH > 10 ? spanH : 100);
     final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.24, 1.0);
 
     // Hiệu ứng Zoom Out mượt mà khi kết thúc (Từ 78% -> 100%)
     final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
     final double outroT = Curves.easeInOutCubic.transform(outroRaw);
 
-    final double camX = ui.lerpDouble(rawCamPos.dx, routeCenterX, outroT)!;
-    final double camY = ui.lerpDouble(rawCamPos.dy, routeCenterY, outroT)!;
+    // Khóa camera bám thẳng vào người chạy trong suốt quá trình chạy (Triệt tiêu 100% lắc ngang)
+    // Khi về đích: Camera chuyển động tịnh tiến thẳng từ vạch đích về tâm toàn cảnh
+    final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
+    final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
 
-    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS / GRAB (Lướt êm ru liên tục không giật)
+    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS (Cố định tâm khung nhìn 100% không rung lắc)
     final double screenCenterX = size.width / 2;
-    final double screenCenterY = ui.lerpDouble(size.height * 0.56, size.height * 0.50, outroT)!;
+    final double screenCenterY = size.height * 0.52;
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
@@ -910,75 +893,61 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 9. VẼ CỘT MỐC BẮT ĐẦU VÀ KẾT THÚC CẮM CHUẨN XÁC 100% NGAY ĐẦU MÚT TUYẾN ĐƯỜNG
-    final bool isLoop = (startPinPixel - finishPinPixel).distance < 20.0;
+    // 9. VẼ CỘT MỐC BẮT ĐẦU VÀ KẾT THÚC (LUÔN LUÔN HIỂN THỊ TỪ ĐẦU VIDEO ĐẾN CUỐI VIDEO)
+    final bool isLoop = (startPinPixel - finishPinPixel).distance < 40.0;
 
-    if (isLoop && outroT > 0.05) {
-      // Khi về đích cung đường khép kín: Hiển thị Huy hiệu Về Đích Hoàng Kim ngay vị trí kết thúc
-      canvas.save();
-      canvas.translate(finishPinPixel.dx, finishPinPixel.dy);
+    // 🟢 Điểm Bắt Đầu (Luôn luôn hiển thị)
+    final Offset startBadgeOffset = isLoop ? const Offset(-24, 0) : Offset.zero;
+    canvas.save();
+    canvas.translate(startPinPixel.dx + startBadgeOffset.dx, startPinPixel.dy + startBadgeOffset.dy);
 
-      canvas.drawCircle(const Offset(0, -28), 26, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35)..style = PaintingStyle.stroke..strokeWidth = 3);
-      canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black54);
-      canvas.drawLine(const Offset(0, 0), const Offset(0, -26), Paint()..color = Colors.black87..strokeWidth = 2.5);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(const Rect.fromLTWH(-48, -52, 96, 26), const Radius.circular(13)),
-        Paint()..color = const Color(0xFFEF4444),
+    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
+      Paint()..color = const Color(0xFF10B981),
+    );
+    final startText = TextPainter(
+      text: const TextSpan(
+        text: '🟢 BẮT ĐẦU',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
+    canvas.restore();
+
+    // 🏁 Điểm Kết Thúc (Luôn luôn hiển thị)
+    final Offset finishBadgeOffset = isLoop ? const Offset(24, 0) : Offset.zero;
+    canvas.save();
+    canvas.translate(finishPinPixel.dx + finishBadgeOffset.dx, finishPinPixel.dy + finishBadgeOffset.dy);
+
+    if (outroT > 0.05) {
+      canvas.drawCircle(
+        const Offset(0, -28),
+        26,
+        Paint()
+          ..color = AppTheme.secondaryNeon.withValues(alpha: 0.35 * outroT)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
       );
-      final finishText = TextPainter(
-        text: const TextSpan(
-          text: '🏁 HOÀN THÀNH',
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      )..layout();
-      finishText.paint(canvas, Offset(-finishText.width / 2, -52 + (26 - finishText.height) / 2));
-      canvas.restore();
-    } else {
-      // 🟢 Điểm Bắt Đầu: Chân cột cắm CHÍNH XÁC tại startPinPixel (Không bị lệch đi đâu)
-      canvas.save();
-      canvas.translate(startPinPixel.dx, startPinPixel.dy);
-
-      canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
-      canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
-        Paint()..color = const Color(0xFF10B981),
-      );
-      final startText = TextPainter(
-        text: const TextSpan(
-          text: '🟢 BẮT ĐẦU',
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      )..layout();
-      startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
-      canvas.restore();
-
-      // 🏁 Điểm Kết Thúc: Cắm CHÍNH XÁC tại finishPinPixel khi về đích
-      if (outroT > 0.05) {
-        canvas.save();
-        canvas.translate(finishPinPixel.dx, finishPinPixel.dy);
-        canvas.scale(outroT, outroT);
-
-        canvas.drawCircle(const Offset(0, -28), 26, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.3)..style = PaintingStyle.stroke..strokeWidth = 3);
-        canvas.drawCircle(const Offset(0, 0), 7, Paint()..color = Colors.black54);
-        canvas.drawLine(const Offset(0, 0), const Offset(0, -26), Paint()..color = Colors.black87..strokeWidth = 2.5);
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(const Rect.fromLTWH(-42, -52, 84, 26), const Radius.circular(13)),
-          Paint()..color = const Color(0xFFEF4444),
-        );
-        final finishText = TextPainter(
-          text: const TextSpan(
-            text: '🏁 KẾT THÚC',
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
-          ),
-          textDirection: ui.TextDirection.ltr,
-        )..layout();
-        finishText.paint(canvas, Offset(-finishText.width / 2, -52 + (26 - finishText.height) / 2));
-        canvas.restore();
-      }
     }
+
+    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
+      Paint()..color = const Color(0xFFEF4444),
+    );
+    final finishText = TextPainter(
+      text: const TextSpan(
+        text: '🏁 KẾT THÚC',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    finishText.paint(canvas, Offset(-finishText.width / 2, -46 + (24 - finishText.height) / 2));
+    canvas.restore();
 
     // 10. VẼ CON TRỎ ĐỊNH VỊ GPS THỂ THAO NIKE/APPLE ATHLETIC BEACON (Sóng Neon + Đĩa Tròn Phát Quang)
     canvas.save();
