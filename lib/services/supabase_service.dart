@@ -278,6 +278,62 @@ class SupabaseService {
     }
   }
 
+  /// Gửi email khôi phục mật khẩu (chứa mã OTP 6 số)
+  static Future<String> sendPasswordResetEmail(String identifier) async {
+    final supa = client;
+    if (supa == null) throw Exception('Supabase client chưa kết nối.');
+
+    String targetEmail = identifier.trim().toLowerCase();
+
+    // Nếu người dùng nhập Username, tự động tìm email tương ứng từ DB profiles
+    if (!targetEmail.contains('@')) {
+      final resolvedEmail = await fetchEmailByUsername(targetEmail);
+      if (resolvedEmail == null || resolvedEmail.isEmpty) {
+        throw Exception('Không tìm thấy tài khoản với tên đăng nhập "$identifier".');
+      }
+      targetEmail = resolvedEmail;
+    }
+
+    try {
+      await supa.auth.resetPasswordForEmail(targetEmail).timeout(const Duration(seconds: 5));
+      return targetEmail;
+    } catch (e) {
+      debugPrint('Lỗi gửi reset password Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Xác thực mã OTP khôi phục mật khẩu và cập nhật mật khẩu mới
+  static Future<void> verifyResetPasswordWithOtp({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    final supa = client;
+    if (supa == null) throw Exception('Supabase client chưa kết nối.');
+
+    try {
+      final cleanEmail = email.trim().toLowerCase();
+      // 1. Xác thực OTP loại Recovery
+      await supa.auth.verifyOTP(
+        email: cleanEmail,
+        token: token.trim(),
+        type: OtpType.recovery,
+      ).timeout(const Duration(seconds: 6));
+
+      // 2. Cập nhật mật khẩu mới
+      await supa.auth.updateUser(
+        UserAttributes(password: newPassword),
+      ).timeout(const Duration(seconds: 5));
+
+      // 3. Đăng xuất sạch phiên tạm thời để người dùng đăng nhập lại
+      await supa.auth.signOut().timeout(const Duration(seconds: 3), onTimeout: () => null);
+    } catch (e) {
+      debugPrint('Lỗi verify reset password OTP: $e');
+      rethrow;
+    }
+  }
+
   /// Đổi mật khẩu tài khoản trên Cloud
   static Future<bool> changePassword(String newPassword) async {
     final supa = client;

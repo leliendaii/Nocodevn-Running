@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/dialogs/otp_dialog.dart';
+import '../widgets/dialogs/forgot_password_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -184,6 +185,21 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Hiển thị Popup Quên Mật Khẩu (Khôi phục qua OTP Email)
+  void _showForgotPasswordModal() {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => ForgotPasswordDialog(
+        initialIdentifier: _loginIdentifierController.text.trim(),
+        onSuccess: (emailOrUser) {
+          setState(() {
+            _loginIdentifierController.text = emailOrUser;
+          });
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -358,21 +374,41 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Checkbox(
-                        value: context.watch<AuthProvider>().rememberMe,
-                        activeColor: AppTheme.primaryNeon,
-                        onChanged: (val) {
-                          context.read<AuthProvider>().rememberMe = val ?? true;
-                        },
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: context.watch<AuthProvider>().rememberMe,
+                            activeColor: AppTheme.primaryNeon,
+                            onChanged: (val) {
+                              context.read<AuthProvider>().rememberMe = val ?? true;
+                            },
+                          ),
+                          const Text(
+                            'Ghi nhớ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                      const Text(
-                        'Ghi nhớ đăng nhập (30 ngày)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: _showForgotPasswordModal,
+                        child: const Text(
+                          'Quên mật khẩu?',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.secondaryNeon,
+                          ),
                         ),
                       ),
                     ],

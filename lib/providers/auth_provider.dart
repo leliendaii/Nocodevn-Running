@@ -251,6 +251,73 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Gửi yêu cầu Quên Mật Khẩu (OTP 6 số về Email)
+  Future<Map<String, dynamic>> sendPasswordReset(String identifier) async {
+    final cleanId = identifier.trim();
+    if (cleanId.isEmpty) {
+      return {'success': false, 'error': 'Vui lòng nhập Email hoặc Tên đăng nhập.'};
+    }
+
+    try {
+      if (SupabaseService.isConfigured) {
+        final targetEmail = await SupabaseService.sendPasswordResetEmail(cleanId);
+        return {'success': true, 'email': targetEmail};
+      }
+      return {'success': false, 'error': 'Dịch vụ xác thực Cloud chưa sẵn sàng.'};
+    } catch (e) {
+      debugPrint('Lỗi gửi password reset: $e');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('không tìm thấy') || errStr.contains('user not found')) {
+        return {'success': false, 'error': 'Không tìm thấy tài khoản với thông tin đã nhập!'};
+      }
+      if (errStr.contains('rate limit') || errStr.contains('too many')) {
+        return {'success': false, 'error': 'Bạn đã yêu cầu quá nhiều lần! Vui lòng chờ ít phút.'};
+      }
+      return {'success': false, 'error': e.toString().replaceAll('Exception:', '').trim()};
+    }
+  }
+
+  /// Xác thực mã OTP và Cập nhật Mật khẩu mới cho tài khoản
+  Future<String?> confirmPasswordReset({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanOtp = otp.trim();
+
+    if (cleanEmail.isEmpty || cleanOtp.isEmpty || newPassword.isEmpty) {
+      return 'Vui lòng điền đầy đủ mã OTP và mật khẩu mới.';
+    }
+
+    if (cleanOtp.length < 6) {
+      return 'Mã OTP phải có đúng 6 chữ số.';
+    }
+
+    if (newPassword.length < 6) {
+      return 'Mật khẩu mới phải có ít nhất 6 ký tự.';
+    }
+
+    try {
+      if (SupabaseService.isConfigured) {
+        await SupabaseService.verifyResetPasswordWithOtp(
+          email: cleanEmail,
+          token: cleanOtp,
+          newPassword: newPassword,
+        );
+        return null;
+      }
+      return 'Dịch vụ xác thực Cloud chưa sẵn sàng.';
+    } catch (e) {
+      debugPrint('Lỗi xác thực reset password: $e');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('invalid') || errStr.contains('expired') || errStr.contains('token') || errStr.contains('otp')) {
+        return 'Mã OTP không chính xác hoặc đã hết hạn!';
+      }
+      return 'Lỗi: ${e.toString().replaceAll('Exception:', '').trim()}';
+    }
+  }
+
   /// Đăng nhập siêu tốc (< 1s) & Kích hoạt Realtime sync
   Future<String?> login(String identifier, String password, {bool remember = true}) async {
     final cleanIdentifier = identifier.trim();
