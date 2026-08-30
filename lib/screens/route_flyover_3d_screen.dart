@@ -28,9 +28,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final List<GeoPoint> _smoothRoute;
   late final List<Offset> _cachedRoutePixels;
   late final List<MilestoneData> _milestones;
+  late final Path _fullVectorPath;
+  late final ui.PathMetric _pathMetric;
+  late final double _totalPathLength;
   late final int _zoomLevel;
 
-  // Cache ảnh map tiles tải từ máy chủ ArcGIS World Street Map (Tốc độ siêu nhanh < 30ms, không watermark, không giới hạn)
+  // Cache ảnh map tiles Google Maps
   final Map<String, ui.Image> _tileCache = {};
   final Set<String> _loadingTiles = {};
   final GlobalKey _previewKey = GlobalKey();
@@ -58,18 +61,31 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
     _smoothRoute = _buildConsistentRoute(widget.session);
 
-    // 3. Tự động tính toán mức Zoom phù hợp (đoạn ngắn zoom to 17, đoạn dài zoom 15)
+    // 3. Tự động tính toán mức Zoom phù hợp
     _zoomLevel = _calculateOptimalZoom(_smoothRoute);
 
-    // 4. Tiền tính toán trước toàn bộ tọa độ Pixel (Zero math trong luồng Paint để đạt 60-120 FPS)
+    // 4. Tiền tính toán trước toàn bộ tọa độ Pixel
     _cachedRoutePixels = _smoothRoute.map((p) => _latLngToPixel(p.lat, p.lng, _zoomLevel)).toList();
+
+    // 5. Xây dựng đường cong Vector Path chuẩn Skia & PathMetric cho chuyển động trượt siêu mượt
+    _fullVectorPath = Path();
+    for (int i = 0; i < _cachedRoutePixels.length; i++) {
+      if (i == 0) {
+        _fullVectorPath.moveTo(_cachedRoutePixels[i].dx, _cachedRoutePixels[i].dy);
+      } else {
+        _fullVectorPath.lineTo(_cachedRoutePixels[i].dx, _cachedRoutePixels[i].dy);
+      }
+    }
+    final metrics = _fullVectorPath.computeMetrics().toList();
+    _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
+    _totalPathLength = _pathMetric.length > 0 ? _pathMetric.length : 1.0;
 
     _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute, _cachedRoutePixels);
 
-    // 5. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM (Chống giật lag)
+    // 6. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM (Chống giật lag)
     _precacheRouteMapTiles();
 
-    // 6. Khởi tạo AnimationController (Chạy mượt 60 FPS)
+    // 7. Khởi tạo AnimationController
     _controller = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: (18000 / _playbackSpeed).round()),
@@ -92,7 +108,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     super.dispose();
   }
 
-  // Chuyển đổi Vĩ độ / Kinh độ sang Tọa độ Pixel Web Mercator
   static Offset _latLngToPixel(double lat, double lng, int zoom) {
     final double sinLat = math.sin(lat * math.pi / 180.0).clamp(-0.9999, 0.9999);
     final double scale = tileSize * math.pow(2, zoom);
@@ -136,7 +151,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         basePoints.add(GeoPoint(p.y, p.x));
       }
     } else {
-      // Tuyến đường chạy bộ chuẩn 100% bám theo lòng đường & vỉa hè thực tế (Không xuyên qua bất kỳ tòa nhà nào)
+      // Tuyến đường thực tế bám 100% theo tim đường & vỉa hè các đại lộ lớn
       basePoints = const [
         GeoPoint(10.77665, 106.70085), // 1. Đầu Phố Đi Bộ Nguyễn Huệ (Trước UBND TP)
         GeoPoint(10.77490, 106.70225), // 2. Thẳng theo Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
@@ -151,13 +166,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       ];
     }
 
-    return _interpolatePath(basePoints, 1000);
+    return _interpolatePath(basePoints, 120);
   }
 
-  // Làm mượt đường cong & tính toán góc quay camera (Bearing Smoothing) chống giật lắc
   List<GeoPoint> _interpolatePath(List<GeoPoint> input, int targetCount) {
     if (input.length < 2) return input;
-    final List<GeoPoint> rawPoints = [];
+    final List<GeoPoint> result = [];
     final int segments = input.length - 1;
     final double step = segments / targetCount;
 
@@ -173,30 +187,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       final dLng = p1.lng - p0.lng;
       final double bearing = math.atan2(dLng, dLat);
 
-      rawPoints.add(GeoPoint(lat, lng, bearing: bearing));
+      result.add(GeoPoint(lat, lng, bearing: bearing));
     }
-
-    // Làm mượt góc quay camera bằng bộ lọc trung bình động (Moving Average) 25 frames để camera lượn cua êm ái
-    const int window = 25;
-    final List<GeoPoint> smoothed = [];
-    for (int i = 0; i < rawPoints.length; i++) {
-      double sinSum = 0.0;
-      double cosSum = 0.0;
-      int count = 0;
-
-      for (int w = -window; w <= window; w++) {
-        final idx = (i + w).clamp(0, rawPoints.length - 1);
-        final b = rawPoints[idx].bearing;
-        sinSum += math.sin(b);
-        cosSum += math.cos(b);
-        count++;
-      }
-
-      final double smoothBearing = math.atan2(sinSum / count, cosSum / count);
-      smoothed.add(GeoPoint(rawPoints[i].lat, rawPoints[i].lng, bearing: smoothBearing));
-    }
-
-    return smoothed;
+    return result;
   }
 
   List<MilestoneData> _generateMilestonePins(double totalKm, List<GeoPoint> route, List<Offset> pixels) {
@@ -213,7 +206,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     return pins;
   }
 
-  // Tiền tải chỉ các ô bản đồ thực sự cần thiết (Chỉ 4 - 9 tiles xung quanh bounding box)
   void _precacheRouteMapTiles() {
     int minTx = 999999, maxTx = -999999;
     int minTy = 999999, maxTy = -999999;
@@ -227,11 +219,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       if (ty > maxTy) maxTy = ty;
     }
 
-    // Mở rộng thêm 2 tile xung quanh bounding box để bao phủ trọn vẹn góc nhìn 3D Flycam
-    minTx -= 2;
-    maxTx += 2;
-    minTy -= 2;
-    maxTy += 3;
+    minTx -= 3;
+    maxTx += 3;
+    minTy -= 3;
+    maxTy += 4;
 
     for (int x = minTx; x <= maxTx; x++) {
       for (int y = minTy; y <= maxTy; y++) {
@@ -240,14 +231,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     }
   }
 
-  // Tải Map Tiles trực tiếp từ cụm máy chủ Google Maps (mt0 -> mt3) với tiếng Việt có dấu chuẩn 100%
   void _loadMapTile(int z, int x, int y) {
     if (_isDisposed) return;
     final key = '$z/$x/$y';
     if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
 
     _loadingTiles.add(key);
-    // Cân bằng tải xoay vòng qua 4 máy chủ mt0, mt1, mt2, mt3 của Google
     final int serverId = (x.abs() + y.abs()) % 4;
     final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z';
 
@@ -385,7 +374,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         body: SafeArea(
           child: Stack(
             children: [
-              // 1. ENGINE 3D FLYCAM SIÊU MƯỢT (GPU Canvas 60 FPS độc lập với HUD)
+              // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục bằng PathMetric, Chữ luôn thẳng đứng)
               Positioned.fill(
                 child: _smoothRoute.isEmpty
                     ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
@@ -396,6 +385,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                             painter: Real3DFlyoverPainter(
                               route: _smoothRoute,
                               pixels: _cachedRoutePixels,
+                              fullPath: _fullVectorPath,
+                              pathMetric: _pathMetric,
+                              totalLength: _totalPathLength,
                               milestones: _milestones,
                               progress: _controller.value,
                               tileCache: _tileCache,
@@ -407,7 +399,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
               ),
 
-              // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG (Cập nhật mượt mà)
+              // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG
               Positioned(
                 top: 12,
                 left: 16,
@@ -429,9 +421,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   child: AnimatedBuilder(
                     animation: _controller,
                     builder: (context, _) {
-                      final progress = _controller.value;
-                      final currentDistance = (_effectiveDistanceKm * progress).toStringAsFixed(2);
-                      final elapsedSec = (_effectiveDurationSec * progress).toInt();
+                      final runProgress = (_controller.value / 0.78).clamp(0.0, 1.0);
+                      final currentDistance = (_effectiveDistanceKm * runProgress).toStringAsFixed(2);
+                      final elapsedSec = (_effectiveDurationSec * runProgress).toInt();
                       final int minutes = elapsedSec ~/ 60;
                       final int seconds = elapsedSec % 60;
                       final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
@@ -623,10 +615,13 @@ class MilestoneData {
   const MilestoneData({required this.km, required this.point, required this.pixel});
 }
 
-// PAINTER VẼ ĐỘNG 3D FLYCAM SIÊU TỐC 60 FPS (ĐÃ TIỀN TÍNH TOÁN TOÀN BỘ TỌA ĐỘ)
+// PAINTER VẼ ĐỘNG FLYCAM SIÊU MƯỢT (BẢN ĐỒ CHUẨN HƯỚNG BẮC, CHỮ THẲNG ĐỨNG, NÉT VẼ VECTOR SẮC NÉT)
 class Real3DFlyoverPainter extends CustomPainter {
   final List<GeoPoint> route;
   final List<Offset> pixels;
+  final Path fullPath;
+  final ui.PathMetric pathMetric;
+  final double totalLength;
   final List<MilestoneData> milestones;
   final double progress;
   final Map<String, ui.Image> tileCache;
@@ -638,6 +633,9 @@ class Real3DFlyoverPainter extends CustomPainter {
   Real3DFlyoverPainter({
     required this.route,
     required this.pixels,
+    required this.fullPath,
+    required this.pathMetric,
+    required this.totalLength,
     required this.milestones,
     required this.progress,
     required this.tileCache,
@@ -647,16 +645,15 @@ class Real3DFlyoverPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (route.isEmpty || pixels.isEmpty) return;
+    if (pixels.isEmpty) return;
 
-    // 1. NỘI SUY SUB-PIXEL LIÊN TỤC 60-120 FPS (Triệt tiêu 100% hiện tượng khựng giật giữa các frame)
-    final double activeFloat = ((pixels.length - 1) * progress).clamp(0.0, (pixels.length - 1).toDouble());
-    final int baseIdx = activeFloat.floor();
-    final int nextIdx = math.min(baseIdx + 1, pixels.length - 1);
-    final double subFrac = activeFloat - baseIdx;
+    // 1. TIẾN ĐỘ CHẠY & NỘI SUY TANGENT BẰNG PATHMETRIC (Trượt siêu êm ái 60-120 FPS)
+    final double runProgress = (progress / 0.78).clamp(0.0, 1.0);
+    final double currentDist = totalLength * runProgress;
 
-    final Offset currentPixel = Offset.lerp(pixels[baseIdx], pixels[nextIdx], subFrac)!;
-    final double currentBearing = ui.lerpDouble(route[baseIdx].bearing, route[nextIdx].bearing, subFrac)!;
+    final ui.Tangent? tangent = pathMetric.getTangentForOffset(currentDist);
+    final Offset currentPixel = tangent?.position ?? pixels.first;
+    final double runnerHeading = tangent?.angle ?? 0.0;
 
     // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
     double minX = 99999999, maxX = -99999999;
@@ -672,23 +669,22 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double spanW = (maxX - minX).abs();
     final double spanH = (maxY - minY).abs();
 
-    final double targetScaleX = (size.width * 0.52) / (spanW > 10 ? spanW : 100);
-    final double targetScaleY = (size.height * 0.36) / (spanH > 10 ? spanH : 100);
+    final double targetScaleX = (size.width * 0.54) / (spanW > 10 ? spanW : 100);
+    final double targetScaleY = (size.height * 0.38) / (spanH > 10 ? spanH : 100);
     final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.18, 1.0);
 
-    // Hiệu ứng chuyển động mượt mà khi kết thúc (Từ 78% -> 100%)
+    // Hiệu ứng Zoom Out mượt mà khi kết thúc (Từ 78% -> 100%)
     final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
     final double outroT = Curves.easeInOutCubic.transform(outroRaw);
 
     final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
-    final double camTilt = ui.lerpDouble(0.58, 0.15, outroT)!;
-    final double camBearing = ui.lerpDouble(currentBearing, 0.0, outroT)!;
+    final double camTilt = ui.lerpDouble(0.40, 0.10, outroT)!; // Góc nghiêng 23° chuẩn Flycam thể thao
 
-    // 3. TÍNH TOÁN MA TRẬN PHỐI CẢNH 3D FLYCAM CHUẨN XÁC
+    // 3. TÍNH TOÁN MA TRẬN CAMERA (Bản đồ chuẩn hướng Bắc, chữ luôn đọc xuôi thẳng đứng)
     final double screenCenterX = size.width / 2;
-    final double screenCenterY = ui.lerpDouble(size.height * 0.65, size.height * 0.50, outroT)!;
+    final double screenCenterY = ui.lerpDouble(size.height * 0.60, size.height * 0.50, outroT)!;
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
@@ -697,15 +693,14 @@ class Real3DFlyoverPainter extends CustomPainter {
       ..setEntry(3, 2, 0.0006)
       ..rotateX(camTilt);
     canvas.transform(perspectiveMatrix.storage);
-    canvas.rotate(-camBearing);
     canvas.scale(camScale, camScale);
     canvas.translate(-camX, -camY);
 
-    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Khử răng cưa FilterQuality.medium)
+    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Không Khung Bàn Cờ)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (2.5 / camScale).ceil().clamp(2, 6);
-    final int tileRadiusY = (3.5 / camScale).ceil().clamp(3, 7);
+    final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
+    final int tileRadiusY = (3.4 / camScale).ceil().clamp(3, 7);
 
     for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
       for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
@@ -726,7 +721,6 @@ class Real3DFlyoverPainter extends CustomPainter {
               ..filterQuality = FilterQuality.medium,
           );
         } else {
-          // Nền dự phòng mượt mà KHÔNG CÓ VIỀN KẺ KHUNG (Xóa sạch bàn cờ)
           canvas.drawRect(tileRect, Paint()..color = const Color(0xFFF1F5F9));
           onTileRequested(zoom, tx, ty);
         }
@@ -734,18 +728,8 @@ class Real3DFlyoverPainter extends CustomPainter {
     }
 
     // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mảnh mờ sắc nét)
-    final fullRoutePath = Path();
-    for (int i = 0; i < pixels.length; i++) {
-      final pt = pixels[i];
-      if (i == 0) {
-        fullRoutePath.moveTo(pt.dx, pt.dy);
-      } else {
-        fullRoutePath.lineTo(pt.dx, pt.dy);
-      }
-    }
-
     canvas.drawPath(
-      fullRoutePath,
+      fullPath,
       Paint()
         ..isAntiAlias = true
         ..color = AppTheme.primaryNeon.withValues(alpha: 0.25)
@@ -755,10 +739,10 @@ class Real3DFlyoverPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // 6. KHI VỀ ĐÍCH: VẼ LẠI TOÀN BỘ CUNG ĐƯỜNG VỚI HÀO QUANG MƯỢT MÀ
+    // 6. KHI VỀ ĐÍCH: VẼ LẠI TOÀN BỘ CUNG ĐƯỜNG VỚI HÀO QUANG ĂN MỪNG
     if (outroT > 0.05) {
       canvas.drawPath(
-        fullRoutePath,
+        fullPath,
         Paint()
           ..isAntiAlias = true
           ..color = AppTheme.secondaryNeon.withValues(alpha: 0.35 * outroT)
@@ -769,25 +753,16 @@ class Real3DFlyoverPainter extends CustomPainter {
       );
     }
 
-    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Vector Chuẩn Sắc Nét, Không Bị Vỡ Pixels)
-    if (baseIdx > 0 || subFrac > 0) {
-      final activeRoutePath = Path();
-      for (int i = 0; i <= baseIdx; i++) {
-        final pt = pixels[i];
-        if (i == 0) {
-          activeRoutePath.moveTo(pt.dx, pt.dy);
-        } else {
-          activeRoutePath.lineTo(pt.dx, pt.dy);
-        }
-      }
-      activeRoutePath.lineTo(currentPixel.dx, currentPixel.dy);
+    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Trích xuất Vector Path trực tiếp từ Skia - Cực kỳ sắc nét và mượt mà)
+    if (currentDist > 1.0) {
+      final Path activePath = pathMetric.extractPath(0.0, currentDist);
 
-      // Lớp 1: Bóng đổ nhẹ dưới mặt đường
+      // Lớp 1: Bóng đổ mặt đường
       canvas.drawPath(
-        activeRoutePath,
+        activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = Colors.black.withValues(alpha: 0.3)
+          ..color = Colors.black.withValues(alpha: 0.28)
           ..strokeWidth = 6.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
@@ -796,10 +771,10 @@ class Real3DFlyoverPainter extends CustomPainter {
 
       // Lớp 2: Vệt chạy đỏ Neon sắc nét chuẩn Strava
       canvas.drawPath(
-        activeRoutePath,
+        activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = const Color(0xFFFF3B30) // Màu đỏ thể thao sắc nét
+          ..color = const Color(0xFFFF334B)
           ..strokeWidth = 4.5
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
@@ -808,11 +783,11 @@ class Real3DFlyoverPainter extends CustomPainter {
 
       // Lớp 3: Lõi sáng tinh tế giúp nét vẽ nổi khối mịn màng
       canvas.drawPath(
-        activeRoutePath,
+        activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = Colors.white.withValues(alpha: 0.65)
-          ..strokeWidth = 1.6
+          ..color = Colors.white.withValues(alpha: 0.70)
+          ..strokeWidth = 1.5
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
@@ -825,7 +800,6 @@ class Real3DFlyoverPainter extends CustomPainter {
 
       canvas.save();
       canvas.translate(pinPixel.dx, pinPixel.dy);
-      canvas.rotate(camBearing);
 
       canvas.drawCircle(const Offset(0, 0), 4, Paint()..color = Colors.black38);
       canvas.drawLine(const Offset(0, 0), const Offset(0, -18), Paint()..color = Colors.black54..strokeWidth = 2);
@@ -849,20 +823,18 @@ class Real3DFlyoverPainter extends CustomPainter {
     final finishPt = pixels.last;
     final bool isLoop = (startPt - finishPt).distance < 45.0;
 
-    // Tách 2 cột mốc lệch sang 2 bên nếu xuất phát & về đích cùng 1 điểm
     final Offset startOffset = isLoop ? const Offset(-30, 0) : Offset.zero;
     final Offset finishOffset = isLoop ? const Offset(30, 0) : Offset.zero;
 
     // Điểm Bắt Đầu 🟢
     canvas.save();
     canvas.translate(startPt.dx + startOffset.dx, startPt.dy + startOffset.dy);
-    canvas.rotate(camBearing);
 
     canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
     canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
     canvas.drawRRect(
       RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
-      Paint()..color = const Color(0xFF10B981), // Xanh lá cây bắt đầu
+      Paint()..color = const Color(0xFF10B981),
     );
     final startText = TextPainter(
       text: const TextSpan(
@@ -878,10 +850,8 @@ class Real3DFlyoverPainter extends CustomPainter {
     if (outroT > 0.05) {
       canvas.save();
       canvas.translate(finishPt.dx + finishOffset.dx, finishPt.dy + finishOffset.dy);
-      canvas.rotate(camBearing);
       canvas.scale(outroT, outroT);
 
-      // Vòng tròn hào quang về đích
       canvas.drawCircle(
         const Offset(0, -28),
         26,
@@ -895,7 +865,7 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.drawLine(const Offset(0, 0), const Offset(0, -26), Paint()..color = Colors.black87..strokeWidth = 2.5);
       canvas.drawRRect(
         RRect.fromRectAndRadius(const Rect.fromLTWH(-42, -52, 84, 26), const Radius.circular(13)),
-        Paint()..color = const Color(0xFFEF4444), // Đỏ Neon Về đích
+        Paint()..color = const Color(0xFFEF4444),
       );
       final finishText = TextPainter(
         text: const TextSpan(
@@ -908,20 +878,21 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 10. VẼ ICON VẬN ĐỘNG VIÊN & CHÙM TIA SÁNG QUÉT PHÍA TRƯỚC
+    // 10. VẼ ICON VẬN ĐỘNG VIÊN & ĐÈN PHA QUÉT ĐƯỜNG THEO HƯỚNG CHẠY
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
+    canvas.rotate(runnerHeading - math.pi / 2); // Xoay đèn pha theo đúng hướng vận động viên đang chạy
 
     final beamPath = Path()
       ..moveTo(0, 0)
-      ..lineTo(-22, 50)
-      ..lineTo(22, 50)
+      ..lineTo(-20, 45)
+      ..lineTo(20, 45)
       ..close();
 
     final beamPaint = Paint()
       ..shader = ui.Gradient.linear(
         const Offset(0, 0),
-        const Offset(0, 50),
+        const Offset(0, 45),
         [
           AppTheme.secondaryNeon.withValues(alpha: 0.45 * (1.0 - outroT)),
           AppTheme.secondaryNeon.withValues(alpha: 0.0),
@@ -929,9 +900,9 @@ class Real3DFlyoverPainter extends CustomPainter {
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    canvas.drawCircle(const Offset(0, 0), 15, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35));
-    canvas.drawCircle(const Offset(0, 0), 8.5, Paint()..color = AppTheme.secondaryNeon);
-    canvas.drawCircle(const Offset(0, 0), 4.5, Paint()..color = Colors.white);
+    canvas.drawCircle(const Offset(0, 0), 14, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35));
+    canvas.drawCircle(const Offset(0, 0), 8.0, Paint()..color = AppTheme.secondaryNeon);
+    canvas.drawCircle(const Offset(0, 0), 4.0, Paint()..color = Colors.white);
 
     canvas.restore();
 
