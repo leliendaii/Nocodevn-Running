@@ -19,7 +19,7 @@ class RouteFlyover3DScreen extends StatefulWidget {
 class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  double _playbackSpeed = 0.75;
+  double _playbackSpeed = 1.0;
   bool _isPlaying = true;
   bool _isDisposed = false;
 
@@ -49,7 +49,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  static const int _baseDurationMs = 9000; // Tốc độ cơ bản nhanh gấp đôi (9 giây thay vì 18 giây)
+  static const int _baseDurationMs = 13500; // Tốc độ cơ bản êm ái, thư thái chuẩn phong cách 0.75x
 
   @override
   void initState() {
