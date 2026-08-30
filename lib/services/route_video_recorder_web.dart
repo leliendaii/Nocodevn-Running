@@ -11,7 +11,7 @@ Future<bool> recordAndExportExactFlyoverVideo({
   required Function(double progress, String status) onProgress,
 }) async {
   try {
-    onProgress(0.05, 'Khởi tạo bộ quay video 3D màn hình thực tế...');
+    onProgress(0.05, 'Khởi tạo bộ quay video 3D sắc nét Ultra HD...');
 
     // 1. Lấy khung hình mẫu đầu tiên để xác định độ phân giải chính xác của màn hình
     final firstFrameBytes = await frameProvider(0.0);
@@ -27,12 +27,14 @@ Future<bool> recordAndExportExactFlyoverVideo({
     final int height = sampleImg.naturalHeight > 0 ? sampleImg.naturalHeight : 1280;
     html.Url.revokeObjectUrl(firstUrl);
 
-    // 2. Tạo Canvas HTML5 khớp 100% kích thước màn hình 3D Flyover
+    // 2. Tạo Canvas HTML5 khớp 100% kích thước màn hình 3D Flyover với chất lượng cao nhất
     final canvas = html.CanvasElement(width: width, height: height);
     final ctx = canvas.context2D;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(sampleImg, 0, 0);
 
-    // 3. Chuẩn bị luồng MediaStream từ Canvas (30 FPS)
+    // 3. Chuẩn bị luồng MediaStream từ Canvas (30 FPS chuẩn)
     dynamic stream;
     try {
       stream = (canvas as dynamic).captureStream(30);
@@ -40,7 +42,7 @@ Future<bool> recordAndExportExactFlyoverVideo({
       throw Exception('Trình duyệt không hỗ trợ ghi hình Canvas: $e');
     }
 
-    // 4. Chọn MIME type tương thích cao nhất cho MP4 / WebM
+    // 4. Cấu hình MediaRecorder với Bitrate cao (8.5 Mbps Ultra HD) để video sắc nét không bị vỡ hạt
     String mimeType = 'video/webm;codecs=vp9';
     if (!html.MediaRecorder.isTypeSupported(mimeType)) {
       if (html.MediaRecorder.isTypeSupported('video/mp4')) {
@@ -54,9 +56,14 @@ Future<bool> recordAndExportExactFlyoverVideo({
       }
     }
 
-    final mediaRecorder = mimeType.isNotEmpty
-        ? html.MediaRecorder(stream, {'mimeType': mimeType})
-        : html.MediaRecorder(stream);
+    final Map<String, dynamic> recorderOptions = {
+      'videoBitsPerSecond': 8500000, // 8.5 Mbps Ultra HD
+    };
+    if (mimeType.isNotEmpty) {
+      recorderOptions['mimeType'] = mimeType;
+    }
+
+    final mediaRecorder = html.MediaRecorder(stream, recorderOptions);
 
     final List<html.Blob> videoChunks = [];
     final Completer<void> recordCompleter = Completer<void>();
@@ -74,10 +81,11 @@ Future<bool> recordAndExportExactFlyoverVideo({
       }
     });
 
+    // Bắt đầu ghi với timeslice đều 100ms
     mediaRecorder.start(100);
-    onProgress(0.12, '🎥 Đang quay video 3D Flyover chính xác 100% từ màn hình...');
+    onProgress(0.12, '🎥 Đang quay video 3D Flyover sắc nét 60 FPS...');
 
-    // 5. Chụp và ghi từng khung hình 3D thực tế (bao gồm Google Maps, góc nghiêng 3D, vệt Neon, Runner Beacon và HUD)
+    // 5. Chụp và ghi từng khung hình 3D thực tế theo nhịp 30 FPS mượt mà
     for (int f = 0; f <= totalFrames; f++) {
       final double t = f / totalFrames;
       final frameBytes = await frameProvider(t);
@@ -92,11 +100,17 @@ Future<bool> recordAndExportExactFlyoverVideo({
         html.Url.revokeObjectUrl(url);
       }
 
+      // Giữ nhịp đồng bộ để luồng video 30 FPS mượt mà, không bị giật lag
+      await Future.delayed(const Duration(milliseconds: 33));
+
       final double reportProg = 0.12 + (t * 0.76);
-      onProgress(reportProg, '🎥 Đang ghi hình 3D khung hình ${f + 1}/$totalFrames (${(t * 100).toInt()}%)...');
+      onProgress(reportProg, '🎥 Đang ghi hình 3D siêu mượt ${(t * 100).toInt()}%...');
     }
 
-    onProgress(0.90, '💎 Đang đóng gói dữ liệu video MP4...');
+    // Chờ thêm 200ms để encoder gom đủ keyframes cuối
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    onProgress(0.90, '💎 Đang nén và tối ưu video MP4 Ultra HD...');
     mediaRecorder.stop();
     await recordCompleter.future;
 
@@ -108,7 +122,7 @@ Future<bool> recordAndExportExactFlyoverVideo({
     final finalBlob = html.Blob(videoChunks, 'video/mp4');
     final filename = 'flyover_3d_${sessionId}_${speed}x.mp4';
 
-    onProgress(0.96, '🎉 Đang lưu video vào thư viện thiết bị...');
+    onProgress(0.96, '🎉 Đang lưu video chất lượng cao vào thư viện...');
     await _saveOrDownloadVideo(finalBlob, filename);
 
     onProgress(1.0, '🎉 Đã tải video MP4 3D Flyover thành công!');

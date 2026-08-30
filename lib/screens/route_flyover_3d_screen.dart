@@ -467,7 +467,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     try {
       final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return null;
-      final ui.Image image = await boundary.toImage(pixelRatio: 1.5);
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
@@ -499,7 +499,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
               RouteVideoRecorder.recordExactScreen(
                 frameProvider: _captureScreenFrame,
-                totalFrames: 45,
+                totalFrames: 75,
                 speed: _playbackSpeed,
                 sessionId: widget.session.id,
                 onProgress: (prog, stat) {
