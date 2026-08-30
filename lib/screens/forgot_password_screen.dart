@@ -123,117 +123,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // 1. MÀN HÌNH NHẬP EMAIL HOẶC USERNAME
+  // 1. MÀN HÌNH NHẬP EMAIL HOẶC USERNAME (GỌN GÀNG NHẤT)
   Widget _buildInputFormView() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Card giới thiệu
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppTheme.divider),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _identifierController,
+          autofocus: true,
+          style: const TextStyle(color: AppTheme.textPrimary),
+          decoration: const InputDecoration(
+            labelText: 'Email hoặc Tên đăng nhập',
+            hintText: 'Nhập email hoặc username đã đăng ký',
+            prefixIcon: Icon(
+              Icons.alternate_email_rounded,
+              color: AppTheme.primaryNeon,
+            ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.lock_reset_rounded, color: AppTheme.primaryNeon, size: 24),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quên Mật Khẩu?',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Nhập Email hoặc Tên đăng nhập đã đăng ký của bạn. Hệ thống sẽ gửi email chứa liên kết an toàn để bạn thiết lập lại mật khẩu mới.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          onSubmitted: (_) => _handleSendResetLink(),
         ),
         const SizedBox(height: 20),
-
-        // Thẻ nhập thông tin
-        const Text(
-          'THÔNG TIN TÀI KHOẢN',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: AppTheme.textSecondary),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.divider),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _identifierController,
-                autofocus: true,
-                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-                decoration: const InputDecoration(
-                  labelText: 'Email hoặc Tên đăng nhập',
-                  hintText: 'Nhập email hoặc username đã đăng ký',
-                  prefixIcon: Icon(
-                    Icons.alternate_email_rounded,
-                    color: AppTheme.primaryNeon,
-                  ),
-                ),
-                onSubmitted: (_) => _handleSendResetLink(),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Nút gửi liên kết
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryNeon,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            onPressed: _isLoading ? null : _handleSendResetLink,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                  )
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.send_rounded, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'GỬI LIÊN KẾT ĐẶT LẠI MẬT KHẨU',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                      ),
-                    ],
-                  ),
-          ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _handleSendResetLink,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                )
+              : const Text('GỬI LIÊN KẾT ĐẶT LẠI MẬT KHẨU'),
         ),
       ],
     );
