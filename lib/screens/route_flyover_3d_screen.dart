@@ -67,15 +67,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // 4. Tiền tính toán trước toàn bộ tọa độ Pixel
     _cachedRoutePixels = _smoothRoute.map((p) => _latLngToPixel(p.lat, p.lng, _zoomLevel)).toList();
 
-    // 5. Xây dựng đường cong Vector Path chuẩn Skia & PathMetric cho chuyển động trượt siêu mượt
-    _fullVectorPath = Path();
-    for (int i = 0; i < _cachedRoutePixels.length; i++) {
-      if (i == 0) {
-        _fullVectorPath.moveTo(_cachedRoutePixels[i].dx, _cachedRoutePixels[i].dy);
-      } else {
-        _fullVectorPath.lineTo(_cachedRoutePixels[i].dx, _cachedRoutePixels[i].dy);
-      }
-    }
+    // 5. Xây dựng đường cong Vector Fillet Spline mượt mà (Bo góc ngã tư tự nhiên)
+    _fullVectorPath = _createSmoothSplinePath(_cachedRoutePixels);
     final metrics = _fullVectorPath.computeMetrics().toList();
     _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
     _totalPathLength = _pathMetric.length > 0 ? _pathMetric.length : 1.0;
@@ -106,6 +99,50 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _controller.stop();
     _controller.dispose();
     super.dispose();
+  }
+
+  // Tạo đường chạy Vector cong bo góc tự nhiên (Chaikin / Bezier Corner Filleting)
+  static Path _createSmoothSplinePath(List<Offset> pts) {
+    final path = Path();
+    if (pts.isEmpty) return path;
+    if (pts.length == 1) {
+      path.moveTo(pts.first.dx, pts.first.dy);
+      return path;
+    }
+
+    path.moveTo(pts.first.dx, pts.first.dy);
+    if (pts.length == 2) {
+      path.lineTo(pts.last.dx, pts.last.dy);
+      return path;
+    }
+
+    const double cornerRadius = 16.0;
+
+    for (int i = 1; i < pts.length - 1; i++) {
+      final pPrev = pts[i - 1];
+      final pCurr = pts[i];
+      final pNext = pts[i + 1];
+
+      final v1 = pCurr - pPrev;
+      final v2 = pNext - pCurr;
+      final len1 = v1.distance;
+      final len2 = v2.distance;
+
+      if (len1 < 1.0 || len2 < 1.0) {
+        path.lineTo(pCurr.dx, pCurr.dy);
+        continue;
+      }
+
+      final double r = math.min(cornerRadius, math.min(len1 / 2.2, len2 / 2.2));
+      final pStart = pCurr - (v1 / len1) * r;
+      final pEnd = pCurr + (v2 / len2) * r;
+
+      path.lineTo(pStart.dx, pStart.dy);
+      path.quadraticBezierTo(pCurr.dx, pCurr.dy, pEnd.dx, pEnd.dy);
+    }
+
+    path.lineTo(pts.last.dx, pts.last.dy);
+    return path;
   }
 
   static Offset _latLngToPixel(double lat, double lng, int zoom) {
@@ -166,30 +203,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       ];
     }
 
-    return _interpolatePath(basePoints, 120);
-  }
-
-  List<GeoPoint> _interpolatePath(List<GeoPoint> input, int targetCount) {
-    if (input.length < 2) return input;
-    final List<GeoPoint> result = [];
-    final int segments = input.length - 1;
-    final double step = segments / targetCount;
-
-    for (double t = 0; t <= segments; t += step) {
-      final int i = t.floor().clamp(0, segments - 1);
-      final double frac = t - i;
-      final p0 = input[i];
-      final p1 = input[i + 1];
-      final lat = p0.lat * (1 - frac) + p1.lat * frac;
-      final lng = p0.lng * (1 - frac) + p1.lng * frac;
-
-      final dLat = p1.lat - p0.lat;
-      final dLng = p1.lng - p0.lng;
-      final double bearing = math.atan2(dLng, dLat);
-
-      result.add(GeoPoint(lat, lng, bearing: bearing));
-    }
-    return result;
+    return basePoints;
   }
 
   List<MilestoneData> _generateMilestonePins(double totalKm, List<GeoPoint> route, List<Offset> pixels) {
@@ -200,7 +214,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
     for (int i = 1; i <= totalPins; i++) {
       final double frac = (i / totalKm).clamp(0.0, 1.0);
-      final int idx = ((route.length - 1) * frac).toInt().clamp(0, route.length - 1);
+      final int idx = ((pixels.length - 1) * frac).toInt().clamp(0, pixels.length - 1);
       pins.add(MilestoneData(km: i, point: route[idx], pixel: pixels[idx]));
     }
     return pins;
@@ -376,14 +390,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
             children: [
               // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục bằng PathMetric, Chữ luôn thẳng đứng)
               Positioned.fill(
-                child: _smoothRoute.isEmpty
+                child: _cachedRoutePixels.isEmpty
                     ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
                     : AnimatedBuilder(
                         animation: _controller,
                         builder: (context, _) {
                           return CustomPaint(
                             painter: Real3DFlyoverPainter(
-                              route: _smoothRoute,
                               pixels: _cachedRoutePixels,
                               fullPath: _fullVectorPath,
                               pathMetric: _pathMetric,
@@ -617,7 +630,6 @@ class MilestoneData {
 
 // PAINTER VẼ ĐỘNG FLYCAM SIÊU MƯỢT (BẢN ĐỒ CHUẨN HƯỚNG BẮC, CHỮ THẲNG ĐỨNG, NÉT VẼ VECTOR SẮC NÉT)
 class Real3DFlyoverPainter extends CustomPainter {
-  final List<GeoPoint> route;
   final List<Offset> pixels;
   final Path fullPath;
   final ui.PathMetric pathMetric;
@@ -631,7 +643,6 @@ class Real3DFlyoverPainter extends CustomPainter {
   static const double tileSize = 256.0;
 
   Real3DFlyoverPainter({
-    required this.route,
     required this.pixels,
     required this.fullPath,
     required this.pathMetric,
@@ -653,7 +664,10 @@ class Real3DFlyoverPainter extends CustomPainter {
 
     final ui.Tangent? tangent = pathMetric.getTangentForOffset(currentDist);
     final Offset currentPixel = tangent?.position ?? pixels.first;
-    final double runnerHeading = tangent?.angle ?? 0.0;
+    // Góc xoay chuẩn theo vector tiếp tuyến của hướng chạy
+    final double runnerHeading = tangent != null
+        ? math.atan2(tangent.vector.dy, tangent.vector.dx)
+        : 0.0;
 
     // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
     double minX = 99999999, maxX = -99999999;
@@ -680,7 +694,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
-    final double camTilt = ui.lerpDouble(0.40, 0.10, outroT)!; // Góc nghiêng 23° chuẩn Flycam thể thao
+    final double camTilt = ui.lerpDouble(0.38, 0.08, outroT)!; // Góc nghiêng 22° chuẩn Flycam
 
     // 3. TÍNH TOÁN MA TRẬN CAMERA (Bản đồ chuẩn hướng Bắc, chữ luôn đọc xuôi thẳng đứng)
     final double screenCenterX = size.width / 2;
@@ -696,7 +710,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     canvas.scale(camScale, camScale);
     canvas.translate(-camX, -camY);
 
-    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Không Khung Bàn Cờ)
+    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Gối mép 0.5px - Triệt tiêu 100% đường kẻ bàn cờ)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
     final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
@@ -708,7 +722,8 @@ class Real3DFlyoverPainter extends CustomPainter {
         final ty = centerTileY + dy;
         final key = '$zoom/$tx/$ty';
 
-        final tileRect = Rect.fromLTWH(tx * tileSize, ty * tileSize, tileSize, tileSize);
+        // Gối mép 0.5px giữa các ô để triệt tiêu hoàn toàn đường kẻ phân tách
+        final tileRect = Rect.fromLTWH(tx * tileSize - 0.5, ty * tileSize - 0.5, tileSize + 1.0, tileSize + 1.0);
 
         if (tileCache.containsKey(key)) {
           final img = tileCache[key]!;
@@ -732,8 +747,8 @@ class Real3DFlyoverPainter extends CustomPainter {
       fullPath,
       Paint()
         ..isAntiAlias = true
-        ..color = AppTheme.primaryNeon.withValues(alpha: 0.25)
-        ..strokeWidth = 3.5
+        ..color = AppTheme.primaryNeon.withValues(alpha: 0.22)
+        ..strokeWidth = 3.2
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
@@ -746,14 +761,14 @@ class Real3DFlyoverPainter extends CustomPainter {
         Paint()
           ..isAntiAlias = true
           ..color = AppTheme.secondaryNeon.withValues(alpha: 0.35 * outroT)
-          ..strokeWidth = 6.5
+          ..strokeWidth = 6.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
     }
 
-    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Trích xuất Vector Path trực tiếp từ Skia - Cực kỳ sắc nét và mượt mà)
+    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Vector Thể Thao Đậm Nét Chuẩn Strava)
     if (currentDist > 1.0) {
       final Path activePath = pathMetric.extractPath(0.0, currentDist);
 
@@ -763,7 +778,7 @@ class Real3DFlyoverPainter extends CustomPainter {
         Paint()
           ..isAntiAlias = true
           ..color = Colors.black.withValues(alpha: 0.28)
-          ..strokeWidth = 6.0
+          ..strokeWidth = 6.2
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
@@ -774,8 +789,8 @@ class Real3DFlyoverPainter extends CustomPainter {
         activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = const Color(0xFFFF334B)
-          ..strokeWidth = 4.5
+          ..color = const Color(0xFFFF2A42) // Màu đỏ thể thao thương hiệu
+          ..strokeWidth = 4.8
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
@@ -786,8 +801,8 @@ class Real3DFlyoverPainter extends CustomPainter {
         activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = Colors.white.withValues(alpha: 0.70)
-          ..strokeWidth = 1.5
+          ..color = const Color(0xFFFF8A9E)
+          ..strokeWidth = 1.8
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
@@ -878,21 +893,22 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 10. VẼ ICON VẬN ĐỘNG VIÊN & ĐÈN PHA QUÉT ĐƯỜNG THEO HƯỚNG CHẠY
+    // 10. VẼ ICON VẬN ĐỘNG VIÊN & ĐÈN PHA QUÉT ĐƯỜNG XOAY 100% THEO HƯỚNG CHẠY THẬT
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
-    canvas.rotate(runnerHeading - math.pi / 2); // Xoay đèn pha theo đúng hướng vận động viên đang chạy
+    canvas.rotate(runnerHeading); // Xoay 100% chuẩn xác theo hướng tiếp tuyến di chuyển
 
+    // Đèn pha dẫn đường chiếu về phía trước (Hướng di chuyển +X)
     final beamPath = Path()
       ..moveTo(0, 0)
-      ..lineTo(-20, 45)
-      ..lineTo(20, 45)
+      ..lineTo(40, -18)
+      ..lineTo(40, 18)
       ..close();
 
     final beamPaint = Paint()
       ..shader = ui.Gradient.linear(
         const Offset(0, 0),
-        const Offset(0, 45),
+        const Offset(40, 0),
         [
           AppTheme.secondaryNeon.withValues(alpha: 0.45 * (1.0 - outroT)),
           AppTheme.secondaryNeon.withValues(alpha: 0.0),
@@ -900,9 +916,18 @@ class Real3DFlyoverPainter extends CustomPainter {
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    canvas.drawCircle(const Offset(0, 0), 14, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35));
-    canvas.drawCircle(const Offset(0, 0), 8.0, Paint()..color = AppTheme.secondaryNeon);
-    canvas.drawCircle(const Offset(0, 0), 4.0, Paint()..color = Colors.white);
+    // Chấm tròn vận động viên
+    canvas.drawCircle(const Offset(0, 0), 13, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35));
+    canvas.drawCircle(const Offset(0, 0), 7.5, Paint()..color = AppTheme.secondaryNeon);
+    canvas.drawCircle(const Offset(0, 0), 3.8, Paint()..color = Colors.white);
+
+    // Mũi tên định hướng chạy
+    final arrowPath = Path()
+      ..moveTo(1.5, -3.0)
+      ..lineTo(5.5, 0)
+      ..lineTo(1.5, 3.0)
+      ..close();
+    canvas.drawPath(arrowPath, Paint()..color = const Color(0xFF0F172A));
 
     canvas.restore();
 
