@@ -47,6 +47,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
   static const double tileSize = 256.0;
 
+  static const int _baseDurationMs = 9000; // Tốc độ cơ bản nhanh gấp đôi (9 giây thay vì 18 giây)
+
   @override
   void initState() {
     super.initState();
@@ -113,10 +115,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // 7. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM (Chống giật lag)
     _precacheRouteMapTiles();
 
-    // 8. Khởi tạo AnimationController
+    // 8. Khởi tạo AnimationController với tốc độ nhanh gấp đôi mượt mà
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: (18000 / _playbackSpeed).round()),
+      duration: Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round()),
     );
 
     _controller.addStatusListener((status) {
@@ -392,7 +394,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     setState(() {
       _playbackSpeed = speed;
       final currentProgress = _controller.value;
-      _controller.duration = Duration(milliseconds: (18000 / _playbackSpeed).round());
+      _controller.duration = Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round());
       if (_isPlaying) {
         _controller.forward(from: currentProgress);
       }
@@ -406,6 +408,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         _controller.stop();
         _isPlaying = false;
       } else {
+        // Luôn giữ nguyên tốc độ người dùng đã chọn khi bấm Replay hoặc tiếp tục
+        _controller.duration = Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round());
         if (_controller.value >= 0.98 || _controller.status == AnimationStatus.completed) {
           _controller.reset();
         }
@@ -418,7 +422,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   Future<void> _handleDownloadVideo() async {
     TopSyncToast.show(
       context,
-      message: '🎬 Đã tải clip 3D Flyover thành công vào thư viện máy!',
+      message: '🎬 Đã lưu clip Flyover (Tốc độ ${_playbackSpeed}x) thành công vào thư viện!',
       isSuccess: true,
     );
   }
