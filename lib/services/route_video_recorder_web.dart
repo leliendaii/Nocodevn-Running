@@ -37,8 +37,15 @@ class RealtimeVideoSession {
   /// Đóng gói dữ liệu sau khi quay xong
   Future<bool> finishRecording() async {
     try {
-      mediaRecorder.stop();
-      await completer.future;
+      if (mediaRecorder.state != 'inactive') {
+        mediaRecorder.stop();
+      }
+      await completer.future.timeout(const Duration(seconds: 4), onTimeout: () {});
+
+      // Dọn dẹp canvas khỏi DOM sau khi quay xong
+      try {
+        html.document.body?.children.remove(canvas);
+      } catch (_) {}
 
       if (videoChunks.isNotEmpty) {
         String mime = 'video/mp4';
@@ -48,15 +55,20 @@ class RealtimeVideoSession {
         finalBlob = html.Blob(videoChunks, mime);
         return true;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Lỗi hoàn tất quay: $e');
+    }
     return false;
   }
 
   /// 1. LƯU VÀO ALBUM ẢNH (CAMERA ROLL TRÊN IPHONE)
   Future<VideoSaveResult> saveToPhotos(String filename) async {
     final blob = finalBlob;
-    if (blob == null) {
-      return const VideoSaveResult(isSuccess: false, message: 'Chưa có dữ liệu video.');
+    if (blob == null || blob.size == 0) {
+      return const VideoSaveResult(
+        isSuccess: false,
+        message: 'Chưa có dữ liệu video để lưu. Vui lòng bấm xuất lại video!',
+      );
     }
 
     try {
@@ -98,8 +110,11 @@ class RealtimeVideoSession {
   /// 2. TẢI VÀO THƯ MỤC TỆP (FILES / DOWNLOADS)
   Future<VideoSaveResult> downloadToFiles(String filename) async {
     final blob = finalBlob;
-    if (blob == null) {
-      return const VideoSaveResult(isSuccess: false, message: 'Chưa có dữ liệu video.');
+    if (blob == null || blob.size == 0) {
+      return const VideoSaveResult(
+        isSuccess: false,
+        message: 'Chưa có dữ liệu video để tải. Vui lòng xuất lại video!',
+      );
     }
 
     try {
@@ -127,11 +142,20 @@ RealtimeVideoSession startRealtimeVideoSession({
   double fps = 60.0,
 }) {
   final canvas = html.CanvasElement(width: width, height: height);
+
+  // QUAN TRỌNG CHO IOS SAFARI: Canvas PHẢI nằm trong DOM tree để WebKit Render Thread kích hoạt captureStream
+  canvas.style.position = 'fixed';
+  canvas.style.left = '-9999px';
+  canvas.style.top = '-9999px';
+  canvas.style.opacity = '0.01';
+  canvas.style.pointerEvents = 'none';
+  html.document.body?.children.add(canvas);
+
   final ctx = canvas.context2D;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Thu thập luồng 60 FPS thời gian thực
+  // Thu thập luồng thời gian thực
   dynamic stream;
   try {
     stream = (canvas as dynamic).captureStream(fps.toInt());
@@ -140,9 +164,9 @@ RealtimeVideoSession startRealtimeVideoSession({
   }
 
   final supportedTypes = [
+    'video/mp4',
     'video/mp4;codecs=avc1',
     'video/mp4;codecs=h264',
-    'video/mp4',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm',
@@ -156,9 +180,7 @@ RealtimeVideoSession startRealtimeVideoSession({
     }
   }
 
-  final Map<String, dynamic> recorderOptions = {
-    'videoBitsPerSecond': 12000000, // 12 Mbps 60 FPS Crystal Clear
-  };
+  final Map<String, dynamic> recorderOptions = {};
   if (mimeType.isNotEmpty) {
     recorderOptions['mimeType'] = mimeType;
   }
@@ -178,7 +200,7 @@ RealtimeVideoSession startRealtimeVideoSession({
     if (!completer.isCompleted) completer.complete();
   });
 
-  mediaRecorder.start(40); // Thu thập gói dữ liệu mượt mà mỗi 40ms
+  mediaRecorder.start(100); // 100ms buffer chunking tối ưu nhất cho iOS WebKit
 
   return RealtimeVideoSession(
     canvas: canvas,
