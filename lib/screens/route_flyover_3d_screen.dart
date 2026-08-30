@@ -33,8 +33,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final double _totalPathLength;
   late final int _zoomLevel;
 
-  // Bảng tra cứu tọa độ đều 1.500 điểm (Zero Jitter - Trượt êm tuyệt đối 100%)
+  // Bảng tra cứu tọa độ siêu mịn 2.000 điểm kết hợp bộ lọc Damped Camera Tracking
   late final List<Offset> _sampledPositions;
+  late final List<Offset> _cameraPositions;
   late final List<double> _sampledHeadings;
   late final Offset _startPinPixel;
   late final Offset _finishPinPixel;
@@ -79,18 +80,43 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
     _totalPathLength = _pathMetric.length > 0 ? _pathMetric.length : 1.0;
 
-    // 6. Tiền tính toán bảng nội suy 1.500 điểm đều nhau (Triệt tiêu 100% rung lắc micro-jitter)
-    const int sampleCount = 1500;
+    // 6. Tiền tính toán bảng nội suy 2.000 điểm và bộ lọc làm mượt camera (Damped Camera Tracking)
+    const int sampleCount = 2000;
     _sampledPositions = List.generate(sampleCount, (i) {
       final double dist = _totalPathLength * (i / (sampleCount - 1));
       final tangent = _pathMetric.getTangentForOffset(dist);
       return tangent?.position ?? _cachedRoutePixels.first;
     });
 
+    // Làm mượt camera qua các ngã rẽ bằng bộ lọc Moving Average không gian (Window = 40 samples)
+    const int camWindow = 40;
+    _cameraPositions = List.generate(sampleCount, (i) {
+      double sumX = 0, sumY = 0;
+      int count = 0;
+      for (int w = -camWindow; w <= camWindow; w++) {
+        final idx = (i + w).clamp(0, sampleCount - 1);
+        sumX += _sampledPositions[idx].dx;
+        sumY += _sampledPositions[idx].dy;
+        count++;
+      }
+      return Offset(sumX / count, sumY / count);
+    });
+
+    // Làm mượt góc quay tiếp tuyến (Circular Window = 30 samples)
+    const int headWindow = 30;
     _sampledHeadings = List.generate(sampleCount, (i) {
-      final double dist = _totalPathLength * (i / (sampleCount - 1));
-      final tangent = _pathMetric.getTangentForOffset(dist);
-      return tangent != null ? math.atan2(tangent.vector.dy, tangent.vector.dx) : 0.0;
+      double sinSum = 0, cosSum = 0;
+      for (int w = -headWindow; w <= headWindow; w++) {
+        final idx = (i + w).clamp(0, sampleCount - 1);
+        final double dist = _totalPathLength * (idx / (sampleCount - 1));
+        final tangent = _pathMetric.getTangentForOffset(dist);
+        if (tangent != null) {
+          final double ang = math.atan2(tangent.vector.dy, tangent.vector.dx);
+          sinSum += math.sin(ang);
+          cosSum += math.cos(ang);
+        }
+      }
+      return math.atan2(sinSum, cosSum);
     });
 
     // Vị trí chuẩn xác 100% của Điểm Bắt Đầu và Điểm Kết Thúc
@@ -429,7 +455,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
           body: SafeArea(
             child: Stack(
               children: [
-                // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục 1.500 điểm đều nhau, Zero Jitter)
+                // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục 2.000 điểm đều nhau, Zero Jitter)
                 Positioned.fill(
                   child: _cachedRoutePixels.isEmpty
                       ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
@@ -441,6 +467,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 pixels: _cachedRoutePixels,
                                 fullPath: _fullVectorPath,
                                 sampledPositions: _sampledPositions,
+                                cameraPositions: _cameraPositions,
                                 sampledHeadings: _sampledHeadings,
                                 startPinPixel: _startPinPixel,
                                 finishPinPixel: _finishPinPixel,
@@ -676,6 +703,7 @@ class Real3DFlyoverPainter extends CustomPainter {
   final List<Offset> pixels;
   final Path fullPath;
   final List<Offset> sampledPositions;
+  final List<Offset> cameraPositions;
   final List<double> sampledHeadings;
   final Offset startPinPixel;
   final Offset finishPinPixel;
@@ -693,6 +721,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     required this.pixels,
     required this.fullPath,
     required this.sampledPositions,
+    required this.cameraPositions,
     required this.sampledHeadings,
     required this.startPinPixel,
     required this.finishPinPixel,
@@ -709,7 +738,7 @@ class Real3DFlyoverPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (pixels.isEmpty || sampledPositions.isEmpty) return;
 
-    // 1. TIẾN ĐỘ CHẠY & NỘI SUY BẰNG BẢNG SAMPLING ĐỀU (Zero Jitter - Lướt êm 60-120 FPS)
+    // 1. TIẾN ĐỘ CHẠY & NỘI SUY BẰNG BẢNG SAMPLING ĐỀU 2.000 ĐIỂM (Zero Jitter - Lướt êm 60-120 FPS)
     final double runProgress = (progress / 0.78).clamp(0.0, 1.0);
     final double currentDist = totalLength * runProgress;
 
@@ -719,6 +748,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double subFrac = fIndex - baseIdx;
 
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
+    final Offset rawCamPos = Offset.lerp(cameraPositions[baseIdx], cameraPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
     // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
@@ -742,27 +772,24 @@ class Real3DFlyoverPainter extends CustomPainter {
 
     // Hiệu ứng Zoom Out mượt mà khi kết thúc (Từ 78% -> 100%)
     final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
-    final double outroT = Curves.fastOutSlowIn.transform(outroRaw);
+    final double outroT = Curves.easeInOutCubic.transform(outroRaw);
 
-    final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
-    final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
+    final double camX = ui.lerpDouble(rawCamPos.dx, routeCenterX, outroT)!;
+    final double camY = ui.lerpDouble(rawCamPos.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
 
-    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS / GRAB (Khóa cứng Pixel - Triệt tiêu 100% rung lắc)
+    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS / GRAB (Lướt êm ru liên tục không giật)
     final double screenCenterX = size.width / 2;
     final double screenCenterY = ui.lerpDouble(size.height * 0.56, size.height * 0.50, outroT)!;
-
-    final double renderCamX = camX.roundToDouble();
-    final double renderCamY = camY.roundToDouble();
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
     canvas.scale(camScale, camScale);
-    canvas.translate(-renderCamX, -renderCamY);
+    canvas.translate(-camX, -camY);
 
     // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Gối mép 0.75px - Triệt tiêu 100% đường kẻ bàn cờ)
-    final int centerTileX = (renderCamX / tileSize).floor();
-    final int centerTileY = (renderCamY / tileSize).floor();
+    final int centerTileX = (camX / tileSize).floor();
+    final int centerTileY = (camY / tileSize).floor();
     final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
     final int tileRadiusY = (3.4 / camScale).ceil().clamp(3, 7);
 
@@ -783,7 +810,7 @@ class Real3DFlyoverPainter extends CustomPainter {
             tileRect,
             Paint()
               ..isAntiAlias = true
-              ..filterQuality = FilterQuality.medium,
+              ..filterQuality = FilterQuality.high,
           );
         } else {
           canvas.drawRect(tileRect, Paint()..color = const Color(0xFFF1F5F9));
