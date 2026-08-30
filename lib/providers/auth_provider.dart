@@ -22,6 +22,10 @@ class AuthProvider with ChangeNotifier {
   }
 
   AuthProvider() {
+    _currentUser = LocalStorageService.getSavedUserSessionFast();
+    if (_currentUser != null) {
+      _startAutoSyncRealtime();
+    }
     _initAuth();
   }
 

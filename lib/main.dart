@@ -9,6 +9,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
+import 'services/local_storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,7 @@ void main() async {
     await initializeDateFormatting('vi_VN', null);
     await initializeDateFormatting('vi', null);
   } catch (_) {}
+  await LocalStorageService.init();
   await SupabaseService.initialize();
   runApp(
     DevicePreview(

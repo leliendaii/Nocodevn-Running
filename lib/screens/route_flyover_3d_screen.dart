@@ -40,9 +40,11 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final Offset _startPinPixel;
   late final Offset _finishPinPixel;
 
-  // Cache ảnh map tiles Google Maps
-  final Map<String, ui.Image> _tileCache = {};
-  final Set<String> _loadingTiles = {};
+  // Cache ảnh map tiles Google Maps lưu vĩnh viễn trong RAM (Load 0ms tức thì khi mở lại)
+  static final Map<String, ui.Image> _globalTileMemoryCache = {};
+  Map<String, ui.Image> get _tileCache => _globalTileMemoryCache;
+  static final Set<String> _globalLoadingTiles = {};
+  Set<String> get _loadingTiles => _globalLoadingTiles;
   final GlobalKey _previewKey = GlobalKey();
 
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
@@ -216,14 +218,21 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final double spanLng = (maxLng - minLng).abs();
     final double maxSpan = math.max(spanLat, spanLng);
 
-    if (maxSpan < 0.008) {
-      return 17; // Đoạn ngắn (< 1km) -> Zoom to chi tiết từng ngõ ngách
-    } else if (maxSpan < 0.025) {
-      return 16; // Đoạn trung bình (1 - 3km) -> Zoom chuẩn đường phố
-    } else if (maxSpan < 0.060) {
-      return 15; // Đoạn dài (3 - 8km) -> Zoom quận/khu vực
+    // Quãng đường siêu ngắn (< 500m) -> Zoom cực đại 18
+    if (maxSpan < 0.004) {
+      return 18;
+    } else if (maxSpan < 0.015) {
+      // Quãng đường ngắn (0.5km - 1.5km như buổi chạy 0.63km) -> Zoom 17 chi tiết cao
+      return 17;
+    } else if (maxSpan < 0.035) {
+      // Quãng đường trung bình (1.5km - 4km) -> Zoom 16 chuẩn phố
+      return 16;
+    } else if (maxSpan < 0.075) {
+      // Quãng đường dài (4km - 10km) -> Zoom 15
+      return 15;
     } else {
-      return 14; // Đoạn Marathon (> 8km) -> Zoom toàn thành phố
+      // Quãng đường Marathon (> 10km) -> Zoom 14
+      return 14;
     }
   }
 
@@ -324,25 +333,22 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   void _loadMapTile(int z, int x, int y) {
     if (_isDisposed || !mounted) return;
     final key = '$z/$x/$y';
-    if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
+    if (_globalTileMemoryCache.containsKey(key) || _globalLoadingTiles.contains(key)) return;
 
-    _loadingTiles.add(key);
+    _globalLoadingTiles.add(key);
     final int serverId = (x.abs() + y.abs()) % 4;
     final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z';
 
     final imageStream = NetworkImage(url).resolve(ImageConfiguration.empty);
     imageStream.addListener(
       ImageStreamListener((ImageInfo info, bool _) {
+        _globalTileMemoryCache[key] = info.image;
+        _globalLoadingTiles.remove(key);
         if (!_isDisposed && mounted) {
-          setState(() {
-            _tileCache[key] = info.image;
-            _loadingTiles.remove(key);
-          });
+          setState(() {});
         }
       }, onError: (dynamic error, StackTrace? stack) {
-        if (!_isDisposed) {
-          _loadingTiles.remove(key);
-        }
+        _globalLoadingTiles.remove(key);
       }),
     );
   }
@@ -1084,7 +1090,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
-    // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
+    // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM DYNAMIC CHO QUÃNG ĐƯỜNG NGẮN / DÀI
     double minX = 99999999, maxX = -99999999;
     double minY = 99999999, maxY = -99999999;
     for (final pt in pixels) {
@@ -1098,10 +1104,13 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double spanW = (maxX - minX).abs();
     final double spanH = (maxY - minY).abs();
 
-    // Hệ số Zoom Out lớn hơn (to hơn 25%) để lộ trình to rõ, đẹp mắt
-    final double targetScaleX = (size.width * 0.78) / (spanW > 10 ? spanW : 100);
-    final double targetScaleY = (size.height * 0.56) / (spanH > 10 ? spanH : 100);
-    final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.24, 1.0);
+    // Hệ số Zoom Out thông minh: Quãng đường ngắn tự động phóng to to rõ 75% màn hình, quãng đường dài tự động bao quát vừa vặn
+    final double targetScaleX = (size.width * 0.74) / (spanW > 10 ? spanW : 80);
+    final double targetScaleY = (size.height * 0.52) / (spanH > 10 ? spanH : 80);
+    final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
+
+    // Tỉ lệ camera bám người chạy (Quãng đường ngắn phóng cận cảnh to hơn)
+    final double initialScale = targetScale > 1.2 ? 1.35 : 1.0;
 
     // Hiệu ứng Zoom Out nhanh gọn, dứt khoát khi về đích (Từ 88% -> 100%)
     final double outroRaw = ((progress - 0.88) / 0.12).clamp(0.0, 1.0);
@@ -1111,7 +1120,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     // Khi về đích: Camera chuyển động tịnh tiến thẳng từ vạch đích về tâm toàn cảnh
     final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
-    final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
+    final double camScale = ui.lerpDouble(initialScale, targetScale, outroT)!;
 
     // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS (Cố định tâm khung nhìn 100% không rung lắc)
     final double screenCenterX = size.width / 2;

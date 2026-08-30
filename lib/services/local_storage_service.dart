@@ -20,6 +20,48 @@ class LocalStorageService {
   static const String _keyPendingRuns = 'offline_pending_runs';
   static const String _keyCachedSessions = 'offline_cached_sessions';
 
+  static SharedPreferences? _cachedPrefs;
+
+  /// Khởi tạo sẵn SharedPreferences ngay trong main() để tải tức thì 0ms
+  static Future<void> init() async {
+    try {
+      _cachedPrefs ??= await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('Lỗi init SharedPreferences: $e');
+    }
+  }
+
+  static Future<SharedPreferences> _getPrefs() async {
+    _cachedPrefs ??= await SharedPreferences.getInstance();
+    return _cachedPrefs!;
+  }
+
+  /// Lấy nhanh phiên đăng nhập đồng bộ 0ms từ bộ nhớ RAM
+  static AppUser? getSavedUserSessionFast() {
+    final prefs = _cachedPrefs;
+    if (prefs == null) return null;
+    final rememberMe = prefs.getBool(_keyRememberMe) ?? false;
+    if (!rememberMe) return null;
+
+    final userId = prefs.getString(_keyUserId);
+    final userName = prefs.getString(_keyUserName);
+    final userUsername = prefs.getString(_keyUserUsername) ?? '';
+    final userEmail = prefs.getString(_keyUserEmail);
+    final userRoleStr = prefs.getString(_keyUserRole);
+    final userAvatar = prefs.getString(_keyUserAvatar) ?? '';
+
+    if (userId == null || userEmail == null) return null;
+
+    return AppUser(
+      id: userId,
+      name: userName ?? userEmail.split('@').first,
+      username: userUsername,
+      email: userEmail,
+      role: userRoleStr == 'admin' ? UserRole.admin : UserRole.user,
+      avatarUrl: userAvatar,
+    );
+  }
+
   /// Lưu phiên đăng nhập người dùng và thiết lập 30 ngày
   static Future<void> saveUserSession({
     required AppUser user,
@@ -27,7 +69,7 @@ class LocalStorageService {
     String? password,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setString(_keyUserId, user.id);
       await prefs.setString(_keyUserName, user.name);
       await prefs.setString(_keyUserUsername, user.username);
@@ -49,7 +91,7 @@ class LocalStorageService {
   /// Tải thông tin người dùng đã lưu (Kiểm tra điều kiện 30 ngày)
   static Future<AppUser?> loadSavedUserSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final rememberMe = prefs.getBool(_keyRememberMe) ?? false;
       if (!rememberMe) return null;
 

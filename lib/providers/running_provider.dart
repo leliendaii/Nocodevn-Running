@@ -370,7 +370,7 @@ class RunningProvider with ChangeNotifier {
           locationSettings = AppleSettings(
             accuracy: LocationAccuracy.bestForNavigation,
             activityType: ActivityType.fitness,
-            distanceFilter: 1, // Lọc nhạy 1m để bắt kịp từng bước chạy
+            distanceFilter: 2, // Lọc dịch chuyển tối thiểu 2m chống rung lắc GPS
             pauseLocationUpdatesAutomatically: false,
             showBackgroundLocationIndicator: true,
             allowBackgroundLocationUpdates: true,
@@ -378,7 +378,7 @@ class RunningProvider with ChangeNotifier {
         } else {
           locationSettings = const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 0, // Cập nhật tức thì thời gian thực
+            distanceFilter: 2,
           );
         }
 
@@ -408,8 +408,8 @@ class RunningProvider with ChangeNotifier {
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // Lọc bỏ tọa độ quá nhiễu (> 30m)
-          if (position.accuracy > 30.0) {
+          // Lọc bỏ tọa độ quá nhiễu (> 18m) để tránh cộng dồn sai số vệ tinh
+          if (position.accuracy > 18.0) {
             return;
           }
 
@@ -417,7 +417,7 @@ class RunningProvider with ChangeNotifier {
           _updateDurationFromWallClock();
 
           // Lấy vận tốc tức thời từ chipset GPS phần cứng (m/s)
-          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 5.0)
+          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 3.0)
               ? position.speed
               : -1.0;
 
@@ -437,21 +437,24 @@ class RunningProvider with ChangeNotifier {
             final double effectiveSpeedMps = (hwSpeedMps >= 0.2) ? hwSpeedMps : calcSpeedMps;
             final double speedKmh = (effectiveSpeedMps * 3.6).clamp(0.0, 35.0);
 
-            // Cập nhật Vận tốc tức thời mượt mà (không bị kẹt về 0 khi giảm tốc đột ngột)
-            if (speedKmh >= 0.5) {
+            // Cập nhật Vận tốc tức thời mượt mà (đi bộ 3-6 km/h, chạy 7-20 km/h)
+            if (speedKmh >= 0.8) {
               _instantSpeedKmh = speedKmh;
-            } else if (distanceInMeters < 1.0 && timeDeltaSec > 3.0) {
+            } else if (distanceInMeters < 1.5 && timeDeltaSec > 2.0) {
               _instantSpeedKmh = 0.0;
             }
 
-            // BỘ LỌC CHỐNG TRÔI GPS & TÍNH KM THỰC TẾ:
-            // 1. Loại bỏ nhảy ảo (tốc độ vô lý > 45 km/h hoặc khoảng cách nhảy vọt > 80m trong tích tắc)
-            final bool isAbnormalJump = calcSpeedMps > 13.0 || distanceInMeters > 80.0;
-            
-            // 2. Chống trôi khi đứng yên hoàn toàn (khoảng cách cực nhỏ < 1.2m và tốc độ < 0.25 m/s)
-            final bool isCompletelyStationary = distanceInMeters < 1.2 && effectiveSpeedMps < 0.25;
+            // BỘ LỌC CHỐNG TRÔI GPS KHI ĐI BỘ / ĐỨNG YÊN (Chuẩn Strava & Garmin):
+            // 1. Loại bỏ nhảy ảo bất thường (tốc độ > 35 km/h hoặc khoảng cách nhảy vọt > 50m trong tích tắc)
+            final bool isAbnormalJump = calcSpeedMps > 10.0 || distanceInMeters > 50.0;
 
-            if (!isAbnormalJump && !isCompletelyStationary && distanceInMeters >= 0.8) {
+            // 2. Chống cộng dồn trôi ảo khi đứng yên / di chuyển siêu nhỏ (< 2.0m khi tốc độ < 0.5 m/s)
+            final bool isStationaryDrift = (distanceInMeters < 2.2 && effectiveSpeedMps < 0.5) || (distanceInMeters < 1.4);
+
+            // 3. Điều kiện di chuyển thực tế hợp lệ (đi bộ thật hoặc chạy thật)
+            final bool isValidMovement = !isAbnormalJump && !isStationaryDrift && (distanceInMeters >= 2.2 || (effectiveSpeedMps >= 0.6 && distanceInMeters >= 1.6));
+
+            if (isValidMovement) {
               _distanceKm += distanceInMeters / 1000.0;
               _calories = CalorieCalculator.calculate(
                 distanceKm: _distanceKm,
@@ -467,8 +470,8 @@ class RunningProvider with ChangeNotifier {
                 _lastMilestoneKm = currentKm;
                 onKilometerMilestone?.call(currentKm, currentPace);
               }
-            } else if (!isAbnormalJump && distanceInMeters >= 3.0) {
-              // Cập nhật mốc tọa độ liên tục để không bị kẹt lũy kế
+            } else if (!isAbnormalJump && distanceInMeters >= 4.0) {
+              // Cập nhật mốc tọa độ định kỳ để tránh tích tụ sai số khoảng cách
               _lastPosition = position;
               _lastPositionTime = now;
             }
