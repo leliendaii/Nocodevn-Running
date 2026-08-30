@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
@@ -24,8 +25,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final int _effectiveDurationSec;
   late final String _effectivePace;
 
-  late final List<GeoPoint> _smoothRoute;
-  late final List<MilestoneData> _milestones;
+  List<GeoPoint> _smoothRoute = [];
+  List<MilestoneData> _milestones = [];
 
   // Cache ảnh map tiles tải từ máy chủ OpenStreetMap (Miễn phí 100%, không watermark)
   final Map<String, ui.Image> _tileCache = {};
@@ -43,14 +44,14 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveDurationSec = widget.session.durationSeconds;
       _effectivePace = widget.session.avgPace;
     } else {
-      // Buổi chạy test chưa đủ dữ liệu (dưới 100m hoặc bấm dừng sau vài giây) -> Tự động nạp lộ trình mẫu chuẩn đẹp 2.50 km trong 13:00 (Pace chuẩn 5:12 /km)
+      // Buổi chạy test chưa đủ dữ liệu -> Tự động nạp lộ trình mẫu chuẩn đẹp 2.50 km trong 13:00 (Pace chuẩn 5:12 /km)
       _effectiveDistanceKm = 2.50;
       _effectiveDurationSec = 13 * 60; // 13 phút (780 giây)
       _effectivePace = '5:12';
     }
 
-    _smoothRoute = _prepareSmoothGeoRoute(widget.session.routePoints);
-    _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
+    // Khởi tạo lộ trình và tự động bắt vị trí GPS thực tế hiện tại của thiết bị
+    _initRouteAndDetectLocation();
 
     // Thời lượng video flycam 18 giây ở tốc độ 1x
     _controller = AnimationController(
@@ -69,6 +70,47 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _controller.forward();
   }
 
+  Future<void> _initRouteAndDetectLocation() async {
+    // 1. Nếu buổi chạy đã có GPS ghi lại -> Dùng chính xác 100% tọa độ buổi chạy đó
+    if (widget.session.routePoints.length >= 2) {
+      _smoothRoute = _prepareSmoothGeoRoute(widget.session.routePoints);
+      _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    // 2. Nếu là buổi chạy test (chưa có GPS), tự động lấy tọa độ GPS thời gian thực của thiết bị
+    try {
+      Position? currentPos = await Geolocator.getLastKnownPosition();
+      currentPos ??= await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 3),
+        ),
+      );
+
+      if (mounted) {
+        final lat = currentPos.latitude;
+        final lng = currentPos.longitude;
+        setState(() {
+          _smoothRoute = _createRouteAroundLocation(lat, lng);
+          _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('Không thể tự động lấy GPS: $e');
+    }
+
+    // 3. Nếu chưa kịp cấp quyền GPS, dùng vị trí dự phòng tại Quận 1, TP.HCM
+    if (mounted) {
+      setState(() {
+        _smoothRoute = _prepareSmoothGeoRoute([]);
+        _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
+      });
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -84,16 +126,30 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         basePoints.add(GeoPoint(p.y, p.x)); // p.y là Vĩ độ (Lat), p.x là Kinh độ (Lng)
       }
     } else {
-      // Nạp cung đường chạy bộ thực tế tại các tuyến đường phố trung tâm TP. HỒ CHÍ MINH (Quận 1)
+      // Mặc định tại Phố Đi Bộ Nguyễn Huệ, TP.HCM
       basePoints = _createRealisticHcmRoute();
     }
 
     return _interpolatePath(basePoints, 400);
   }
 
+  // Tự động tạo cung đường chạy bộ vòng quanh vị trí GPS thực tế hiện tại của bạn
+  List<GeoPoint> _createRouteAroundLocation(double centerLat, double centerLng) {
+    const double dLat = 0.0032;
+    const double dLng = 0.0030;
+    final waypoints = [
+      GeoPoint(centerLat, centerLng),
+      GeoPoint(centerLat + dLat, centerLng + dLng * 0.4),
+      GeoPoint(centerLat + dLat * 0.8, centerLng + dLng),
+      GeoPoint(centerLat - dLat * 0.2, centerLng + dLng * 0.9),
+      GeoPoint(centerLat - dLat * 0.6, centerLng + dLng * 0.2),
+      GeoPoint(centerLat, centerLng),
+    ];
+    return _interpolatePath(waypoints, 400);
+  }
+
   // Cung đường thực tế CHỈ CHẠY TRÊN ĐƯỜNG PHỐ TP.HCM (Tuyệt đối không xuống sông)
   List<GeoPoint> _createRealisticHcmRoute() {
-    // Tuyến đường thực tế vòng quanh Quận 1 - Phố Đi Bộ Nguyễn Huệ - Lê Lợi - Nhà Hát TP - Đồng Khởi - Công viên Bến Bạch Đằng
     return const [
       GeoPoint(10.77665, 106.70085), // 1. Tượng Bác Hồ - UBND TP.HCM (Đầu phố đi bộ)
       GeoPoint(10.77530, 106.70200), // 2. Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
@@ -226,15 +282,19 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
           children: [
             // 1. ENGINE 3D FLYCAM CHUẨN KHÔNG MÉO BẢN ĐỒ
             Positioned.fill(
-              child: CustomPaint(
-                painter: Real3DFlyoverPainter(
-                  route: _smoothRoute,
-                  milestones: _milestones,
-                  progress: progress,
-                  tileCache: _tileCache,
-                  onTileRequested: _loadMapTile,
-                ),
-              ),
+              child: _smoothRoute.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primaryNeon),
+                    )
+                  : CustomPaint(
+                      painter: Real3DFlyoverPainter(
+                        route: _smoothRoute,
+                        milestones: _milestones,
+                        progress: progress,
+                        tileCache: _tileCache,
+                        onTileRequested: _loadMapTile,
+                      ),
+                    ),
             ),
 
             // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG
