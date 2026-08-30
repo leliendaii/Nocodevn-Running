@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
 import 'dart:html' as html;
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 class RealtimeVideoSession {
   final html.CanvasElement canvas;
@@ -72,16 +72,20 @@ RealtimeVideoSession startRealtimeVideoSession({
     stream = (canvas as dynamic).captureStream();
   }
 
-  String mimeType = 'video/webm;codecs=vp9';
-  if (!html.MediaRecorder.isTypeSupported(mimeType)) {
-    if (html.MediaRecorder.isTypeSupported('video/mp4')) {
-      mimeType = 'video/mp4';
-    } else if (html.MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-      mimeType = 'video/webm;codecs=vp8';
-    } else if (html.MediaRecorder.isTypeSupported('video/webm')) {
-      mimeType = 'video/webm';
-    } else {
-      mimeType = '';
+  final supportedTypes = [
+    'video/mp4;codecs=avc1',
+    'video/mp4;codecs=h264',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+
+  String mimeType = '';
+  for (final type in supportedTypes) {
+    if (html.MediaRecorder.isTypeSupported(type)) {
+      mimeType = type;
+      break;
     }
   }
 
@@ -119,29 +123,46 @@ RealtimeVideoSession startRealtimeVideoSession({
 }
 
 Future<bool> _saveOrDownloadVideo(html.Blob videoBlob, String filename) async {
-  final userAgent = html.window.navigator.userAgent.toLowerCase();
-  final isMobile = userAgent.contains('iphone') || userAgent.contains('ipad') || userAgent.contains('mobile');
+  try {
+    final userAgent = html.window.navigator.userAgent.toLowerCase();
+    final isIOS = userAgent.contains('iphone') || userAgent.contains('ipad') || userAgent.contains('ipod');
+    final fileMime = videoBlob.type.isNotEmpty ? videoBlob.type : 'video/mp4';
 
-  if (isMobile) {
-    try {
-      final file = html.File([videoBlob], filename, {'type': videoBlob.type.isNotEmpty ? videoBlob.type : 'video/mp4'});
-      await html.window.navigator.share({
-        'files': [file],
-        'title': 'Video 3D Flyover Chạy Bộ',
-        'text': 'Lộ trình chạy bộ 3D Flyover siêu mượt của tôi',
-      });
-      return true;
-    } catch (_) {}
+    // 1. Thử chia sẻ qua bảng chia sẻ gốc của iPhone (Lưu thẳng vào Camera Roll / Ảnh)
+    if (isIOS) {
+      try {
+        final file = html.File([videoBlob], filename, {'type': fileMime});
+        final dynamic nav = html.window.navigator;
+        if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
+          await nav.share({
+            'files': [file],
+            'title': 'Video 3D Flyover',
+            'text': 'Lộ trình chạy bộ 3D Flyover của tôi',
+          });
+          return true;
+        }
+      } catch (e) {
+        debugPrint('iOS Web Share không hỗ trợ trực tiếp, chuyển sang tải file: $e');
+      }
+    }
+
+    // 2. Tải file tự động trực tiếp về máy
+    final url = html.Url.createObjectUrlFromBlob(videoBlob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', filename)
+      ..style.display = 'none';
+    html.document.body?.children.add(anchor);
+    anchor.click();
+    html.document.body?.children.remove(anchor);
+
+    // 3. Nếu trên iOS Safari, mở tab video trực tiếp để người dùng có thể bấm giữ Lưu Video
+    if (isIOS) {
+      html.window.open(url, '_blank');
+    }
+
+    return true;
+  } catch (e) {
+    debugPrint('Lỗi lưu video: $e');
+    return false;
   }
-
-  // Tải file trực tiếp về Windows / Mac
-  final url = html.Url.createObjectUrlFromBlob(videoBlob);
-  final anchor = html.AnchorElement(href: url)
-    ..setAttribute('download', filename)
-    ..style.display = 'none';
-  html.document.body?.children.add(anchor);
-  anchor.click();
-  html.document.body?.children.remove(anchor);
-  html.Url.revokeObjectUrl(url);
-  return true;
 }

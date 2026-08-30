@@ -677,20 +677,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                       ),
 
-                    // Nút Lưu video / Tải về (Cử chỉ người dùng trực tiếp cho iOS)
+                    // Nút Tải về (Màu xanh nước biển đồng bộ thương hiệu)
                     if (isDone) ...[
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
+                        height: 48,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppTheme.secondaryNeon,
+                            foregroundColor: const Color(0xFF0F172A),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                             elevation: 8,
-                            shadowColor: const Color(0xFF10B981).withValues(alpha: 0.5),
+                            shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.4),
                           ),
                           onPressed: () async {
                             if (activeSession != null) {
@@ -700,11 +700,16 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.download_rounded, size: 22),
+                              Icon(Icons.download_rounded, size: 22, color: Color(0xFF0F172A)),
                               SizedBox(width: 8),
                               Text(
-                                'LƯU VÀO THƯ VIỆN ẢNH / TẢI VỀ',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                'TẢI VỀ',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: 1.0,
+                                ),
                               ),
                             ],
                           ),
@@ -713,7 +718,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
-                        height: 42,
+                        height: 40,
                         child: TextButton(
                           onPressed: () => Navigator.of(ctx).pop(),
                           child: const Text(
