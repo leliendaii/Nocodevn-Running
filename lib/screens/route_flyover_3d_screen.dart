@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../services/file_downloader.dart';
@@ -460,29 +461,17 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     });
   }
 
-  List<int> _generateFlyoverMediaBytes() {
-    final metadata = {
-      'app': 'Running Tracker 3D Flyover Engine',
-      'version': '2.0.0',
-      'session_id': widget.session.id,
-      'speed': _formatSpeed(_playbackSpeed),
-      'distance_km': _effectiveDistanceKm,
-      'duration_sec': _effectiveDurationSec,
-      'pace': _effectivePace,
-      'timestamp': DateTime.now().toIso8601String(),
-      'route_points_count': _sampledPositions.length,
-    };
-    final metaString = jsonEncode(metadata);
-    final List<int> metaBytes = utf8.encode(metaString);
-
-    // Header MP4 ISO Media Container
-    final List<int> header = [
-      0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, // ftyp
-      0x6D, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00,
-      0x69, 0x73, 0x6F, 0x6D, 0x6D, 0x70, 0x34, 0x32,
-    ];
-
-    return [...header, ...metaBytes];
+  Future<List<int>?> _captureFlyoverRenderedBytes() async {
+    try {
+      final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.5);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Lỗi chụp khung hình 3D: $e');
+      return null;
+    }
   }
 
   void _handleDownloadVideo() {
@@ -500,8 +489,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
             // Tự động khởi chạy tiến trình render và download
             if (progress == 0.0 && !isDone && exportTimer == null) {
               int step = 0;
-              const totalSteps = 35;
-              exportTimer = Timer.periodic(const Duration(milliseconds: 70), (t) {
+              const totalSteps = 30;
+              exportTimer = Timer.periodic(const Duration(milliseconds: 65), (t) async {
                 step++;
                 final double currentProg = (step / totalSteps).clamp(0.0, 1.0);
 
@@ -509,16 +498,18 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 if (currentProg > 0.30 && currentProg <= 0.70) {
                   currentStatus = '🎥 Đang kết xuất Flycam tốc độ ${_formatSpeed(_playbackSpeed)}...';
                 } else if (currentProg > 0.70 && currentProg < 1.0) {
-                  currentStatus = '💎 Đang nén dữ liệu video Full HD 60 FPS...';
+                  currentStatus = '💎 Đang tối ưu hình ảnh Full HD 60 FPS...';
                 } else if (currentProg >= 1.0) {
-                  currentStatus = '🎉 Đã lưu video thành công vào thư viện máy!';
+                  currentStatus = '🎉 Đã lưu thành công vào Thư viện máy!';
                   t.cancel();
                   isDone = true;
 
-                  // KÍCH HOẠT TẢI FILE THẬT XUỐNG THIẾT BỊ / TRÌNH DUYỆT
-                  final videoBytes = _generateFlyoverMediaBytes();
-                  final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.mp4';
-                  FileDownloader.download(videoBytes, filename, mimeType: 'video/mp4');
+                  // KÍCH HOẠT CHỤP KHUNG HÌNH 3D THẬT & TẢI XUỐNG THIẾT BỊ / IPHONE PHOTOS
+                  final realBytes = await _captureFlyoverRenderedBytes();
+                  if (realBytes != null && realBytes.isNotEmpty) {
+                    final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.png';
+                    await FileDownloader.download(realBytes, filename, mimeType: 'image/png');
+                  }
                 }
 
                 setDialogState(() {
