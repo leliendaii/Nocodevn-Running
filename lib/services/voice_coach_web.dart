@@ -3,7 +3,6 @@ import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 
 dynamic _audioContext;
-html.AudioElement? _currentAudioPlayer;
 
 /// Phát âm báo thể thao Beep Beep qua Web Audio API (100% phát ra tiếng trên mọi iPhone, Android, PC)
 void playAthleticBeep({double freq = 880.0, double durationSec = 0.15}) {
@@ -36,62 +35,56 @@ void playAthleticBeep({double freq = 880.0, double durationSec = 0.15}) {
   }
 }
 
-/// Phát giọng đọc Tiếng Việt chuẩn 100% (Giọng Tiếng Việt truyền cảm, rõ ràng, không bị nói tiếng Anh)
+/// Phát giọng đọc Tiếng Việt chuẩn 100% (ResponsiveVoice Vietnamese Female -> Browser Google/Siri Tiếng Việt)
 void speakTextNative(String text, {double rate = 1.0}) {
   try {
-    // 1. Luôn phát âm báo thể thao Beep khởi động âm thanh phần cứng
+    // 1. Luôn phát âm báo thể thao Beep khởi động loa
     playAthleticBeep(freq: 800.0, durationSec: 0.12);
 
-    // 2. Dừng audio trước đó nếu đang đọc dở
-    if (_currentAudioPlayer != null) {
+    final dynamic win = html.window;
+
+    // 2. Cách 1: Sử dụng ResponsiveVoice chuyên giọng đọc Nữ Tiếng Việt (100% giọng Tiếng Việt tự nhiên, tròn vành rõ chữ)
+    if (win.responsiveVoice != null) {
       try {
-        _currentAudioPlayer?.pause();
-      } catch (_) {}
-      _currentAudioPlayer = null;
+        win.responsiveVoice.cancel();
+        win.responsiveVoice.speak(
+          text,
+          'Vietnamese Female',
+          {'rate': rate, 'pitch': 1.0},
+        );
+        return;
+      } catch (e) {
+        debugPrint('Lỗi ResponsiveVoice: $e');
+      }
     }
 
-    // 3. Ưu tiên phát trực tiếp qua kênh âm thanh Tiếng Việt chuẩn (100% giọng Tiếng Việt tự nhiên)
-    final encodedText = Uri.encodeComponent(text);
-    final audioUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=$encodedText';
-
-    final audio = html.AudioElement(audioUrl);
-    _currentAudioPlayer = audio;
-    audio.playbackRate = rate;
-
-    audio.play().then((_) {
-      // Đã phát thành công giọng Tiếng Việt chuẩn
-    }).catchError((_) {
-      // Fallback sang SpeechSynthesis nếu thiết bị offline
-      _speakViaSpeechSynthesis(text, rate);
-    });
-  } catch (e) {
-    debugPrint('Lỗi Voice Coach: $e');
-    _speakViaSpeechSynthesis(text, rate);
-  }
-}
-
-void _speakViaSpeechSynthesis(String text, double rate) {
-  try {
+    // 3. Cách 2: Sử dụng Web Speech Synthesis với giọng Tiếng Việt
     final synth = html.window.speechSynthesis;
     if (synth == null) return;
     synth.resume();
 
     final voices = synth.getVoices();
+    html.SpeechSynthesisVoice? viVoice;
+    for (final v in voices) {
+      final lang = (v.lang ?? '').toLowerCase().replaceAll('_', '-');
+      final name = (v.name ?? '').toLowerCase();
+      if (lang.startsWith('vi') || name.contains('viet') || name.contains('việt')) {
+        viVoice = v;
+        break;
+      }
+    }
+
     final utterance = html.SpeechSynthesisUtterance(text)
       ..rate = rate
       ..pitch = 1.0
       ..lang = 'vi-VN';
 
-    // Tìm giọng đọc Tiếng Việt thực sự
-    for (final v in voices) {
-      final lang = (v.lang ?? '').toLowerCase();
-      final name = (v.name ?? '').toLowerCase();
-      if (lang.contains('vi') || name.contains('viet')) {
-        utterance.voice = v;
-        break;
-      }
+    if (viVoice != null) {
+      utterance.voice = viVoice;
     }
 
     synth.speak(utterance);
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('Lỗi Voice Coach: $e');
+  }
 }
