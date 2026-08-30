@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
@@ -36,16 +35,19 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   void initState() {
     super.initState();
 
-    // Thiết lập số liệu hiển thị (nếu là buổi chạy test 0km, nạp lộ trình mẫu 3.5km để mô phỏng)
-    _effectiveDistanceKm = widget.session.distanceKm > 0.05
-        ? widget.session.distanceKm
-        : 3.50;
-    _effectiveDurationSec = widget.session.durationSeconds > 0
-        ? widget.session.durationSeconds
-        : 18 * 60 + 24;
-    _effectivePace = widget.session.durationSeconds > 0 && widget.session.distanceKm > 0.05
-        ? widget.session.avgPace
-        : '5:15';
+    // Đồng bộ số liệu hiển thị: Nếu buổi chạy thật có dữ liệu hợp lệ (>= 0.1km & >= 30s) -> Dùng 100% số liệu thật
+    final bool hasValidRealData = widget.session.distanceKm >= 0.1 && widget.session.durationSeconds >= 30;
+
+    if (hasValidRealData) {
+      _effectiveDistanceKm = widget.session.distanceKm;
+      _effectiveDurationSec = widget.session.durationSeconds;
+      _effectivePace = widget.session.avgPace;
+    } else {
+      // Buổi chạy test chưa đủ dữ liệu (dưới 100m hoặc bấm dừng sau vài giây) -> Tự động nạp lộ trình mẫu chuẩn đẹp 2.50 km trong 13:00 (Pace chuẩn 5:12 /km)
+      _effectiveDistanceKm = 2.50;
+      _effectiveDurationSec = 13 * 60; // 13 phút (780 giây)
+      _effectivePace = '5:12';
+    }
 
     _smoothRoute = _prepareSmoothGeoRoute(widget.session.routePoints);
     _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
@@ -82,31 +84,34 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         basePoints.add(GeoPoint(p.y, p.x)); // p.y là Vĩ độ (Lat), p.x là Kinh độ (Lng)
       }
     } else {
-      // Nếu là dữ liệu chạy mẫu, định vị tại TP. HỒ CHÍ MINH (Khu vực Phố Đi Bộ Nguyễn Huệ / Bến Bạch Đằng / Sông Sài Gòn)
+      // Nạp cung đường chạy bộ thực tế tại các tuyến đường phố trung tâm TP. HỒ CHÍ MINH (Quận 1)
       basePoints = _createRealisticHcmRoute();
     }
 
     return _interpolatePath(basePoints, 400);
   }
 
-  // Cung đường thể thao thực tế tại TP. HỒ CHÍ MINH (Quận 1 - Bến Bạch Đằng - Phố đi bộ Nguyễn Huệ)
+  // Cung đường thực tế CHỈ CHẠY TRÊN ĐƯỜNG PHỐ TP.HCM (Tuyệt đối không xuống sông)
   List<GeoPoint> _createRealisticHcmRoute() {
-    // Tọa độ trung tâm: 10.7735° N, 106.7045° E (Bến Bạch Đằng & Phố đi bộ Nguyễn Huệ, TP.HCM)
-    const double centerLat = 10.7735;
-    const double centerLng = 106.7045;
-    final List<GeoPoint> list = [];
-    const int count = 50;
-    for (int i = 0; i <= count; i++) {
-      final t = (i / count) * 2 * math.pi;
-      // Cung đường ven sông Sài Gòn & đường Nguyễn Huệ
-      final lat = centerLat + 0.0038 * math.cos(t) + 0.0012 * math.sin(2 * t);
-      final lng = centerLng + 0.0032 * math.sin(t) + 0.0008 * math.cos(2 * t);
-      list.add(GeoPoint(lat, lng));
-    }
-    return list;
+    // Tuyến đường thực tế vòng quanh Quận 1 - Phố Đi Bộ Nguyễn Huệ - Lê Lợi - Nhà Hát TP - Đồng Khởi - Công viên Bến Bạch Đằng
+    return const [
+      GeoPoint(10.77665, 106.70085), // 1. Tượng Bác Hồ - UBND TP.HCM (Đầu phố đi bộ)
+      GeoPoint(10.77530, 106.70200), // 2. Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
+      GeoPoint(10.77680, 106.70320), // 3. Lê Lợi hướng về Nhà Hát Thành Phố
+      GeoPoint(10.77720, 106.70380), // 4. Công trường Lam Sơn (Trước Nhà Hát TP)
+      GeoPoint(10.77580, 106.70480), // 5. Đường Đồng Khởi
+      GeoPoint(10.77440, 106.70580), // 6. Đồng Khởi giao Ngô Đức Kế
+      GeoPoint(10.77380, 106.70630), // 7. Đồng Khởi giao Tôn Đức Thắng (Công viên Bạch Đằng)
+      GeoPoint(10.77250, 106.70580), // 8. Chạy trên vỉa hè Công viên Bến Bạch Đằng
+      GeoPoint(10.77180, 106.70510), // 9. Rẽ vào đường Hàm Nghi
+      GeoPoint(10.77280, 106.70380), // 10. Hàm Nghi giao Hồ Tùng Mậu
+      GeoPoint(10.77380, 106.70310), // 11. Rẽ vào Phố Đi Bộ Nguyễn Huệ
+      GeoPoint(10.77530, 106.70200), // 12. Dọc theo Phố Đi Bộ Nguyễn Huệ
+      GeoPoint(10.77665, 106.70085), // 13. Về lại điểm xuất phát trước UBND TP
+    ];
   }
 
-  // Làm mượt đường cong 400 điểm giúp Flycam lượn êm ái
+  // Làm mượt đường cong Bézier 400 điểm giúp Flycam lượn êm ái
   List<GeoPoint> _interpolatePath(List<GeoPoint> input, int targetCount) {
     if (input.length < 2) return input;
     final List<GeoPoint> result = [];
@@ -209,7 +214,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final progress = _controller.value;
     final currentDistance = (_effectiveDistanceKm * progress).toStringAsFixed(2);
     final elapsedSec = (_effectiveDurationSec * progress).toInt();
-    final elapsedFormatted = DateFormat('mm:ss').format(DateTime(2026, 1, 1, 0, 0, elapsedSec));
+    final int minutes = elapsedSec ~/ 60;
+    final int seconds = elapsedSec % 60;
+    final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     final isCompleted = progress >= 0.98;
 
     return Scaffold(
