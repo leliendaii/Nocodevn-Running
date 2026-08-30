@@ -961,15 +961,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateRunDialog(context, running),
-        backgroundColor: AppTheme.primaryNeon,
-        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-        label: const Text(
-          'THÊM BUỔI CHẠY',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
-        ),
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
@@ -1466,7 +1457,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   },
                 ),
               ],
-              const SizedBox(height: 70), // Khoảng trống cho FAB
+              const SizedBox(height: 16),
             ],
           ),
         ),
