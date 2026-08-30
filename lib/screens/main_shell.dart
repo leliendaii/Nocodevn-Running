@@ -616,7 +616,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             iconColor: AppTheme.primaryNeon,
                             title: 'TỔNG KM',
                             value: kmValue,
-                            unit: 'km',
                           ),
                         ),
                         Container(
@@ -631,7 +630,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             iconColor: AppTheme.secondaryNeon,
                             title: 'TỔNG GIỜ',
                             value: hoursValue,
-                            unit: 'giờ',
                           ),
                         ),
                         Container(
@@ -646,7 +644,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             iconColor: AppTheme.primaryNeon,
                             title: 'TỔNG CALO',
                             value: calValue,
-                            unit: 'kcal',
                           ),
                         ),
                       ],
@@ -776,7 +773,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     required Color iconColor,
     required String title,
     required String value,
-    required String unit,
+    String unit = '',
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -815,7 +812,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: AppTheme.textPrimary,
                     letterSpacing: -0.5,
