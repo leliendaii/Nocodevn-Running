@@ -20,7 +20,7 @@ class RouteFlyover3DScreen extends StatefulWidget {
 class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  double _playbackSpeed = 1.0;
+  double _playbackSpeed = 0.75;
   bool _isPlaying = true;
   bool _isDisposed = false;
 
