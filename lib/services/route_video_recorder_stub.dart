@@ -2,10 +2,18 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+class VideoSaveResult {
+  final bool isSuccess;
+  final String message;
+  const VideoSaveResult({required this.isSuccess, required this.message});
+}
+
 class RealtimeVideoSession {
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {}
   Future<bool> finishRecording() async => true;
-  Future<bool> saveOrShare(String filename) async => true;
+  Future<VideoSaveResult> saveOrShare(String filename) async {
+    return const VideoSaveResult(isSuccess: true, message: 'Đã tải video thành công!');
+  }
 }
 
 RealtimeVideoSession startRealtimeVideoSession({

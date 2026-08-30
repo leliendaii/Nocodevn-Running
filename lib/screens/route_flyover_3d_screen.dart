@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../services/route_video_recorder.dart';
+import '../widgets/top_sync_toast.dart';
 
 class RouteFlyover3DScreen extends StatefulWidget {
   final RunSession session;
@@ -742,7 +743,26 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           ),
                           onPressed: () async {
                             if (activeSession != null) {
-                              await activeSession!.saveOrShare(filename);
+                              final result = await activeSession!.saveOrShare(filename);
+                              if (!ctx.mounted) return;
+                              if (result.isSuccess) {
+                                Navigator.of(ctx).pop();
+                                if (mounted) {
+                                  TopSyncToast.show(
+                                    context,
+                                    message: result.message,
+                                    isSuccess: true,
+                                  );
+                                }
+                              } else {
+                                if (mounted) {
+                                  TopSyncToast.show(
+                                    context,
+                                    message: result.message,
+                                    isSuccess: false,
+                                  );
+                                }
+                              }
                             }
                           },
                           child: const Row(
