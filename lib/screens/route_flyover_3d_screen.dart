@@ -1016,6 +1016,8 @@ class Real3DFlyoverPainter extends CustomPainter {
     canvas.restore();
 
     canvas.restore();
+
+    canvas.restore();
   }
 
   @override
