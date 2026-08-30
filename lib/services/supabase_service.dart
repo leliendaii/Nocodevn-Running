@@ -267,14 +267,14 @@ class SupabaseService {
     }
   }
 
-  /// Đăng xuất khỏi Cloud
+  /// Đăng xuất khỏi Cloud an toàn tuyệt đối
   static Future<void> signOut() async {
     final supa = client;
     if (supa == null) return;
     try {
-      await supa.auth.signOut().timeout(const Duration(seconds: 3));
-    } catch (e) {
-      debugPrint('Lỗi đăng xuất Supabase: $e');
+      await supa.auth.signOut(scope: SignOutScope.local).timeout(const Duration(seconds: 4), onTimeout: () => null);
+    } catch (_) {
+      // Bỏ qua lỗi mạng khi đăng xuất vì local session đã được dọn sạch
     }
   }
 

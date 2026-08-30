@@ -75,30 +75,30 @@ class AuthProvider with ChangeNotifier {
 
   /// Làm mới thông tin quyền Admin và Profile từ Cloud
   Future<void> refreshProfileFromServer() async {
-    if (_currentUser == null || !SupabaseService.isConfigured) return;
-
+    final user = _currentUser;
+    if (user == null) return;
     try {
       final profile = await SupabaseService.fetchProfile(
-        _currentUser!.id,
-        _currentUser!.email,
-        _currentUser!.username,
+        user.id,
+        user.email,
+        user.username,
       );
-      if (profile != null) {
+      if (profile != null && _currentUser != null && _currentUser!.id == user.id) {
         final roleStr = (profile['role'] as String?)?.toLowerCase().trim() ?? 'user';
         final newRole = roleStr == 'admin' ? UserRole.admin : UserRole.user;
-        final displayName = profile['name'] as String? ?? _currentUser!.name;
-        final username = profile['username'] as String? ?? _currentUser!.username;
-        final avatar = profile['avatar_url'] as String? ?? _currentUser!.avatarUrl;
+        final displayName = profile['name'] as String? ?? user.name;
+        final username = profile['username'] as String? ?? user.username;
+        final avatar = profile['avatar_url'] as String? ?? user.avatarUrl;
 
-        if (_currentUser!.role != newRole ||
-            _currentUser!.name != displayName ||
-            _currentUser!.username != username ||
-            _currentUser!.avatarUrl != avatar) {
+        if (user.role != newRole ||
+            user.name != displayName ||
+            user.username != username ||
+            user.avatarUrl != avatar) {
           _currentUser = AppUser(
-            id: _currentUser!.id,
+            id: user.id,
             name: displayName,
             username: username,
-            email: _currentUser!.email,
+            email: user.email,
             role: newRole,
             avatarUrl: avatar,
           );
@@ -462,9 +462,9 @@ class AuthProvider with ChangeNotifier {
   void logout() {
     _autoSyncTimer?.cancel();
     _realtimeProfileChannel?.unsubscribe();
-    SupabaseService.signOut();
-    LocalStorageService.clearUserSession();
     _currentUser = null;
+    LocalStorageService.clearUserSession();
+    SupabaseService.signOut();
     notifyListeners();
   }
 
