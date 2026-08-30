@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 
@@ -96,62 +97,88 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: pages),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppTheme.surface,
-          border: Border(top: BorderSide(color: AppTheme.divider, width: 1)),
+      bottomNavigationBar: _buildCustomBottomNavBar(),
+    );
+  }
+
+  // THANH ĐIỀU HƯỚNG BOTTOM NAVIGATION CAO CẤP PHONG CÁCH ATHLETIC DOCK
+  Widget _buildCustomBottomNavBar() {
+    final tabs = [
+      {'icon': Icons.directions_run_rounded, 'label': 'Chạy'},
+      {'icon': Icons.history_rounded, 'label': 'Lịch sử'},
+      {'icon': Icons.insights_rounded, 'label': 'Thống kê'},
+      {'icon': Icons.person_rounded, 'label': 'Cá nhân'},
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F172A),
+        border: Border(
+          top: BorderSide(color: Color(0xFF1E293B), width: 1.2),
         ),
-        child: NavigationBar(
-          backgroundColor: Colors.transparent,
-          indicatorColor: AppTheme.primaryNeon.withValues(alpha: 0.2),
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) {
-            setState(() => _currentIndex = index);
-            context.read<AuthProvider>().checkUserStillExistsOnServer();
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(
-                Icons.directions_run_outlined,
-                color: AppTheme.textSecondary,
-              ),
-              selectedIcon: Icon(
-                Icons.directions_run,
-                color: AppTheme.primaryNeon,
-              ),
-              label: 'Chạy',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.history_rounded, color: AppTheme.textSecondary),
-              selectedIcon: Icon(
-                Icons.history_rounded,
-                color: AppTheme.primaryNeon,
-              ),
-              label: 'Lịch sử',
-            ),
-            NavigationDestination(
-              icon: Icon(
-                Icons.bar_chart_rounded,
-                color: AppTheme.textSecondary,
-              ),
-              selectedIcon: Icon(
-                Icons.bar_chart_rounded,
-                color: AppTheme.primaryNeon,
-              ),
-              label: 'Thống kê',
-            ),
-            NavigationDestination(
-              icon: Icon(
-                Icons.person_outline_rounded,
-                color: AppTheme.textSecondary,
-              ),
-              selectedIcon: Icon(
-                Icons.person_rounded,
-                color: AppTheme.primaryNeon,
-              ),
-              label: 'Cá nhân',
-            ),
-          ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(tabs.length, (index) {
+              final isSelected = _currentIndex == index;
+              final tab = tabs[index];
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _currentIndex = index);
+                    context.read<AuthProvider>().checkUserStillExistsOnServer();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppTheme.primaryNeon.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppTheme.primaryNeon.withValues(alpha: 0.35)
+                            : Colors.transparent,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tab['icon'] as IconData,
+                          size: 24,
+                          color: isSelected
+                              ? AppTheme.primaryNeon
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          tab['label'] as String,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                            color: isSelected
+                                ? AppTheme.primaryNeon
+                                : const Color(0xFF94A3B8),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
       ),
     );

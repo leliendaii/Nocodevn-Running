@@ -231,10 +231,18 @@ class RunningProvider with ChangeNotifier {
   }
 
   String get currentPace {
-    if (_distanceKm <= 0.01 || _durationSeconds <= 0) return '0:00';
+    if (_distanceKm <= 0.005 || _durationSeconds <= 0) {
+      if (_instantSpeedKmh >= 1.5) {
+        final double pace = 60.0 / _instantSpeedKmh;
+        final int min = pace.floor().clamp(1, 30);
+        final int sec = ((pace - min) * 60).round().clamp(0, 59);
+        return '$min:${sec.toString().padLeft(2, '0')}';
+      }
+      return '0:00';
+    }
     final double pace = (_durationSeconds / 60.0) / _distanceKm;
-    final int min = pace.floor();
-    final int sec = ((pace - min) * 60).round();
+    final int min = pace.floor().clamp(1, 35);
+    final int sec = ((pace - min) * 60).round().clamp(0, 59);
     return '$min:${sec.toString().padLeft(2, '0')}';
   }
 
@@ -361,7 +369,7 @@ class RunningProvider with ChangeNotifier {
           locationSettings = AppleSettings(
             accuracy: LocationAccuracy.bestForNavigation,
             activityType: ActivityType.fitness,
-            distanceFilter: 2, // Lọc dịch chuyển tối thiểu 2m
+            distanceFilter: 1, // Lọc nhạy 1m để bắt kịp từng bước chạy
             pauseLocationUpdatesAutomatically: false,
             showBackgroundLocationIndicator: true,
             allowBackgroundLocationUpdates: true,
@@ -369,7 +377,7 @@ class RunningProvider with ChangeNotifier {
         } else {
           locationSettings = const LocationSettings(
             accuracy: LocationAccuracy.high,
-            distanceFilter: 2,
+            distanceFilter: 0, // Cập nhật tức thì thời gian thực
           );
         }
 
@@ -422,7 +430,7 @@ class RunningProvider with ChangeNotifier {
             // 2. Chống trôi khi đứng yên hoàn toàn (khoảng cách cực nhỏ < 1.2m và tốc độ < 0.25 m/s)
             final bool isCompletelyStationary = distanceInMeters < 1.2 && effectiveSpeedMps < 0.25;
 
-            if (!isAbnormalJump && !isCompletelyStationary && distanceInMeters >= 1.5) {
+            if (!isAbnormalJump && !isCompletelyStationary && distanceInMeters >= 0.8) {
               _distanceKm += distanceInMeters / 1000.0;
               _calories = CalorieCalculator.calculate(
                 distanceKm: _distanceKm,

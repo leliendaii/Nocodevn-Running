@@ -480,7 +480,7 @@ class _RunningScreenState extends State<RunningScreen>
                         ],
                       ),
                     ),
-                    // Badge Trạng thái
+                    // Badge Trạng thái Header
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -488,18 +488,16 @@ class _RunningScreenState extends State<RunningScreen>
                       ),
                       decoration: BoxDecoration(
                         color: running.isRunning
-                            ? AppTheme.primaryNeon.withValues(alpha: 0.15)
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
                             : (running.isPaused
-                                  ? AppTheme.secondaryNeon.withValues(
-                                      alpha: 0.15,
-                                    )
+                                  ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
                                   : AppTheme.surfaceLight),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: running.isRunning
-                              ? AppTheme.primaryNeon
+                              ? const Color(0xFF10B981)
                               : (running.isPaused
-                                    ? AppTheme.secondaryNeon
+                                    ? const Color(0xFFF59E0B)
                                     : AppTheme.divider),
                           width: 1,
                         ),
@@ -513,9 +511,9 @@ class _RunningScreenState extends State<RunningScreen>
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: running.isRunning
-                                  ? AppTheme.primaryNeon
+                                  ? const Color(0xFF10B981)
                                   : (running.isPaused
-                                        ? AppTheme.secondaryNeon
+                                        ? const Color(0xFFF59E0B)
                                         : AppTheme.textMuted),
                             ),
                           ),
@@ -528,9 +526,9 @@ class _RunningScreenState extends State<RunningScreen>
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               color: running.isRunning
-                                  ? AppTheme.primaryNeon
+                                  ? const Color(0xFF10B981)
                                   : (running.isPaused
-                                        ? AppTheme.secondaryNeon
+                                        ? const Color(0xFFF59E0B)
                                         : AppTheme.textMuted),
                             ),
                           ),
@@ -627,7 +625,7 @@ class _RunningScreenState extends State<RunningScreen>
                             ),
                           ),
                           const SizedBox(height: 14),
-                          // Badge trạng thái hoạt động
+                          // Badge trạng thái hoạt động thể chất thời gian thực
                           Builder(
                             builder: (context) {
                               final activity = running.currentActivityType;
@@ -656,6 +654,10 @@ class _RunningScreenState extends State<RunningScreen>
                                   color = AppTheme.primaryNeon;
                               }
 
+                              final String labelText = running.isRunning && running.instantSpeedKmh > 0.5
+                                  ? '${activity.toUpperCase()} • ${running.instantSpeedKmh.toStringAsFixed(1)} KM/H'
+                                  : activity.toUpperCase();
+
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -681,7 +683,7 @@ class _RunningScreenState extends State<RunningScreen>
                                     Icon(icon, size: 16, color: color),
                                     const SizedBox(width: 8),
                                     Text(
-                                      activity.toUpperCase(),
+                                      labelText,
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w900,
