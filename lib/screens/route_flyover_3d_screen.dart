@@ -20,18 +20,35 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late AnimationController _controller;
   double _playbackSpeed = 1.0;
   bool _isPlaying = true;
+
+  late final double _effectiveDistanceKm;
+  late final int _effectiveDurationSec;
+  late final String _effectivePace;
+
   late final List<GeoPoint> _smoothRoute;
   late final List<MilestoneData> _milestones;
 
-  // Cache ảnh map tiles tải từ máy chủ bản đồ đường phố thật
+  // Cache ảnh map tiles tải từ máy chủ bản đồ đường phố thật OpenStreetMap (Miễn phí 100%, Không watermark)
   final Map<String, ui.Image> _tileCache = {};
   final Set<String> _loadingTiles = {};
 
   @override
   void initState() {
     super.initState();
+
+    // Nếu buổi chạy là dữ liệu test hoặc chưa có số km, dùng mốc chuẩn 3.5km để mô phỏng trọn vẹn
+    _effectiveDistanceKm = widget.session.distanceKm > 0.05
+        ? widget.session.distanceKm
+        : 3.50;
+    _effectiveDurationSec = widget.session.durationSeconds > 0
+        ? widget.session.durationSeconds
+        : 18 * 60 + 24;
+    _effectivePace = widget.session.durationSeconds > 0 && widget.session.distanceKm > 0.05
+        ? widget.session.avgPace
+        : '5:15';
+
     _smoothRoute = _prepareSmoothGeoRoute(widget.session.routePoints);
-    _milestones = _generateMilestonePins(widget.session.distanceKm, _smoothRoute);
+    _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
 
     // Thời lượng video flycam 18 giây ở tốc độ 1x
     _controller = AnimationController(
@@ -65,30 +82,29 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         basePoints.add(GeoPoint(p.y, p.x)); // p.y là Vĩ độ (Lat), p.x là Kinh độ (Lng)
       }
     } else {
-      // Nếu là dữ liệu chạy mẫu (chưa có GPS), tạo cung đường thực tế quanh Hồ Hoàn Kiếm / Phố đi bộ
+      // Nếu là dữ liệu chạy mẫu (chưa có GPS), tạo cung đường chạy thực tế quanh trung tâm Hồ Hoàn Kiếm
       basePoints = _createRealisticCityRoute();
     }
 
-    return _interpolatePath(basePoints, 350);
+    return _interpolatePath(basePoints, 400);
   }
 
   // Cung đường thực tế quanh khu vực đô thị thể thao
   List<GeoPoint> _createRealisticCityRoute() {
-    // Tọa độ mẫu: 21.0285° N, 105.8542° E (Khu vực trung tâm Hồ Hoàn Kiếm, Hà Nội)
     const double centerLat = 21.0285;
     const double centerLng = 105.8542;
     final List<GeoPoint> list = [];
-    const int count = 40;
+    const int count = 50;
     for (int i = 0; i <= count; i++) {
       final t = (i / count) * 2 * math.pi;
-      final lat = centerLat + 0.0045 * math.cos(t) + 0.0015 * math.sin(2 * t);
-      final lng = centerLng + 0.0035 * math.sin(t) + 0.0010 * math.cos(2 * t);
+      final lat = centerLat + 0.0035 * math.cos(t) + 0.0012 * math.sin(2 * t);
+      final lng = centerLng + 0.0030 * math.sin(t) + 0.0008 * math.cos(2 * t);
       list.add(GeoPoint(lat, lng));
     }
     return list;
   }
 
-  // Làm mượt đường cong Bézier 350 điểm giúp Flycam lượn êm ái
+  // Làm mượt đường cong Bézier 400 điểm giúp Flycam lượn êm ái
   List<GeoPoint> _interpolatePath(List<GeoPoint> input, int targetCount) {
     if (input.length < 2) return input;
     final List<GeoPoint> result = [];
@@ -161,14 +177,14 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     });
   }
 
-  // Tải Map Tiles thật từ máy chủ Carto Voyager (Bản đồ đường phố sạch đẹp có tiếng Việt)
+  // Tải Map Tiles thật từ máy chủ OpenStreetMap (Miễn phí 100%, không API Key, không Watermark)
   void _loadMapTile(int z, int x, int y) {
     final key = '$z/$x/$y';
     if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
 
     _loadingTiles.add(key);
-    // Sử dụng CartoDB Voyager Tile sạch đẹp chuẩn Vector Apple/Nike Maps
-    final url = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/$z/$x/$y.png';
+    // Sử dụng OpenStreetMap Standard Tile sạch đẹp
+    final url = 'https://tile.openstreetmap.org/$z/$x/$y.png';
 
     final imageStream = NetworkImage(url).resolve(ImageConfiguration.empty);
     imageStream.addListener(
@@ -188,8 +204,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   @override
   Widget build(BuildContext context) {
     final progress = _controller.value;
-    final currentDistance = (widget.session.distanceKm * progress).toStringAsFixed(2);
-    final elapsedSec = (widget.session.durationSeconds * progress).toInt();
+    final currentDistance = (_effectiveDistanceKm * progress).toStringAsFixed(2);
+    final elapsedSec = (_effectiveDurationSec * progress).toInt();
     final elapsedFormatted = DateFormat('mm:ss').format(DateTime(2026, 1, 1, 0, 0, elapsedSec));
 
     return Scaffold(
@@ -249,7 +265,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text('PACE', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                        Text('${widget.session.avgPace} /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
+                        Text('$_effectivePace /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
                       ],
                     ),
                     Column(
@@ -447,7 +463,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     // Dời tâm thế giới theo tọa độ người chạy
     canvas.translate(-currentPixel.dx, -currentPixel.dy);
 
-    // 2. VẼ CÁC MAP TILES THỰC TẾ (Real Street Map Tiles)
+    // 2. VẼ CÁC MAP TILES THỰC TẾ (OpenStreetMap Real Street Map Tiles)
     final int centerTileX = (currentPixel.dx / tileSize).floor();
     final int centerTileY = (currentPixel.dy / tileSize).floor();
 
@@ -470,7 +486,7 @@ class Real3DFlyoverPainter extends CustomPainter {
           );
         } else {
           // Nếu tile chưa tải xong, vẽ nền đô thị sạch đẹp và gửi yêu cầu tải
-          canvas.drawRect(tileRect, Paint()..color = const Color(0xFFE2E8F0));
+          canvas.drawRect(tileRect, Paint()..color = const Color(0xFFF1F5F9));
           canvas.drawRect(
             tileRect,
             Paint()
@@ -483,40 +499,63 @@ class Real3DFlyoverPainter extends CustomPainter {
       }
     }
 
-    // 3. VẼ ĐƯỜNG CHẠY BỘ THỰC TẾ TRÊN MẶT ĐƯỜNG
-    final routePath = Path();
-    for (int i = 0; i <= activeIdx; i++) {
+    // 3. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Full Route Background Outline)
+    final fullRoutePath = Path();
+    for (int i = 0; i < route.length; i++) {
       final pt = _latLngToPixel(route[i].lat, route[i].lng);
       if (i == 0) {
-        routePath.moveTo(pt.dx, pt.dy);
+        fullRoutePath.moveTo(pt.dx, pt.dy);
       } else {
-        routePath.lineTo(pt.dx, pt.dy);
+        fullRoutePath.lineTo(pt.dx, pt.dy);
       }
     }
-
-    // Bóng đổ đường chạy
+    // Đường mờ phía trước
     canvas.drawPath(
-      routePath,
+      fullRoutePath,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.35)
-        ..strokeWidth = 9
+        ..color = AppTheme.primaryNeon.withValues(alpha: 0.3)
+        ..strokeWidth = 5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // Vạch đường chạy đỏ cam thể thao sắc nét
-    canvas.drawPath(
-      routePath,
-      Paint()
-        ..color = AppTheme.primaryNeon
-        ..strokeWidth = 6.5
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
+    // 4. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Active Red Neon Trail)
+    if (activeIdx > 0) {
+      final activeRoutePath = Path();
+      for (int i = 0; i <= activeIdx; i++) {
+        final pt = _latLngToPixel(route[i].lat, route[i].lng);
+        if (i == 0) {
+          activeRoutePath.moveTo(pt.dx, pt.dy);
+        } else {
+          activeRoutePath.lineTo(pt.dx, pt.dy);
+        }
+      }
 
-    // 4. VẼ CỘT MỐC KM CẮM NỔI 3D TRÊN TUYẾN ĐƯỜNG
+      // Bóng đổ đường chạy
+      canvas.drawPath(
+        activeRoutePath,
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.4)
+          ..strokeWidth = 9
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+
+      // Vạch đường chạy đỏ cam thể thao sắc nét
+      canvas.drawPath(
+        activeRoutePath,
+        Paint()
+          ..color = AppTheme.primaryNeon
+          ..strokeWidth = 6.5
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+
+    // 5. VẼ CỘT MỐC KM CẮM NỔI 3D TRÊN TUYẾN ĐƯỜNG
     for (final m in milestones) {
       final pinPixel = _latLngToPixel(m.point.lat, m.point.lng);
 
@@ -545,7 +584,7 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 5. VẼ ICON VẬN ĐỘNG VIÊN & CHÙM TIA SÁNG QUÉT PHÍA TRƯỚC
+    // 6. VẼ ICON VẬN ĐỘNG VIÊN & CHÙM TIA SÁNG QUÉT PHÍA TRƯỚC
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
