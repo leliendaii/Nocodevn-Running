@@ -228,79 +228,107 @@ class HistoryScreen extends StatelessWidget {
   }
 
   void _showDetailBottomSheet(BuildContext context, RunSession session) {
-    final dateFormat = DateFormat('EEEE, dd/MM/yyyy HH:mm', 'vi');
+    final running = context.read<RunningProvider>();
+    final realName = running.getUserRealName(session.userId, session.userName);
+    final realAvatar = running.getUserRealAvatar(session.userId);
+    final isAdmin = running.isUserAdmin(session.userId);
+
+    // Xử lý an toàn thứ trong tuần trên mọi hệ điều hành (kể cả khi chưa load locale)
+    final weekdays = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+    final weekdayName = weekdays[session.startTime.weekday - 1];
+    final formattedDate = '$weekdayName, ${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)}';
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
       backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Chi tiết buổi chạy',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '${session.formattedDistance} KM',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.primaryNeon,
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.divider,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                dateFormat.format(session.startTime),
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Column(
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildDetailRow('Người chạy', session.userName),
-                    const Divider(color: AppTheme.divider),
-                    _buildDetailRow('Tổng thời gian', session.formattedDuration),
-                    const Divider(color: AppTheme.divider),
-                    _buildDetailRow('Tốc độ trung bình', '${session.avgPace} phút/km'),
-                    const Divider(color: AppTheme.divider),
-                    _buildDetailRow('Năng lượng tiêu thụ', '${session.calories} kcal'),
-                    if (session.notes.isNotEmpty) ...[
-                      const Divider(color: AppTheme.divider),
-                      _buildDetailRow('Ghi chú', session.notes),
-                    ],
+                    const Text(
+                      'Chi tiết buổi chạy',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${session.formattedDistance} KM',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryNeon,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  formattedDate,
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Người chạy', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                          Row(
+                            children: [
+                              UserAvatar(
+                                avatarUrl: realAvatar,
+                                name: realName,
+                                radius: 12,
+                                isAdmin: isAdmin,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(realName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Divider(color: AppTheme.divider, height: 16),
+                      _buildDetailRow('Tổng thời gian', session.formattedDuration),
+                      const Divider(color: AppTheme.divider, height: 16),
+                      _buildDetailRow('Tốc độ trung bình', '${session.avgPace} phút/km'),
+                      const Divider(color: AppTheme.divider, height: 16),
+                      _buildDetailRow('Năng lượng tiêu thụ', '${session.calories} kcal'),
+                      if (session.notes.isNotEmpty) ...[
+                        const Divider(color: AppTheme.divider, height: 16),
+                        _buildDetailRow('Ghi chú', session.notes),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -308,15 +336,12 @@ class HistoryScreen extends StatelessWidget {
   }
 
   Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      ],
     );
   }
 }
