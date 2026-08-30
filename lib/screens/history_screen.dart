@@ -6,6 +6,7 @@ import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_avatar.dart';
+import 'route_flyover_3d_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -325,6 +326,40 @@ class HistoryScreen extends StatelessWidget {
                         _buildDetailRow('Ghi chú', session.notes),
                       ],
                     ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // NÚT XEM MÔ PHỎNG 3D FLYOVER (Chỉ load video khi người dùng nhấn vào)
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
+                    label: const Text(
+                      'XEM MÔ PHỎNG 3D FLYOVER',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.secondaryNeon,
+                      foregroundColor: Colors.white,
+                      elevation: 6,
+                      shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop(); // Đóng bottomsheet
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RouteFlyover3DScreen(session: session),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
