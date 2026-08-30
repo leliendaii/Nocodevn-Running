@@ -7,6 +7,7 @@ import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/running/live_mini_map.dart';
 
 class RunningScreen extends StatefulWidget {
   const RunningScreen({super.key});
@@ -801,10 +802,17 @@ class _RunningScreenState extends State<RunningScreen>
                         ),
                       ],
                     ),
+                    if (running.isRunning || running.isPaused) ...[
+                      const SizedBox(height: 12),
+                      LiveMiniMap(
+                        routePoints: running.currentRoute,
+                        isRunning: running.isRunning,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY
               if (running.isIdle ||

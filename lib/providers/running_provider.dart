@@ -5,6 +5,7 @@ import '../models/run_session.dart';
 import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/calorie_calculator.dart';
+import '../services/voice_coach_service.dart';
 
 enum TrackingState { idle, running, paused, finished }
 
@@ -345,6 +346,9 @@ class RunningProvider with ChangeNotifier {
     // Lưu ngay checkpoint điểm xuất phát
     saveActiveCheckpointNow();
 
+    // Phát âm thanh Huấn Luyện Viên tiếng Việt khi bắt đầu
+    VoiceCoachService.speakStart();
+
     // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -460,11 +464,12 @@ class RunningProvider with ChangeNotifier {
               _lastPosition = position;
               _lastPositionTime = now;
 
-              // KIỂM TRA MỐC KM ĐẠT ĐƯỢC (1.0km, 2.0km, 3.0km...) ĐỂ KÍCH HOẠT RUNG & THÔNG BÁO
+              // KIỂM TRA MỐC KM ĐẠT ĐƯỢC (1.0km, 2.0km, 3.0km...) ĐỂ KÍCH HOẠT RUNG & GIỌNG ĐỌC COACH
               final int currentKm = _distanceKm.floor();
               if (currentKm > _lastMilestoneKm && currentKm > 0) {
                 _lastMilestoneKm = currentKm;
                 onKilometerMilestone?.call(currentKm, currentPace);
+                VoiceCoachService.speakMilestone(currentKm, formattedCurrentDuration, currentPace);
               }
             } else if (!isAbnormalJump && distanceInMeters >= 3.0) {
               // Cập nhật mốc tọa độ liên tục để không bị kẹt lũy kế
@@ -496,6 +501,7 @@ class RunningProvider with ChangeNotifier {
     _pauseStartTime = DateTime.now();
     _positionStream?.pause();
     saveActiveCheckpointNow();
+    VoiceCoachService.speakPause();
     notifyListeners();
   }
 
@@ -509,6 +515,7 @@ class RunningProvider with ChangeNotifier {
     _positionStream?.resume();
     _updateDurationFromWallClock();
     saveActiveCheckpointNow();
+    VoiceCoachService.speakResume();
     notifyListeners();
   }
 
@@ -538,6 +545,13 @@ class RunningProvider with ChangeNotifier {
       calories: _calories,
       notes: notes,
       routePoints: List.from(_currentRoute),
+    );
+
+    // Phát âm thanh chúc mừng hoàn thành buổi chạy
+    VoiceCoachService.speakFinish(
+      distanceKm: newSession.distanceKm,
+      duration: newSession.formattedDuration,
+      calories: newSession.calories,
     );
 
     _sessions.insert(0, newSession);
