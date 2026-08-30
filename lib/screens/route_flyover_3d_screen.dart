@@ -694,23 +694,17 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
-    final double camTilt = ui.lerpDouble(0.38, 0.08, outroT)!; // Góc nghiêng 22° chuẩn Flycam
 
-    // 3. TÍNH TOÁN MA TRẬN CAMERA (Bản đồ chuẩn hướng Bắc, chữ luôn đọc xuôi thẳng đứng)
+    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GRAB/GOOGLE MAPS (Trượt êm như nhung, không rung lắc)
     final double screenCenterX = size.width / 2;
-    final double screenCenterY = ui.lerpDouble(size.height * 0.60, size.height * 0.50, outroT)!;
+    final double screenCenterY = ui.lerpDouble(size.height * 0.58, size.height * 0.50, outroT)!;
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
-
-    final perspectiveMatrix = Matrix4.identity()
-      ..setEntry(3, 2, 0.0006)
-      ..rotateX(camTilt);
-    canvas.transform(perspectiveMatrix.storage);
     canvas.scale(camScale, camScale);
     canvas.translate(-camX, -camY);
 
-    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Gối mép 0.5px - Triệt tiêu 100% đường kẻ bàn cờ)
+    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Gối mép 0.75px - Triệt tiêu 100% đường kẻ bàn cờ)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
     final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
@@ -722,8 +716,8 @@ class Real3DFlyoverPainter extends CustomPainter {
         final ty = centerTileY + dy;
         final key = '$zoom/$tx/$ty';
 
-        // Gối mép 0.5px giữa các ô để triệt tiêu hoàn toàn đường kẻ phân tách
-        final tileRect = Rect.fromLTWH(tx * tileSize - 0.5, ty * tileSize - 0.5, tileSize + 1.0, tileSize + 1.0);
+        // Gối mép 0.75px giữa các ô để triệt tiêu hoàn toàn đường kẻ phân tách
+        final tileRect = Rect.fromLTWH(tx * tileSize - 0.75, ty * tileSize - 0.75, tileSize + 1.5, tileSize + 1.5);
 
         if (tileCache.containsKey(key)) {
           final img = tileCache[key]!;
@@ -777,8 +771,8 @@ class Real3DFlyoverPainter extends CustomPainter {
         activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = Colors.black.withValues(alpha: 0.28)
-          ..strokeWidth = 6.2
+          ..color = Colors.black.withValues(alpha: 0.25)
+          ..strokeWidth = 6.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
@@ -893,41 +887,82 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 10. VẼ ICON VẬN ĐỘNG VIÊN & ĐÈN PHA QUÉT ĐƯỜNG XOAY 100% THEO HƯỚNG CHẠY THẬT
+    // 10. VẼ ICON ĐỊNH VỊ GPS CAO CẤP CHUẨN GRAB/BE/STRAVA (Có sóng Radar lan tỏa & Mũi tên điều hướng 3D)
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
+
+    // Sóng Radar lan tỏa (Pulsing Radar Wave)
+    final double pulse = (progress * 18.0) % 1.0;
+    canvas.drawCircle(
+      Offset.zero,
+      12 + pulse * 22,
+      Paint()
+        ..isAntiAlias = true
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35 * (1.0 - pulse) * (1.0 - outroT))
+        ..style = PaintingStyle.fill,
+    );
+
     canvas.rotate(runnerHeading); // Xoay 100% chuẩn xác theo hướng tiếp tuyến di chuyển
 
     // Đèn pha dẫn đường chiếu về phía trước (Hướng di chuyển +X)
     final beamPath = Path()
       ..moveTo(0, 0)
-      ..lineTo(40, -18)
-      ..lineTo(40, 18)
+      ..lineTo(46, -20)
+      ..lineTo(46, 20)
       ..close();
 
     final beamPaint = Paint()
+      ..isAntiAlias = true
       ..shader = ui.Gradient.linear(
         const Offset(0, 0),
-        const Offset(40, 0),
+        const Offset(46, 0),
         [
-          AppTheme.secondaryNeon.withValues(alpha: 0.45 * (1.0 - outroT)),
-          AppTheme.secondaryNeon.withValues(alpha: 0.0),
+          const Color(0xFF00E5FF).withValues(alpha: 0.50 * (1.0 - outroT)),
+          const Color(0xFF00E5FF).withValues(alpha: 0.0),
         ],
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    // Chấm tròn vận động viên
-    canvas.drawCircle(const Offset(0, 0), 13, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35));
-    canvas.drawCircle(const Offset(0, 0), 7.5, Paint()..color = AppTheme.secondaryNeon);
-    canvas.drawCircle(const Offset(0, 0), 3.8, Paint()..color = Colors.white);
-
-    // Mũi tên định hướng chạy
+    // Bóng đổ icon định vị
     final arrowPath = Path()
-      ..moveTo(1.5, -3.0)
-      ..lineTo(5.5, 0)
-      ..lineTo(1.5, 3.0)
+      ..moveTo(14, 0)
+      ..lineTo(-10, -9)
+      ..lineTo(-5, 0)
+      ..lineTo(-10, 9)
       ..close();
-    canvas.drawPath(arrowPath, Paint()..color = const Color(0xFF0F172A));
+
+    canvas.drawPath(
+      arrowPath.shift(const Offset(0, 2)),
+      Paint()
+        ..isAntiAlias = true
+        ..color = Colors.black38,
+    );
+
+    // Mũi tên phi thuyền định vị cao cấp (Gradient Xanh Cyan -> Xanh Lục)
+    final arrowPaint = Paint()
+      ..isAntiAlias = true
+      ..shader = ui.Gradient.linear(
+        const Offset(-10, 0),
+        const Offset(14, 0),
+        [
+          const Color(0xFF00B0FF),
+          const Color(0xFF00E5FF),
+        ],
+      );
+    canvas.drawPath(arrowPath, arrowPaint);
+
+    // Viền trắng bóng bẩy
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..color = Colors.white,
+    );
+
+    // Tâm tròn phát sáng giữa mũi tên
+    canvas.drawCircle(Offset.zero, 3.5, Paint()..color = Colors.white);
 
     canvas.restore();
 
