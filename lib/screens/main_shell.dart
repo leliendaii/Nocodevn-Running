@@ -13,6 +13,7 @@ import 'admin_dashboard_screen.dart';
 import 'auto_end_schedule_screen.dart';
 import 'account_info_screen.dart';
 import 'security_settings_screen.dart';
+import '../widgets/top_sync_toast.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -45,10 +46,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       debugPrint('📱 [LIFECYCLE] Người dùng quay lại App -> Tự động làm mới dữ liệu mới nhất!');
       _refreshAllAppData();
+    } else if (state == AppLifecycleState.paused || 
+               state == AppLifecycleState.inactive || 
+               state == AppLifecycleState.detached) {
+      // Lưu checkpoint ngay lập tức khi app bị ẩn hoặc chuẩn bị đóng
+      context.read<RunningProvider>().saveActiveCheckpointNow();
     }
   }
 
-  void _refreshAllAppData() {
+  void _refreshAllAppData() async {
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
     auth.refreshProfileFromServer();
@@ -56,6 +62,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (auth.currentUser != null) {
       running.loadAutoEndConfigForUser(auth.currentUser!.id);
     }
+
+    // Tự động khôi phục và lưu buổi chạy nếu lần trước bị vuốt tắt app / sập nguồn
+    final recovered = await running.recoverUnfinishedRunSession();
+    if (recovered != null && mounted) {
+      TopSyncToast.show(
+        context,
+        message: '🛡️ Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km - ${recovered.formattedDuration}) do thoát app!',
+      );
+    }
+
     running.refreshAllData();
   }
 

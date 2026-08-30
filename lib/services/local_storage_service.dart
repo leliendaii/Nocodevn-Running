@@ -368,5 +368,63 @@ class LocalStorageService {
       };
     }
   }
+
+  // ==========================================
+  // BẢO VỆ TIẾN TRÌNH CHẠY (CHỐNG MẤT DỮ LIỆU KHI VUỐT TẮT / ĐÓNG APP ĐỘT NGỘT)
+  // ==========================================
+  static const String _keyActiveTracking = 'active_tracking_session_checkpoint';
+
+  /// Lưu điểm phục hồi (Checkpoint) phiên chạy hiện tại
+  static Future<void> saveActiveTrackingCheckpoint({
+    required String userId,
+    required String userName,
+    required DateTime startTime,
+    required int durationSeconds,
+    required double distanceKm,
+    required int calories,
+    required bool isPaused,
+    required List<Map<String, double>> routePoints,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = {
+        'user_id': userId,
+        'user_name': userName,
+        'start_time': startTime.toIso8601String(),
+        'duration_seconds': durationSeconds,
+        'distance_km': distanceKm,
+        'calories': calories,
+        'is_paused': isPaused,
+        'route_points': routePoints,
+        'last_updated_ms': DateTime.now().millisecondsSinceEpoch,
+      };
+      await prefs.setString(_keyActiveTracking, jsonEncode(data));
+    } catch (e) {
+      debugPrint('Lỗi lưu checkpoint active run: $e');
+    }
+  }
+
+  /// Đọc điểm phục hồi phiên chạy chưa lưu (nếu có)
+  static Future<Map<String, dynamic>?> loadActiveTrackingCheckpoint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_keyActiveTracking);
+      if (str == null || str.isEmpty) return null;
+      return jsonDecode(str) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Lỗi đọc checkpoint active run: $e');
+      return null;
+    }
+  }
+
+  /// Xóa điểm phục hồi khi buổi chạy đã được lưu hoặc reset bình thường
+  static Future<void> clearActiveTrackingCheckpoint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyActiveTracking);
+    } catch (e) {
+      debugPrint('Lỗi xóa checkpoint active run: $e');
+    }
+  }
 }
 
