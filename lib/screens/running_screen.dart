@@ -249,249 +249,235 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
 
-              // BẢNG ĐỒNG HỒ TRUNG TÂM (Đẹp mắt, thoáng đãng, Thời gian & KM sát nhau)
+              // KHÔNG GIAN ĐỒNG HỒ THỂ THAO THOÁNG ĐÃNG (PRO SPORT DASHBOARD)
               Expanded(
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: running.isRunning
-                          ? AppTheme.primaryNeon.withValues(alpha: 0.6)
-                          : AppTheme.divider,
-                      width: 1.5,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 1. Khung Thời gian chạy (Thoáng đãng, thanh lịch)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'THỜI GIAN CHẠY',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2.0,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          running.formattedCurrentDuration,
+                          style: const TextStyle(
+                            fontSize: 44,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3.0,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
                     ),
-                    boxShadow: running.isRunning
-                        ? [
-                            BoxShadow(
-                              color: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                              blurRadius: 30,
-                              offset: const Offset(-4, 0),
-                            ),
-                            BoxShadow(
-                              color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                              blurRadius: 30,
-                              offset: const Offset(4, 0),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // 1. Khung Thời gian chạy
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceLight,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppTheme.divider),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              running.formattedCurrentDuration,
-                              style: const TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.0,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            const Text(
-                              'THỜI GIAN',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textMuted,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      // 2. Quãng đường KM nổi bật ở vị trí trung tâm
-                      AnimatedBuilder(
-                        animation: _pulseAnimation,
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: running.isRunning ? _pulseAnimation.value : 1.0,
-                            child: child,
-                          );
-                        },
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              running.distanceKm.toStringAsFixed(2),
-                              style: const TextStyle(
-                                fontSize: 82,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.primaryNeon,
-                                height: 0.95,
-                                letterSpacing: -1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'KILOMETERS (KM)',
-                                style: TextStyle(
-                                  fontSize: 12,
+                    // 2. Khối Quãng đường HERO (0.00 KM) - Cực lớn, thoáng đãng, trung tâm
+                    AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: running.isRunning ? _pulseAnimation.value : 1.0,
+                          child: child,
+                        );
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                running.distanceKm.toStringAsFixed(2),
+                                style: const TextStyle(
+                                  fontSize: 92,
                                   fontWeight: FontWeight.w900,
                                   color: AppTheme.primaryNeon,
-                                  letterSpacing: 2.0,
+                                  height: 0.95,
+                                  letterSpacing: -3.0,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Builder(
-                              builder: (context) {
-                                final activity = running.currentActivityType;
-                                IconData icon;
-                                Color color;
-
-                                switch (activity) {
-                                  case 'Đứng yên':
-                                    icon = Icons.pause_circle_outline_rounded;
-                                    color = AppTheme.textMuted;
-                                    break;
-                                  case 'Đi bộ':
-                                    icon = Icons.directions_walk_rounded;
-                                    color = AppTheme.secondaryNeon;
-                                    break;
-                                  case 'Chạy bộ':
-                                    icon = Icons.directions_run_rounded;
-                                    color = AppTheme.primaryNeon;
-                                    break;
-                                  case 'Bứt tốc':
-                                    icon = Icons.bolt_rounded;
-                                    color = AppTheme.accentOrange;
-                                    break;
-                                  default:
-                                    icon = Icons.directions_run_rounded;
-                                    color = AppTheme.primaryNeon;
-                                }
-
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.surfaceLight,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: color.withValues(alpha: 0.6)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(icon, size: 14, color: color),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        activity,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: color,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 3. 2 THẺ CHỈ SỐ: PACE VÀ CALORIES (CÂN ĐỐI, RÕ RÀNG)
-                      Row(
-                        children: [
-                          // Thẻ Pace TB
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceLight,
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(color: AppTheme.divider),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'KM',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.primaryNeon,
+                                  letterSpacing: 1.5,
+                                ),
                               ),
-                              child: Column(
-                                children: [
-                                  const Icon(Icons.speed_rounded, color: AppTheme.secondaryNeon, size: 24),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${running.currentPace} /km',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'PACE TB',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.textMuted,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(height: 12),
+                          // Badge trạng thái hoạt động
+                          Builder(
+                            builder: (context) {
+                              final activity = running.currentActivityType;
+                              IconData icon;
+                              Color color;
 
-                          // Thẻ Calories
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceLight,
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(color: AppTheme.divider),
-                              ),
-                              child: Column(
-                                children: [
-                                  const Icon(Icons.local_fire_department_rounded, color: AppTheme.primaryNeon, size: 24),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${running.calories} kcal',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.textPrimary,
-                                    ),
+                              switch (activity) {
+                                case 'Đứng yên':
+                                  icon = Icons.pause_circle_outline_rounded;
+                                  color = AppTheme.textMuted;
+                                  break;
+                                case 'Đi bộ':
+                                  icon = Icons.directions_walk_rounded;
+                                  color = AppTheme.secondaryNeon;
+                                  break;
+                                case 'Chạy bộ':
+                                  icon = Icons.directions_run_rounded;
+                                  color = AppTheme.primaryNeon;
+                                  break;
+                                case 'Bứt tốc':
+                                  icon = Icons.bolt_rounded;
+                                  color = AppTheme.accentOrange;
+                                  break;
+                                default:
+                                  icon = Icons.directions_run_rounded;
+                                  color = AppTheme.primaryNeon;
+                              }
+
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surface,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: color.withValues(alpha: 0.5),
+                                    width: 1.2,
                                   ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'CALORIES',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.textMuted,
-                                      letterSpacing: 0.5,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.15),
+                                      blurRadius: 16,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(icon, size: 16, color: color),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      activity.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: color,
+                                        letterSpacing: 1.0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+
+                    // 3. 2 Thẻ Chỉ số Dưới: PACE TB & CALORIES (Riêng biệt, thoáng, cao cấp)
+                    Row(
+                      children: [
+                        // Thẻ Pace TB
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: AppTheme.divider),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: const [
+                                    Icon(Icons.speed_rounded, color: AppTheme.secondaryNeon, size: 20),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'PACE TB',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textMuted,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '${running.currentPace} /km',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Thẻ Calories
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: AppTheme.divider),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: const [
+                                    Icon(Icons.local_fire_department_rounded, color: AppTheme.primaryNeon, size: 20),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'CALORIES',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textMuted,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '${running.calories} kcal',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 20),
