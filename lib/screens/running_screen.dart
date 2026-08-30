@@ -294,34 +294,29 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                running.distanceKm.toStringAsFixed(2),
-                                style: const TextStyle(
-                                  fontSize: 92,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.primaryNeon,
-                                  height: 0.95,
-                                  letterSpacing: -3.0,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'KM',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.primaryNeon,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            running.distanceKm.toStringAsFixed(2),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 96,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.primaryNeon,
+                              height: 0.95,
+                              letterSpacing: -2.0,
+                            ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'KILOMÉT',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.primaryNeon,
+                              letterSpacing: 3.5,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
                           // Badge trạng thái hoạt động
                           Builder(
                             builder: (context) {
