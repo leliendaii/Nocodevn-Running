@@ -15,43 +15,70 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  late final TextEditingController _identifierController;
+  int _step = 1; // 1: Nhập email/username, 2: Nhập 6 số OTP & Mật khẩu mới
   bool _isLoading = false;
-  bool _emailSent = false;
   String _targetEmail = '';
 
-  int _resendCountdown = 60;
-  Timer? _countdownTimer;
+  // Controllers Step 1
+  late final TextEditingController _identifierController;
+
+  // Controllers Step 2
+  final List<TextEditingController> _otpControllers =
+      List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  bool _obscureNewPass = true;
+  bool _obscureConfirmPass = true;
+
+  // Đếm ngược gửi lại OTP
+  int _otpCountdown = 60;
+  Timer? _otpTimer;
 
   @override
   void initState() {
     super.initState();
-    _identifierController = TextEditingController(text: widget.initialIdentifier ?? '');
+    _identifierController =
+        TextEditingController(text: widget.initialIdentifier ?? '');
   }
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
+    _otpTimer?.cancel();
     _identifierController.dispose();
+    for (final c in _otpControllers) {
+      c.dispose();
+    }
+    for (final f in _otpFocusNodes) {
+      f.dispose();
+    }
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   void _startCountdown() {
-    _countdownTimer?.cancel();
-    setState(() => _resendCountdown = 60);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendCountdown > 0) {
-        setState(() => _resendCountdown--);
+    _otpTimer?.cancel();
+    setState(() => _otpCountdown = 60);
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_otpCountdown > 0) {
+        setState(() => _otpCountdown--);
       } else {
         timer.cancel();
       }
     });
   }
 
-  Future<void> _handleSendResetLink() async {
+  // BƯỚC 1: Gửi mã OTP 6 số về Email
+  Future<void> _handleSendResetOtp() async {
     final identifier = _identifierController.text.trim();
     if (identifier.isEmpty) {
-      TopSyncToast.show(context, message: 'Vui lòng nhập Email hoặc Tên đăng nhập!', isSuccess: false);
+      TopSyncToast.show(
+        context,
+        message: 'Vui lòng nhập Email hoặc Tên đăng nhập!',
+        isSuccess: false,
+      );
       return;
     }
 
@@ -65,12 +92,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (result['success'] == true) {
       setState(() {
         _targetEmail = result['email'] ?? identifier;
-        _emailSent = true;
+        _step = 2;
       });
       _startCountdown();
+      for (final c in _otpControllers) {
+        c.clear();
+      }
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) _otpFocusNodes[0].requestFocus();
+      });
       TopSyncToast.show(
         context,
-        message: 'Đã gửi email khôi phục mật khẩu đến $_targetEmail!',
+        message: 'Đã gửi mã OTP 6 số đến email $_targetEmail!',
         isSuccess: true,
       );
     } else {
@@ -82,8 +115,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
-  Future<void> _handleResendLink() async {
-    if (_resendCountdown > 0 || _isLoading) return;
+  // Gửi lại mã OTP
+  Future<void> _handleResendOtp() async {
+    if (_otpCountdown > 0 || _isLoading) return;
 
     setState(() => _isLoading = true);
     final auth = context.read<AuthProvider>();
@@ -94,17 +128,78 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     if (result['success'] == true) {
       _startCountdown();
+      for (final c in _otpControllers) {
+        c.clear();
+      }
+      _otpFocusNodes[0].requestFocus();
       TopSyncToast.show(
         context,
-        message: 'Đã gửi lại email khôi phục mới!',
+        message: 'Đã gửi lại mã OTP 6 số mới tới email!',
         isSuccess: true,
       );
     } else {
       TopSyncToast.show(
         context,
-        message: result['error'] ?? 'Không thể gửi lại email!',
+        message: result['error'] ?? 'Không thể gửi lại mã OTP!',
         isSuccess: false,
       );
+    }
+  }
+
+  // BƯỚC 2: Xác thực mã OTP và Cập nhật Mật khẩu mới
+  Future<void> _handleResetPassword() async {
+    final enteredOtp = _otpControllers.map((c) => c.text.trim()).join();
+    final newPass = _newPasswordController.text;
+    final confirmPass = _confirmPasswordController.text;
+
+    if (enteredOtp.length < 6) {
+      TopSyncToast.show(
+        context,
+        message: 'Vui lòng nhập đủ 6 chữ số OTP từ Email!',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    if (newPass.length < 6) {
+      TopSyncToast.show(
+        context,
+        message: 'Mật khẩu mới phải có ít nhất 6 ký tự!',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    if (newPass != confirmPass) {
+      TopSyncToast.show(
+        context,
+        message: 'Mật khẩu xác nhận không trùng khớp!',
+        isSuccess: false,
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final auth = context.read<AuthProvider>();
+    final error = await auth.confirmPasswordReset(
+      email: _targetEmail,
+      otp: enteredOtp,
+      newPassword: newPass,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error == null) {
+      _otpTimer?.cancel();
+      Navigator.of(context).pop();
+      TopSyncToast.show(
+        context,
+        message: '🎉 Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới.',
+        isSuccess: true,
+      );
+    } else {
+      TopSyncToast.show(context, message: error, isSuccess: false);
     }
   }
 
@@ -116,15 +211,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-          child: _emailSent ? _buildSuccessView() : _buildInputFormView(),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: _step == 1 ? _buildStep1View() : _buildStep2View(),
         ),
       ),
     );
   }
 
-  // 1. MÀN HÌNH NHẬP EMAIL HOẶC USERNAME (GỌN GÀNG NHẤT)
-  Widget _buildInputFormView() {
+  // 1. MÀN HÌNH BƯỚC 1: NHẬP EMAIL / TÊN ĐĂNG NHẬP
+  Widget _buildStep1View() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -141,198 +236,187 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               color: AppTheme.primaryNeon,
             ),
           ),
-          onSubmitted: (_) => _handleSendResetLink(),
+          onSubmitted: (_) => _handleSendResetOtp(),
         ),
         const SizedBox(height: 20),
         ElevatedButton(
-          onPressed: _isLoading ? null : _handleSendResetLink,
+          onPressed: _isLoading ? null : _handleSendResetOtp,
           child: _isLoading
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
                 )
-              : const Text('GỬI LIÊN KẾT ĐẶT LẠI MẬT KHẨU'),
+              : const Text('GỬI MÃ OTP XÁC THỰC'),
         ),
       ],
     );
   }
 
-  // 2. MÀN HÌNH THÀNH CÔNG (HƯỚNG DẪN MỞ EMAIL)
-  Widget _buildSuccessView() {
+  // 2. MÀN HÌNH BƯỚC 2: NHẬP MÃ OTP 6 SỐ & MẬT KHẨU MỚI
+  Widget _buildStep2View() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 10),
-        // Biểu tượng thư gửi thành công
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-            border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: const Icon(Icons.mark_email_read_rounded, color: AppTheme.primaryNeon, size: 40),
-        ),
-        const SizedBox(height: 18),
-
-        const Text(
-          'ĐÃ GỬI THƯ KHÔI PHỤC!',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-
-        const Text(
-          'Liên kết đặt lại mật khẩu đã được gửi đến địa chỉ:',
-          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-
-        // Hộp hiển thị Email
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceLight,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.email_outlined, size: 18, color: AppTheme.primaryNeon),
-              const SizedBox(width: 8),
-              Text(
-                _targetEmail,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primaryNeon),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Hướng dẫn các bước tiếp theo
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.divider),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'CÁC BƯỚC TIẾP THEO:',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted, letterSpacing: 0.6),
-              ),
-              const SizedBox(height: 10),
-              _buildStepItem(1, 'Mở ứng dụng Gmail hoặc Hộp thư của bạn.'),
-              _buildStepItem(2, 'Tìm thư mới từ hệ thống với tiêu đề "Reset your password".'),
-              _buildStepItem(3, 'Bấm vào liên kết "Reset password" trong email để nhập mật khẩu mới.'),
-              _buildStepItem(4, 'Quay lại ứng dụng và đăng nhập bằng mật khẩu mới vừa tạo.'),
-              const Divider(color: AppTheme.divider, height: 20),
-              const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.accentOrange),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Nếu không thấy thư, vui lòng kiểm tra thêm mục Thư rác (Spam) hoặc Quảng cáo.',
-                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Nút quay lại đăng nhập
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryNeon,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        const SizedBox(height: 4),
+        Center(
+          child: RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
               children: [
-                Icon(Icons.login_rounded, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'HOÀN TẤT & QUAY LẠI ĐĂNG NHẬP',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                const TextSpan(text: 'Mã xác nhận 6 số đã được gửi tới email:\n'),
+                TextSpan(
+                  text: _targetEmail,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryNeon,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 20),
 
-        // Nút gửi lại
-        TextButton(
-          onPressed: _resendCountdown == 0 ? _handleResendLink : null,
-          child: Text(
-            _resendCountdown > 0
-                ? 'Chưa nhận được email? Gửi lại (${_resendCountdown}s)'
-                : 'Chưa nhận được email? Bấm để gửi lại',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: _resendCountdown > 0 ? AppTheme.textMuted : AppTheme.secondaryNeon,
+        // 6 Ô NHẬP MÃ OTP CHUẨN ĐẸP
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(6, (index) {
+            return SizedBox(
+              width: 44,
+              height: 52,
+              child: TextField(
+                controller: _otpControllers[index],
+                focusNode: _otpFocusNodes[index],
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                maxLength: 1,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primaryNeon,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppTheme.surfaceLight,
+                  contentPadding: EdgeInsets.zero,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppTheme.divider, width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppTheme.primaryNeon, width: 2),
+                  ),
+                ),
+                onChanged: (val) {
+                  if (val.isNotEmpty && index < 5) {
+                    _otpFocusNodes[index + 1].requestFocus();
+                  } else if (val.isEmpty && index > 0) {
+                    _otpFocusNodes[index - 1].requestFocus();
+                  }
+                },
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 10),
+
+        // Hàng điều khiển: Đổi email & Đếm ngược gửi lại
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+              onPressed: () => setState(() => _step = 1),
+              child: const Text(
+                '← Đổi email / username',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+              onPressed: _otpCountdown == 0 ? _handleResendOtp : null,
+              child: Text(
+                _otpCountdown > 0 ? 'Gửi lại mã (${_otpCountdown}s)' : 'Gửi lại mã OTP',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _otpCountdown > 0 ? AppTheme.textMuted : AppTheme.secondaryNeon,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Ô nhập Mật khẩu mới
+        TextField(
+          controller: _newPasswordController,
+          obscureText: _obscureNewPass,
+          style: const TextStyle(color: AppTheme.textPrimary),
+          decoration: InputDecoration(
+            labelText: 'Mật khẩu mới (ít nhất 6 ký tự)',
+            hintText: 'Nhập mật khẩu mới',
+            prefixIcon: const Icon(
+              Icons.lock_outline_rounded,
+              color: AppTheme.primaryNeon,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscureNewPass ? Icons.visibility_off : Icons.visibility,
+                color: AppTheme.textMuted,
+              ),
+              onPressed: () => setState(() => _obscureNewPass = !_obscureNewPass),
             ),
           ),
         ),
-      ],
-    );
-  }
+        const SizedBox(height: 14),
 
-  Widget _buildStepItem(int stepNumber, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceLight,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.divider),
+        // Ô xác nhận Mật khẩu mới
+        TextField(
+          controller: _confirmPasswordController,
+          obscureText: _obscureConfirmPass,
+          style: const TextStyle(color: AppTheme.textPrimary),
+          decoration: InputDecoration(
+            labelText: 'Xác nhận lại mật khẩu mới',
+            hintText: 'Nhập lại mật khẩu mới',
+            prefixIcon: const Icon(
+              Icons.lock_reset_rounded,
+              color: AppTheme.primaryNeon,
             ),
-            child: Center(
-              child: Text(
-                '$stepNumber',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryNeon),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscureConfirmPass ? Icons.visibility_off : Icons.visibility,
+                color: AppTheme.textMuted,
               ),
+              onPressed: () => setState(() => _obscureConfirmPass = !_obscureConfirmPass),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary, height: 1.3),
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 22),
+
+        // Nút đặt lại mật khẩu
+        ElevatedButton(
+          onPressed: _isLoading ? null : _handleResetPassword,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('ĐẶT LẠI MẬT KHẨU & ĐĂNG NHẬP'),
+        ),
+      ],
     );
   }
 }
