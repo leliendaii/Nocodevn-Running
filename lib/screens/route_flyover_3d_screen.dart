@@ -150,47 +150,95 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     super.dispose();
   }
 
-  // Tạo đường chạy Vector cong bo góc tự nhiên (Chaikin / Bezier Corner Filleting)
+  // 1. Thuật toán Ramer-Douglas-Peucker: Lọc sạch 100% nhiễu răng cưa và điểm giật lùi của GPS
+  static List<Offset> _simplifyPoints(List<Offset> points, double tolerance) {
+    if (points.length <= 2) return points;
+
+    double maxDist = 0.0;
+    int index = 0;
+    final p1 = points.first;
+    final p2 = points.last;
+
+    for (int i = 1; i < points.length - 1; i++) {
+      final double dx = p2.dx - p1.dx;
+      final double dy = p2.dy - p1.dy;
+      double dist;
+      if (dx == 0 && dy == 0) {
+        dist = (points[i] - p1).distance;
+      } else {
+        dist = (((points[i].dx - p1.dx) * dy - (points[i].dy - p1.dy) * dx).abs()) / math.sqrt(dx * dx + dy * dy);
+      }
+
+      if (dist > maxDist) {
+        maxDist = dist;
+        index = i;
+      }
+    }
+
+    if (maxDist > tolerance) {
+      final left = _simplifyPoints(points.sublist(0, index + 1), tolerance);
+      final right = _simplifyPoints(points.sublist(index), tolerance);
+      return [...left.sublist(0, left.length - 1), ...right];
+    } else {
+      return [p1, p2];
+    }
+  }
+
+  // 2. Thuật toán Chaikin Curve: Làm mượt đường cong tự nhiên, liền mạch, triệt tiêu mọi góc nhọn
+  static List<Offset> _chaikinSmooth(List<Offset> points, int iterations) {
+    if (points.length <= 2) return points;
+    List<Offset> result = List.from(points);
+
+    for (int it = 0; it < iterations; it++) {
+      if (result.length <= 2) break;
+      final List<Offset> next = [result.first];
+      for (int i = 0; i < result.length - 1; i++) {
+        final p0 = result[i];
+        final p1 = result[i + 1];
+        final q = Offset(0.75 * p0.dx + 0.25 * p1.dx, 0.75 * p0.dy + 0.25 * p1.dy);
+        final r = Offset(0.25 * p0.dx + 0.75 * p1.dx, 0.25 * p0.dy + 0.75 * p1.dy);
+        next.add(q);
+        next.add(r);
+      }
+      next.add(result.last);
+      result = next;
+    }
+    return result;
+  }
+
+  // Tạo đường chạy Vector mượt mà, liền mạch, chuẩn Google Maps / Strava
   static Path _createSmoothSplinePath(List<Offset> pts) {
     final path = Path();
     if (pts.isEmpty) return path;
-    if (pts.length == 1) {
-      path.moveTo(pts.first.dx, pts.first.dy);
-      return path;
-    }
 
-    path.moveTo(pts.first.dx, pts.first.dy);
-    if (pts.length == 2) {
-      path.lineTo(pts.last.dx, pts.last.dy);
-      return path;
-    }
-
-    const double cornerRadius = 16.0;
-
-    for (int i = 1; i < pts.length - 1; i++) {
-      final pPrev = pts[i - 1];
-      final pCurr = pts[i];
-      final pNext = pts[i + 1];
-
-      final v1 = pCurr - pPrev;
-      final v2 = pNext - pCurr;
-      final len1 = v1.distance;
-      final len2 = v2.distance;
-
-      if (len1 < 1.0 || len2 < 1.0) {
-        path.lineTo(pCurr.dx, pCurr.dy);
-        continue;
+    // Lọc bỏ điểm trùng hoặc khoảng cách quá ngắn
+    final List<Offset> dedup = [pts.first];
+    for (int i = 1; i < pts.length; i++) {
+      if ((pts[i] - dedup.last).distance >= 2.0) {
+        dedup.add(pts[i]);
       }
-
-      final double r = math.min(cornerRadius, math.min(len1 / 2.2, len2 / 2.2));
-      final pStart = pCurr - (v1 / len1) * r;
-      final pEnd = pCurr + (v2 / len2) * r;
-
-      path.lineTo(pStart.dx, pStart.dy);
-      path.quadraticBezierTo(pCurr.dx, pCurr.dy, pEnd.dx, pEnd.dy);
+    }
+    if (dedup.length == 1 && pts.length > 1) {
+      dedup.add(pts.last);
     }
 
-    path.lineTo(pts.last.dx, pts.last.dy);
+    if (dedup.length <= 2) {
+      path.moveTo(dedup.first.dx, dedup.first.dy);
+      path.lineTo(dedup.last.dx, dedup.last.dy);
+      return path;
+    }
+
+    // 1. Đơn giản hóa nhiễu
+    final simplified = _simplifyPoints(dedup, 2.5);
+
+    // 2. Làm mịn đường cong tự nhiên bằng Chaikin
+    final smoothed = _chaikinSmooth(simplified, 2);
+
+    // 3. Xây dựng Path liền mạch
+    path.moveTo(smoothed.first.dx, smoothed.first.dy);
+    for (int i = 1; i < smoothed.length; i++) {
+      path.lineTo(smoothed[i].dx, smoothed[i].dy);
+    }
     return path;
   }
 
@@ -1168,67 +1216,53 @@ class Real3DFlyoverPainter extends CustomPainter {
       }
     }
 
-    // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mảnh mờ sắc nét)
+    // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mảnh mờ thanh lịch, sắc nét)
     canvas.drawPath(
       fullPath,
       Paint()
         ..isAntiAlias = true
-        ..color = AppTheme.primaryNeon.withValues(alpha: 0.22)
-        ..strokeWidth = 3.2
+        ..color = Colors.black.withValues(alpha: 0.15)
+        ..strokeWidth = 3.6
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // 6. KHI VỀ ĐÍCH: VẼ LẠI TOÀN BỘ CUNG ĐƯỜNG VỚI HÀO QUANG ĂN MỪNG
-    if (outroT > 0.05) {
-      canvas.drawPath(
-        fullPath,
-        Paint()
-          ..isAntiAlias = true
-          ..color = AppTheme.secondaryNeon.withValues(alpha: 0.35 * outroT)
-          ..strokeWidth = 6.0
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
-    }
-
-    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Vector Thể Thao Đậm Nét Chuẩn Strava)
+    // 6. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Vector Thể Thao Liền Mạch Chuẩn Strava)
     if (currentDist > 1.0) {
       final Path activePath = pathMetric.extractPath(0.0, currentDist);
 
-      // Lớp 1: Bóng đổ mặt đường
+      // Lớp 1: Bóng đổ mặt đường tạo chiều sâu
       canvas.drawPath(
         activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = Colors.black.withValues(alpha: 0.25)
-          ..strokeWidth = 6.0
+          ..color = Colors.black.withValues(alpha: 0.22)
+          ..strokeWidth = 5.2
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
 
-      // Lớp 2: Vệt chạy đỏ Neon sắc nét chuẩn Strava
+      // Lớp 2: Vệt chạy đỏ Neon liền mạch chuẩn thể thao
       canvas.drawPath(
         activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = const Color(0xFFFF2A42) // Màu đỏ thể thao thương hiệu
-          ..strokeWidth = 4.8
+          ..color = const Color(0xFFFF2A42)
+          ..strokeWidth = 4.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
 
-      // Lớp 3: Lõi sáng tinh tế giúp nét vẽ nổi khối mịn màng
+      // Lớp 3: Lõi sáng thể thao tinh tế
       canvas.drawPath(
         activePath,
         Paint()
           ..isAntiAlias = true
-          ..color = const Color(0xFFFF8A9E)
-          ..strokeWidth = 1.8
+          ..color = const Color(0xFFFFB3C0)
+          ..strokeWidth = 1.4
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
