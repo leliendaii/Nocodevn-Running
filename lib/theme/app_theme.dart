@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Bảng màu thể thao Đỏ Đậm Phong Cách Nocode Running (Racing Red Theme)
+  // Bảng màu thể thao Đỏ Đậm & Xanh Electric Blue (#FF2A42 & #139EFE)
   static const Color background = Color(0xFF0D0E15); // Nền đen sâu thẳm
   static const Color surface = Color(0xFF181A26); // Thẻ bề mặt
   static const Color surfaceLight = Color(0xFF242738); // Thẻ phụ
   static const Color primaryNeon = Color(0xFFFF2A42); // Đỏ thể thao rực rỡ (Primary Red)
-  static const Color secondaryNeon = Color(0xFFFF6584); // Đỏ san hô sáng (Secondary Coral)
+  static const Color secondaryNeon = Color(0xFF139EFE); // Xanh Electric Blue thể thao rực rỡ (Secondary Cyan Blue)
   static const Color accentOrange = Color(0xFFFF5722); // Cam lửa thể thao
   static const Color textPrimary = Color(0xFFF8FAFC);
   static const Color textSecondary = Color(0xFF94A3B8);

@@ -192,23 +192,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Logo & Tiêu đề ứng dụng
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.all(20),
+                    width: 96,
+                    height: 96,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppTheme.surface,
-                      border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4), width: 2),
+                      border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.5), width: 2),
                       boxShadow: [
                         BoxShadow(
                           color: AppTheme.primaryNeon.withValues(alpha: 0.25),
-                          blurRadius: 30,
-                          spreadRadius: 4,
+                          blurRadius: 24,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.directions_run_rounded,
-                      size: 48,
-                      color: AppTheme.primaryNeon,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.directions_run_rounded,
+                            size: 48,
+                            color: AppTheme.primaryNeon,
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
