@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
@@ -13,7 +14,8 @@ class RunningScreen extends StatefulWidget {
   State<RunningScreen> createState() => _RunningScreenState();
 }
 
-class _RunningScreenState extends State<RunningScreen> with SingleTickerProviderStateMixin {
+class _RunningScreenState extends State<RunningScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -37,7 +39,12 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
   }
 
   // Hộp thoại lưu buổi chạy sau khi hoàn thành
-  void _showSaveRunDialog(BuildContext context, RunningProvider running, String userId, String userName) {
+  void _showSaveRunDialog(
+    BuildContext context,
+    RunningProvider running,
+    String userId,
+    String userName,
+  ) {
     final notesController = TextEditingController(text: 'Buổi chạy ngoài trời');
 
     showDialog(
@@ -51,7 +58,11 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
         ),
         title: const Row(
           children: [
-            Icon(Icons.emoji_events_rounded, color: AppTheme.primaryNeon, size: 28),
+            Icon(
+              Icons.emoji_events_rounded,
+              color: AppTheme.primaryNeon,
+              size: 28,
+            ),
             SizedBox(width: 10),
             Text(
               'HOÀN THÀNH!',
@@ -77,11 +88,23 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildSummaryItem('QUÃNG ĐƯỜNG', '${running.distanceKm.toStringAsFixed(2)} km', AppTheme.primaryNeon),
+                  _buildSummaryItem(
+                    'QUÃNG ĐƯỜNG',
+                    '${running.distanceKm.toStringAsFixed(2)} km',
+                    AppTheme.primaryNeon,
+                  ),
                   Container(width: 1, height: 36, color: AppTheme.divider),
-                  _buildSummaryItem('THỜI GIAN', running.formattedCurrentDuration, AppTheme.textPrimary),
+                  _buildSummaryItem(
+                    'THỜI GIAN',
+                    running.formattedCurrentDuration,
+                    AppTheme.textPrimary,
+                  ),
                   Container(width: 1, height: 36, color: AppTheme.divider),
-                  _buildSummaryItem('CALO', '${running.calories} kcal', AppTheme.secondaryNeon),
+                  _buildSummaryItem(
+                    'CALO',
+                    '${running.calories} kcal',
+                    AppTheme.secondaryNeon,
+                  ),
                 ],
               ),
             ),
@@ -92,7 +115,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               decoration: const InputDecoration(
                 labelText: 'Ghi chú buổi chạy',
                 hintText: 'Cảm giác chạy, thời tiết...',
-                prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.primaryNeon),
+                prefixIcon: Icon(
+                  Icons.note_alt_outlined,
+                  color: AppTheme.primaryNeon,
+                ),
               ),
             ),
           ],
@@ -103,17 +129,25 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               running.resetTracking();
               Navigator.of(ctx).pop();
             },
-            child: const Text('BỎ QUA', style: TextStyle(color: AppTheme.textMuted)),
+            child: const Text(
+              'BỎ QUA',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               running.stopAndSaveTracking(
                 userId: userId,
                 userName: userName,
-                notes: notesController.text.trim().isEmpty ? 'Buổi chạy ngoài trời' : notesController.text.trim(),
+                notes: notesController.text.trim().isEmpty
+                    ? 'Buổi chạy ngoài trời'
+                    : notesController.text.trim(),
               );
               Navigator.of(ctx).pop();
-              TopSyncToast.show(context, message: 'Đã lưu & đồng bộ lên Cloud!');
+              TopSyncToast.show(
+                context,
+                message: 'Đã lưu & đồng bộ lên Cloud!',
+              );
             },
             child: const Text('LƯU THÀNH TÍCH'),
           ),
@@ -125,9 +159,23 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
   Widget _buildSummaryItem(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textMuted,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -160,7 +208,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
             children: [
               // HEADER GỘP: THÔNG TIN USER + TRẠNG THÁI + NÚT ĐĂNG XUẤT
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(22),
@@ -182,30 +233,47 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                         children: [
                           Text(
                             user?.name ?? 'Vận động viên',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            user?.isAdmin == true ? '🛡️ Quản trị viên' : '🏃‍♂️ Người chạy bộ',
-                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                            user?.isAdmin == true
+                                ? '🛡️ Quản trị viên'
+                                : '🏃‍♂️ Người chạy bộ',
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     // Badge Trạng thái
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: running.isRunning
                             ? AppTheme.primaryNeon.withValues(alpha: 0.15)
-                            : (running.isPaused ? AppTheme.secondaryNeon.withValues(alpha: 0.15) : AppTheme.surfaceLight),
+                            : (running.isPaused
+                                  ? AppTheme.secondaryNeon.withValues(
+                                      alpha: 0.15,
+                                    )
+                                  : AppTheme.surfaceLight),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: running.isRunning
                               ? AppTheme.primaryNeon
-                              : (running.isPaused ? AppTheme.secondaryNeon : AppTheme.divider),
+                              : (running.isPaused
+                                    ? AppTheme.secondaryNeon
+                                    : AppTheme.divider),
                           width: 1,
                         ),
                       ),
@@ -219,18 +287,24 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                               shape: BoxShape.circle,
                               color: running.isRunning
                                   ? AppTheme.primaryNeon
-                                  : (running.isPaused ? AppTheme.secondaryNeon : AppTheme.textMuted),
+                                  : (running.isPaused
+                                        ? AppTheme.secondaryNeon
+                                        : AppTheme.textMuted),
                             ),
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            running.isRunning ? 'ĐANG CHẠY' : (running.isPaused ? 'TẠM DỪNG' : 'SẴN SÀNG'),
+                            running.isRunning
+                                ? 'ĐANG CHẠY'
+                                : (running.isPaused ? 'TẠM DỪNG' : 'SẴN SÀNG'),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               color: running.isRunning
                                   ? AppTheme.primaryNeon
-                                  : (running.isPaused ? AppTheme.secondaryNeon : AppTheme.textMuted),
+                                  : (running.isPaused
+                                        ? AppTheme.secondaryNeon
+                                        : AppTheme.textMuted),
                             ),
                           ),
                         ],
@@ -241,9 +315,16 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                       tooltip: 'Đăng xuất',
-                      icon: const Icon(Icons.logout_rounded, color: AppTheme.textMuted, size: 20),
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: AppTheme.textMuted,
+                        size: 20,
+                      ),
                       onPressed: () => auth.logout(),
                     ),
                   ],
@@ -287,7 +368,9 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                       animation: _pulseAnimation,
                       builder: (context, child) {
                         return Transform.scale(
-                          scale: running.isRunning ? _pulseAnimation.value : 1.0,
+                          scale: running.isRunning
+                              ? _pulseAnimation.value
+                              : 1.0,
                           child: child,
                         );
                       },
@@ -307,7 +390,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'KILOMÉT',
+                            'KILOMET',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
@@ -347,7 +430,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                               }
 
                               return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 7,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppTheme.surface,
                                   borderRadius: BorderRadius.circular(24),
@@ -391,7 +477,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                         // Thẻ Pace TB
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 18,
+                              horizontal: 16,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.surface,
                               borderRadius: BorderRadius.circular(24),
@@ -402,7 +491,11 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                               children: [
                                 Row(
                                   children: const [
-                                    Icon(Icons.speed_rounded, color: AppTheme.secondaryNeon, size: 20),
+                                    Icon(
+                                      Icons.speed_rounded,
+                                      color: AppTheme.secondaryNeon,
+                                      size: 20,
+                                    ),
                                     SizedBox(width: 6),
                                     Text(
                                       'PACE TB',
@@ -433,7 +526,10 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                         // Thẻ Calories
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 18,
+                              horizontal: 16,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.surface,
                               borderRadius: BorderRadius.circular(24),
@@ -444,7 +540,11 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                               children: [
                                 Row(
                                   children: const [
-                                    Icon(Icons.local_fire_department_rounded, color: AppTheme.primaryNeon, size: 20),
+                                    Icon(
+                                      Icons.local_fire_department_rounded,
+                                      color: AppTheme.primaryNeon,
+                                      size: 20,
+                                    ),
                                     SizedBox(width: 6),
                                     Text(
                                       'CALORIES',
@@ -478,7 +578,8 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               const SizedBox(height: 20),
 
               // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY
-              if (running.isIdle || running.state == TrackingState.finished) ...[
+              if (running.isIdle ||
+                  running.state == TrackingState.finished) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 58,
@@ -487,18 +588,28 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryNeon,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       elevation: 8,
                       shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.play_arrow_rounded, size: 28, color: Colors.white),
+                        Icon(
+                          Icons.play_arrow_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'BẮT ĐẦU CHẠY',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
                         ),
                       ],
                     ),
@@ -513,20 +624,33 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                         child: OutlinedButton(
                           onPressed: () => running.pauseTracking(),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppTheme.secondaryNeon, width: 1.5),
+                            side: const BorderSide(
+                              color: AppTheme.secondaryNeon,
+                              width: 1.5,
+                            ),
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.pause_rounded, color: AppTheme.secondaryNeon, size: 22),
+                              Icon(
+                                Icons.pause_rounded,
+                                color: AppTheme.secondaryNeon,
+                                size: 22,
+                              ),
                               SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'TẠM DỪNG',
                                   maxLines: 1,
-                                  style: TextStyle(color: AppTheme.secondaryNeon, fontSize: 13, fontWeight: FontWeight.w900),
+                                  style: TextStyle(
+                                    color: AppTheme.secondaryNeon,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
                             ],
@@ -539,22 +663,37 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                       child: SizedBox(
                         height: 58,
                         child: ElevatedButton(
-                          onPressed: () => _showSaveRunDialog(context, running, user?.id ?? '', user?.name ?? ''),
+                          onPressed: () => _showSaveRunDialog(
+                            context,
+                            running,
+                            user?.id ?? '',
+                            user?.name ?? '',
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryNeon,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.stop_rounded, color: Colors.white, size: 22),
+                              Icon(
+                                Icons.stop_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                               SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'KẾT THÚC',
                                   maxLines: 1,
-                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
                             ],
@@ -575,18 +714,28 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.secondaryNeon,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                              Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                               SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'TIẾP TỤC',
                                   maxLines: 1,
-                                  style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
                             ],
@@ -599,22 +748,37 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                       child: SizedBox(
                         height: 58,
                         child: ElevatedButton(
-                          onPressed: () => _showSaveRunDialog(context, running, user?.id ?? '', user?.name ?? ''),
+                          onPressed: () => _showSaveRunDialog(
+                            context,
+                            running,
+                            user?.id ?? '',
+                            user?.name ?? '',
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryNeon,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.stop_rounded, color: Colors.white, size: 22),
+                              Icon(
+                                Icons.stop_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                               SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'KẾT THÚC',
                                   maxLines: 1,
-                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
                             ],

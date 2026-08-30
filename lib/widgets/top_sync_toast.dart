@@ -4,13 +4,13 @@ import '../theme/app_theme.dart';
 class TopSyncToast {
   static OverlayEntry? _currentEntry;
 
-  /// Hiển thị popup thông báo đẩy ở góc trên bên phải màn hình
+  /// Hiển thị popup thông báo đẩy gọn gàng ở góc trên màn hình
   static void show(
     BuildContext context, {
     required String message,
     bool isSuccess = true,
     IconData? icon,
-    Duration duration = const Duration(seconds: 4),
+    Duration duration = const Duration(seconds: 3),
   }) {
     _currentEntry?.remove();
     _currentEntry = null;
@@ -24,13 +24,13 @@ class TopSyncToast {
     entry = OverlayEntry(
       builder: (ctx) => Positioned(
         top: MediaQuery.of(ctx).padding.top + 8,
-        right: 14,
+        right: 12,
         child: Material(
           color: Colors.transparent,
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutBack,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
             builder: (context, val, child) {
               return Transform.scale(
                 scale: val,
@@ -41,45 +41,22 @@ class TopSyncToast {
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(ctx).size.width * 0.85,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTheme.surface.withValues(alpha: 0.96),
-                      borderRadius: BorderRadius.circular(16),
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: themeColor,
-                        width: 1.5,
+                        width: 1.2,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeColor.withValues(alpha: 0.35),
-                          blurRadius: 18,
-                          spreadRadius: 2,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: themeColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: themeColor.withValues(alpha: 0.9),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         Icon(
                           icon ?? (isSuccess ? Icons.check_circle_rounded : Icons.error_outline_rounded),
                           color: themeColor,
-                          size: 18,
+                          size: 16,
                         ),
                         const SizedBox(width: 8),
                         Flexible(
@@ -90,7 +67,7 @@ class TopSyncToast {
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.2,
-                              height: 1.3,
+                              height: 1.25,
                             ),
                           ),
                         ),
@@ -116,3 +93,4 @@ class TopSyncToast {
     });
   }
 }
+

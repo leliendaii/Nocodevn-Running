@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+
+// Bộ nhớ cache RAM lưu trữ ảnh avatar để không giải mã lại mỗi khi màn hình re-render
+final Map<String, Uint8List> _avatarMemoryCache = {};
 
 class UserAvatar extends StatelessWidget {
   final String? avatarUrl;
@@ -26,7 +30,9 @@ class UserAvatar extends StatelessWidget {
     final cleanName = name.trim();
     final initial = cleanName.isNotEmpty ? cleanName[0].toUpperCase() : 'U';
 
-    Widget avatarContent = _buildImage(initial, effectiveBorderColor);
+    Widget avatarContent = RepaintBoundary(
+      child: _buildImage(initial, effectiveBorderColor),
+    );
 
     if (showBorder) {
       avatarContent = Container(
@@ -69,11 +75,20 @@ class UserAvatar extends StatelessWidget {
     if (url.startsWith('data:image')) {
       try {
         final base64Str = url.split(',').last;
+        Uint8List? bytes = _avatarMemoryCache[base64Str];
+        if (bytes == null) {
+          bytes = base64Decode(base64Str);
+          if (_avatarMemoryCache.length > 50) {
+            _avatarMemoryCache.clear();
+          }
+          _avatarMemoryCache[base64Str] = bytes;
+        }
         return Image.memory(
-          base64Decode(base64Str),
+          bytes,
           fit: BoxFit.cover,
           width: radius * 2,
           height: radius * 2,
+          gaplessPlayback: true, // Chống nháy hình tuyệt đối khi widget rebuild
           errorBuilder: (_, _, _) => _buildFallbackInitial(initial, accentColor),
         );
       } catch (_) {
@@ -88,19 +103,13 @@ class UserAvatar extends StatelessWidget {
         fit: BoxFit.cover,
         width: radius * 2,
         height: radius * 2,
+        gaplessPlayback: true, // Chống nháy hình tuyệt đối khi widget rebuild
         errorBuilder: (_, _, _) => _buildFallbackInitial(initial, accentColor),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            color: AppTheme.surfaceLight,
-            child: const Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.primaryNeon),
-              ),
-            ),
-          );
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return _buildFallbackInitial(initial, accentColor);
         },
       );
     }
@@ -137,3 +146,4 @@ class UserAvatar extends StatelessWidget {
     );
   }
 }
+
