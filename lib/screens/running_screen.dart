@@ -489,19 +489,26 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
               if (running.isIdle || running.state == TrackingState.finished) ...[
                 SizedBox(
                   width: double.infinity,
-                  height: 60,
-                  child: ElevatedButton.icon(
+                  height: 58,
+                  child: ElevatedButton(
                     onPressed: () => running.startTracking(user?.id),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 32, color: Colors.white),
-                    label: const Text(
-                      'BẮT ĐẦU CHẠY',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.0),
-                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryNeon,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       elevation: 8,
                       shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.play_arrow_rounded, size: 28, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'BẮT ĐẦU CHẠY',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -510,35 +517,55 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                   children: [
                     Expanded(
                       child: SizedBox(
-                        height: 60,
-                        child: OutlinedButton.icon(
+                        height: 58,
+                        child: OutlinedButton(
                           onPressed: () => running.pauseTracking(),
-                          icon: const Icon(Icons.pause_rounded, color: Colors.amber, size: 28),
-                          label: const Text(
-                            'TẠM DỪNG',
-                            style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w900),
-                          ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.amber, width: 2),
+                            side: const BorderSide(color: Colors.amber, width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.pause_rounded, color: Colors.amber, size: 22),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'TẠM DỪNG',
+                                  maxLines: 1,
+                                  style: TextStyle(color: Colors.amber, fontSize: 13, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: SizedBox(
-                        height: 60,
-                        child: ElevatedButton.icon(
+                        height: 58,
+                        child: ElevatedButton(
                           onPressed: () => _showSaveRunDialog(context, running, user?.id ?? '', user?.name ?? ''),
-                          icon: const Icon(Icons.stop_rounded, color: Colors.white, size: 28),
-                          label: const Text(
-                            'KẾT THÚC',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryNeon,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.stop_rounded, color: Colors.white, size: 22),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'KẾT THÚC',
+                                  maxLines: 1,
+                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -550,35 +577,55 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                   children: [
                     Expanded(
                       child: SizedBox(
-                        height: 60,
-                        child: ElevatedButton.icon(
+                        height: 58,
+                        child: ElevatedButton(
                           onPressed: () => running.resumeTracking(),
-                          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
-                          label: const Text(
-                            'TIẾP TỤC',
-                            style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
-                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.success,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'TIẾP TỤC',
+                                  maxLines: 1,
+                                  style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: SizedBox(
-                        height: 60,
-                        child: ElevatedButton.icon(
+                        height: 58,
+                        child: ElevatedButton(
                           onPressed: () => _showSaveRunDialog(context, running, user?.id ?? '', user?.name ?? ''),
-                          icon: const Icon(Icons.stop_rounded, color: Colors.white, size: 28),
-                          label: const Text(
-                            'KẾT THÚC',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryNeon,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.stop_rounded, color: Colors.white, size: 22),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'KẾT THÚC',
+                                  maxLines: 1,
+                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

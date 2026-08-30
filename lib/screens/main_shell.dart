@@ -21,20 +21,42 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   TimeFilter _personalFilter = TimeFilter.week;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      auth.refreshProfileFromServer();
-      if (auth.currentUser != null) {
-        context.read<RunningProvider>().loadAutoEndConfigForUser(auth.currentUser!.id);
-      }
+      _refreshAllAppData();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('📱 [LIFECYCLE] Người dùng quay lại App -> Tự động làm mới dữ liệu mới nhất!');
+      _refreshAllAppData();
+    }
+  }
+
+  void _refreshAllAppData() {
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    auth.refreshProfileFromServer();
+    final running = context.read<RunningProvider>();
+    if (auth.currentUser != null) {
+      running.loadAutoEndConfigForUser(auth.currentUser!.id);
+    }
+    running.refreshAllData();
   }
 
   @override
