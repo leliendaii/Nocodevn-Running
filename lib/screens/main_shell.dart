@@ -583,15 +583,24 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   final totalSeconds = running.getUserTotalDurationSeconds(user?.id);
                   final totalCalories = running.getUserTotalCalories(user?.id);
 
-                  final hoursValue = totalSeconds >= 3600
-                      ? (totalSeconds / 3600).toStringAsFixed(1)
-                      : (totalSeconds / 60).toStringAsFixed(0);
-                  final hoursUnit = totalSeconds >= 3600 ? 'giờ' : 'phút';
+                  // Luôn tính bằng giờ (chuẩn hóa không dùng phút)
+                  final totalHours = totalSeconds / 3600.0;
+                  final hoursValue = totalHours >= 1000
+                      ? _formatIntegerWithComma(totalHours.toInt())
+                      : totalHours.toStringAsFixed(1);
+
+                  // Định dạng KM đẹp mắt, tối ưu khi số lớn
+                  final kmValue = totalKm >= 1000
+                      ? _formatIntegerWithComma(totalKm.toInt())
+                      : totalKm.toStringAsFixed(2);
+
+                  // Định dạng Calories có phân cách hàng nghìn
+                  final calValue = _formatIntegerWithComma(totalCalories);
 
                   return Container(
                     padding: const EdgeInsets.symmetric(
                       vertical: 16,
-                      horizontal: 12,
+                      horizontal: 8,
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
@@ -606,7 +615,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             icon: Icons.directions_run_rounded,
                             iconColor: AppTheme.primaryNeon,
                             title: 'TỔNG KM',
-                            value: totalKm.toStringAsFixed(2),
+                            value: kmValue,
                             unit: 'km',
                           ),
                         ),
@@ -615,14 +624,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           width: 1,
                           color: AppTheme.divider,
                         ),
-                        // Cột 2: Tổng Giờ Chạy
+                        // Cột 2: Tổng Giờ Chạy (Luôn hiển thị GIỜ)
                         Expanded(
                           child: _buildProfileStatItem(
                             icon: Icons.timer_outlined,
                             iconColor: AppTheme.secondaryNeon,
                             title: 'TỔNG GIỜ',
                             value: hoursValue,
-                            unit: hoursUnit,
+                            unit: 'giờ',
                           ),
                         ),
                         Container(
@@ -636,7 +645,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             icon: Icons.local_fire_department_rounded,
                             iconColor: AppTheme.primaryNeon,
                             title: 'TỔNG CALO',
-                            value: '$totalCalories',
+                            value: calValue,
                             unit: 'kcal',
                           ),
                         ),
@@ -750,6 +759,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
+  // Định dạng số nguyên có dấu phẩy phân cách hàng nghìn (ví dụ: 12,500)
+  String _formatIntegerWithComma(num value) {
+    final str = value.toInt().toString();
+    return str.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
   Widget _buildProfileStatItem({
     required IconData icon,
     required Color iconColor,
@@ -765,42 +783,53 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           children: [
             Icon(icon, size: 13, color: iconColor),
             const SizedBox(width: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-                color: AppTheme.textMuted,
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                  color: AppTheme.textMuted,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 6),
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: value,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              if (unit.isNotEmpty) ...[
-                const TextSpan(text: ' '),
-                TextSpan(
-                  text: unit,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
                   style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textMuted,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.5,
                   ),
                 ),
+                if (unit.isNotEmpty) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    unit,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],
