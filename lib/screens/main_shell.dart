@@ -456,94 +456,124 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
-              // Avatar với nút Tải ảnh lên
-              Center(
-                child: Stack(
+              // THẺ HỒ SƠ NGƯỜI DÙNG BỐ TRÍ NGANG (GỌN GÀNG, HIỆN ĐẠI)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Row(
                   children: [
-                    UserAvatar(
-                      avatarUrl: user?.avatarUrl,
-                      name: user?.name ?? 'Người dùng',
-                      radius: 50,
-                      isAdmin: user?.isAdmin == true,
-                      onTap: () => AvatarPickerDialog.show(context, auth),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: GestureDetector(
-                        onTap: () => AvatarPickerDialog.show(context, auth),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppTheme.primaryNeon,
-                            border: Border.all(
-                              color: AppTheme.background,
-                              width: 2,
+                    // Avatar với nút Camera
+                    Stack(
+                      children: [
+                        UserAvatar(
+                          avatarUrl: user?.avatarUrl,
+                          name: user?.name ?? 'Người dùng',
+                          radius: 36,
+                          isAdmin: user?.isAdmin == true,
+                          onTap: () => AvatarPickerDialog.show(context, auth),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: () => AvatarPickerDialog.show(context, auth),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppTheme.primaryNeon,
+                                border: Border.all(
+                                  color: AppTheme.background,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                          child: const Icon(
-                            Icons.camera_alt_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Thông tin User (Tên, username/email, Badge chức vụ)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user?.name ?? 'Người dùng',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          if (user?.username != null &&
+                              user!.username.isNotEmpty) ...[
+                            Text(
+                              '@${user.username}',
+                              style: const TextStyle(
+                                color: AppTheme.secondaryNeon,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          Text(
+                            user?.email ?? '',
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryNeon.withValues(
+                                alpha: 0.15,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppTheme.primaryNeon.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              user?.isAdmin == true
+                                  ? '🛡️ QUẢN TRỊ VIÊN'
+                                  : '🏃 VẬN ĐỘNG VIÊN',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.primaryNeon,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              Text(
-                user?.name ?? 'Người dùng',
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (user?.username != null && user!.username.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '@${user.username}',
-                  style: const TextStyle(
-                    color: AppTheme.secondaryNeon,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-              Text(
-                user?.email ?? '',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppTheme.primaryNeon.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Text(
-                  user?.isAdmin == true
-                      ? '🛡️ QUẢN TRỊ VIÊN'
-                      : '🏃 VẬN ĐỘNG VIÊN',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.primaryNeon,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // ==========================================
               // KHỐI 1: ⏰ CÀI ĐẶT CHẠY BỘ
