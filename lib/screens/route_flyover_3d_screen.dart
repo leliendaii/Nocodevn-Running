@@ -702,35 +702,43 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // Gợi ý cho iOS iPhone
+                    // Hướng dẫn chi tiết lưu vào Album Ảnh trên iPhone
                     if (isDone)
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.3)),
                         ),
-                        child: const Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.tips_and_updates_outlined, color: AppTheme.secondaryNeon, size: 18),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Trên iPhone: Bấm nút bên dưới rồi chọn "Lưu video" để lưu vào Thư viện Ảnh.',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textPrimary, height: 1.3),
-                              ),
+                            const Row(
+                              children: [
+                                Icon(Icons.photo_library_outlined, color: AppTheme.secondaryNeon, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Hướng dẫn lưu video vào iPhone:',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '• Bấm "LƯU VÀO ALBUM ẢNH" bên dưới -> Chọn "Lưu video" trên bảng chia sẻ của iPhone.\n• Hoặc bấm "TẢI VÀO THƯ MỤC TỆP" để tải vào app Tệp (Files).',
+                              style: TextStyle(fontSize: 11, color: AppTheme.textPrimary.withValues(alpha: 0.9), height: 1.4),
                             ),
                           ],
                         ),
                       ),
 
-                    // Nút Tải về (Màu xanh nước biển đồng bộ thương hiệu)
                     if (isDone) ...[
+                      // Nút 1: Lưu vào Album Ảnh (Camera Roll)
                       SizedBox(
                         width: double.infinity,
-                        height: 48,
+                        height: 50,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.secondaryNeon,
@@ -743,40 +751,29 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           ),
                           onPressed: () async {
                             if (activeSession != null) {
-                              final result = await activeSession!.saveOrShare(filename);
+                              final result = await activeSession!.saveToPhotos(filename);
                               if (!ctx.mounted) return;
-                              if (result.isSuccess) {
-                                Navigator.of(ctx).pop();
-                                if (mounted) {
-                                  TopSyncToast.show(
-                                    context,
-                                    message: result.message,
-                                    isSuccess: true,
-                                  );
-                                }
-                              } else {
-                                if (mounted) {
-                                  TopSyncToast.show(
-                                    context,
-                                    message: result.message,
-                                    isSuccess: false,
-                                  );
-                                }
+                              if (mounted) {
+                                TopSyncToast.show(
+                                  context,
+                                  message: result.message,
+                                  isSuccess: result.isSuccess,
+                                );
                               }
                             }
                           },
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.download_rounded, size: 22, color: Color(0xFF0F172A)),
+                              Icon(Icons.photo_library_rounded, size: 20, color: Color(0xFF0F172A)),
                               SizedBox(width: 8),
                               Text(
-                                'TẢI VỀ',
+                                'LƯU VÀO ALBUM ẢNH (PHOTOS)',
                                 style: TextStyle(
-                                  fontSize: 15,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A),
-                                  letterSpacing: 1.0,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ],
@@ -784,14 +781,60 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                       ),
                       const SizedBox(height: 10),
+
+                      // Nút 2: Tải vào Thư mục Tệp (Files / Downloads)
                       SizedBox(
                         width: double.infinity,
-                        height: 40,
+                        height: 44,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF475569)),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () async {
+                            if (activeSession != null) {
+                              final result = await activeSession!.downloadToFiles(filename);
+                              if (!ctx.mounted) return;
+                              if (mounted) {
+                                TopSyncToast.show(
+                                  context,
+                                  message: result.message,
+                                  isSuccess: result.isSuccess,
+                                );
+                              }
+                            }
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.folder_open_rounded, size: 18, color: Colors.white70),
+                              SizedBox(width: 8),
+                              Text(
+                                'TẢI VÀO THƯ MỤC TỆP (FILES)',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Nút 3: Đóng modal
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
                         child: TextButton(
                           onPressed: () => Navigator.of(ctx).pop(),
                           child: const Text(
-                            'ĐÓNG',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                            'HOÀN TẤT / ĐÓNG',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                           ),
                         ),
                       ),
