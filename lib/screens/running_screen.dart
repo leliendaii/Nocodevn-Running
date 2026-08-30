@@ -154,7 +154,19 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NOCODE RUNNING'),
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [AppTheme.primaryNeon, AppTheme.secondaryNeon],
+          ).createShader(bounds),
+          child: const Text(
+            'NOCODE RUNNING',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2.0,
+              color: Colors.white,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'Đăng xuất',
@@ -205,12 +217,12 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                       decoration: BoxDecoration(
                         color: running.isRunning
                             ? AppTheme.primaryNeon.withValues(alpha: 0.2)
-                            : (running.isPaused ? Colors.amber.withValues(alpha: 0.2) : AppTheme.surface),
+                            : (running.isPaused ? AppTheme.secondaryNeon.withValues(alpha: 0.2) : AppTheme.surface),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: running.isRunning
                               ? AppTheme.primaryNeon
-                              : (running.isPaused ? Colors.amber : AppTheme.divider),
+                              : (running.isPaused ? AppTheme.secondaryNeon : AppTheme.divider),
                           width: 1,
                         ),
                       ),
@@ -223,7 +235,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                               shape: BoxShape.circle,
                               color: running.isRunning
                                   ? AppTheme.primaryNeon
-                                  : (running.isPaused ? Colors.amber : AppTheme.textMuted),
+                                  : (running.isPaused ? AppTheme.secondaryNeon : AppTheme.textMuted),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -234,7 +246,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                               fontWeight: FontWeight.w900,
                               color: running.isRunning
                                   ? AppTheme.primaryNeon
-                                  : (running.isPaused ? Colors.amber : AppTheme.textMuted),
+                                  : (running.isPaused ? AppTheme.secondaryNeon : AppTheme.textMuted),
                             ),
                           ),
                         ],
@@ -264,7 +276,12 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                             BoxShadow(
                               color: AppTheme.primaryNeon.withValues(alpha: 0.2),
                               blurRadius: 30,
-                              spreadRadius: 2,
+                              offset: const Offset(-4, 0),
+                            ),
+                            BoxShadow(
+                              color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                              blurRadius: 30,
+                              offset: const Offset(4, 0),
                             ),
                           ]
                         : [],
@@ -521,20 +538,20 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                         child: OutlinedButton(
                           onPressed: () => running.pauseTracking(),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.amber, width: 1.5),
+                            side: const BorderSide(color: AppTheme.secondaryNeon, width: 1.5),
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.pause_rounded, color: Colors.amber, size: 22),
+                              Icon(Icons.pause_rounded, color: AppTheme.secondaryNeon, size: 22),
                               SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'TẠM DỪNG',
                                   maxLines: 1,
-                                  style: TextStyle(color: Colors.amber, fontSize: 13, fontWeight: FontWeight.w900),
+                                  style: TextStyle(color: AppTheme.secondaryNeon, fontSize: 13, fontWeight: FontWeight.w900),
                                 ),
                               ),
                             ],
@@ -581,7 +598,7 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                         child: ElevatedButton(
                           onPressed: () => running.resumeTracking(),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.success,
+                            backgroundColor: AppTheme.secondaryNeon,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),

@@ -273,7 +273,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                                     barRods: [
                                       BarChartRodData(
                                         toY: entry.value.distanceKm,
-                                        color: AppTheme.primaryNeon,
+                                        gradient: const LinearGradient(
+                                          colors: [AppTheme.primaryNeon, AppTheme.secondaryNeon],
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                        ),
                                         width: 14,
                                         borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
                                       ),
