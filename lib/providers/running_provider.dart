@@ -379,7 +379,7 @@ class RunningProvider with ChangeNotifier {
             final double speedKmh = (effectiveSpeedMps * 3.6).clamp(0.0, 35.0);
 
             // Cập nhật Vận tốc tức thời phản hồi nhanh
-            if (speedKmh < 0.8 || (distanceInMeters < 1.5 && effectiveSpeedMps < 0.3)) {
+            if (speedKmh < 1.0 || (distanceInMeters < 1.5 && effectiveSpeedMps < 0.3)) {
               _instantSpeedKmh = 0.0;
             } else {
               _instantSpeedKmh = speedKmh;

@@ -4,15 +4,12 @@ class CalorieCalculator {
   // Cân nặng tiêu chuẩn trung bình của người Việt Nam (kg)
   static const double defaultWeightKg = 65.0;
 
-  /// Phân loại hình thái vận động dựa trên tốc độ tức thời (km/h)
+  /// Phân loại 4 trạng thái vận động chuẩn Luyện tập Thể thao theo Vận tốc tức thời (km/h)
   static String getActivityType({required double speedKmh}) {
-    if (speedKmh < 0.8) return 'Đứng yên';
-    if (speedKmh < 4.5) return 'Đi bộ';
-    if (speedKmh < 6.5) return 'Đi bộ nhanh (Power Walk)';
-    if (speedKmh < 8.5) return 'Chạy chậm (Jogging)';
-    if (speedKmh < 12.0) return 'Chạy bộ đều (Running)';
-    if (speedKmh < 15.0) return 'Chạy nhanh (Fast Run)';
-    return 'Chạy nước rút (Sprint)';
+    if (speedKmh < 1.0) return 'Đứng yên';
+    if (speedKmh < 6.5) return 'Đi bộ';
+    if (speedKmh < 12.0) return 'Chạy bộ';
+    return 'Bứt tốc';
   }
 
   /// Lấy chỉ số MET (Metabolic Equivalent of Task) chuẩn y khoa

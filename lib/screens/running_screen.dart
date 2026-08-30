@@ -344,28 +344,58 @@ class _RunningScreenState extends State<RunningScreen> with SingleTickerProvider
                             ),
                             if (running.isRunning || running.isPaused) ...[
                               const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surfaceLight,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.directions_walk_rounded, size: 14, color: AppTheme.secondaryNeon),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      running.currentActivityType,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.secondaryNeon,
-                                      ),
+                              Builder(
+                                builder: (context) {
+                                  final activity = running.currentActivityType;
+                                  IconData icon;
+                                  Color color;
+
+                                  switch (activity) {
+                                    case 'Đứng yên':
+                                      icon = Icons.pause_circle_outline_rounded;
+                                      color = AppTheme.textMuted;
+                                      break;
+                                    case 'Đi bộ':
+                                      icon = Icons.directions_walk_rounded;
+                                      color = AppTheme.secondaryNeon;
+                                      break;
+                                    case 'Chạy bộ':
+                                      icon = Icons.directions_run_rounded;
+                                      color = AppTheme.primaryNeon;
+                                      break;
+                                    case 'Bứt tốc':
+                                      icon = Icons.bolt_rounded;
+                                      color = AppTheme.accentOrange;
+                                      break;
+                                    default:
+                                      icon = Icons.directions_run_rounded;
+                                      color = AppTheme.secondaryNeon;
+                                  }
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surfaceLight,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: color.withValues(alpha: 0.6)),
                                     ),
-                                  ],
-                                ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(icon, size: 15, color: color),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          activity,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: color,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ],
