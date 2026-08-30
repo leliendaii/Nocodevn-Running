@@ -9,6 +9,7 @@ class RealtimeVideoSession {
   final html.MediaRecorder mediaRecorder;
   final List<html.Blob> videoChunks;
   final Completer<void> completer;
+  html.Blob? finalBlob;
 
   RealtimeVideoSession({
     required this.canvas,
@@ -27,17 +28,29 @@ class RealtimeVideoSession {
     } catch (_) {}
   }
 
-  /// Dừng ghi hình và lưu video MP4 60 FPS siêu mượt
-  Future<void> stopAndDownload(String filename) async {
+  /// Đóng gói dữ liệu sau khi quay xong
+  Future<bool> finishRecording() async {
     try {
       mediaRecorder.stop();
       await completer.future;
 
       if (videoChunks.isNotEmpty) {
-        final finalBlob = html.Blob(videoChunks, 'video/mp4');
-        await _saveOrDownloadVideo(finalBlob, filename);
+        String mime = 'video/mp4';
+        if (videoChunks.first.type.isNotEmpty) {
+          mime = videoChunks.first.type;
+        }
+        finalBlob = html.Blob(videoChunks, mime);
+        return true;
       }
     } catch (_) {}
+    return false;
+  }
+
+  /// Kích hoạt lưu vào Thư viện Ảnh (iPhone Web Share) hoặc tải về máy qua cử chỉ người dùng trực tiếp (User Gesture)
+  Future<bool> saveOrShare(String filename) async {
+    final blob = finalBlob;
+    if (blob == null) return false;
+    return await _saveOrDownloadVideo(blob, filename);
   }
 }
 
@@ -105,19 +118,19 @@ RealtimeVideoSession startRealtimeVideoSession({
   );
 }
 
-Future<void> _saveOrDownloadVideo(html.Blob videoBlob, String filename) async {
+Future<bool> _saveOrDownloadVideo(html.Blob videoBlob, String filename) async {
   final userAgent = html.window.navigator.userAgent.toLowerCase();
   final isMobile = userAgent.contains('iphone') || userAgent.contains('ipad') || userAgent.contains('mobile');
 
   if (isMobile) {
     try {
-      final file = html.File([videoBlob], filename, {'type': 'video/mp4'});
+      final file = html.File([videoBlob], filename, {'type': videoBlob.type.isNotEmpty ? videoBlob.type : 'video/mp4'});
       await html.window.navigator.share({
         'files': [file],
         'title': 'Video 3D Flyover Chạy Bộ',
-        'text': 'Lộ trình chạy bộ 3D Flyover siêu mượt 60 FPS của tôi',
+        'text': 'Lộ trình chạy bộ 3D Flyover siêu mượt của tôi',
       });
-      return;
+      return true;
     } catch (_) {}
   }
 
@@ -130,4 +143,5 @@ Future<void> _saveOrDownloadVideo(html.Blob videoBlob, String filename) async {
   anchor.click();
   html.document.body?.children.remove(anchor);
   html.Url.revokeObjectUrl(url);
+  return true;
 }

@@ -4,7 +4,8 @@ import 'dart:typed_data';
 
 class RealtimeVideoSession {
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {}
-  Future<void> stopAndDownload(String filename) async {}
+  Future<bool> finishRecording() async => true;
+  Future<bool> saveOrShare(String filename) async => true;
 }
 
 RealtimeVideoSession startRealtimeVideoSession({

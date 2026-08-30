@@ -473,6 +473,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         String status = 'Đang chuẩn bị luồng quay trực tiếp 60 FPS...';
         bool isDone = false;
         bool isStarted = false;
+        RealtimeVideoSession? activeSession;
+        final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.mp4';
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -496,6 +498,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     height: firstImg.height,
                     fps: 60.0,
                   );
+                  activeSession = session;
 
                   // 3. Lắng nghe từng nhịp chuyển động VSync của Flutter (60 lần/giây, Zero Stepping)
                   bool isCapturing = false;
@@ -528,16 +531,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
                   setDialogState(() {
                     progress = 0.95;
-                    status = '💎 Đang tối ưu và tải video MP4 60 FPS...';
+                    status = '💎 Đang tối ưu hóa định dạng MP4 60 FPS...';
                   });
 
-                  // 4. Kết thúc và tải file MP4
-                  final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.mp4';
-                  await session.stopAndDownload(filename);
+                  // 4. Kết thúc đóng gói video
+                  await session.finishRecording();
 
                   setDialogState(() {
                     progress = 1.0;
-                    status = '🎉 Đã lưu video 60 FPS siêu mượt thành công!';
+                    status = '🎉 Video đã sẵn sàng! Bấm nút bên dưới để lưu vào máy.';
                     isDone = true;
                   });
 
@@ -643,31 +645,97 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-                    // Nút Đóng / Hoàn tất
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDone ? const Color(0xFF10B981) : AppTheme.surfaceLight,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                    // Gợi ý cho iOS iPhone
+                    if (isDone)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155)),
                         ),
-                        onPressed: isDone
-                            ? () {
-                                Navigator.of(ctx).pop();
-                              }
-                            : null,
-                        child: Text(
-                          isDone ? 'HOÀN TẤT & ĐÓNG' : 'ĐANG XỬ LÝ...',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.tips_and_updates_outlined, color: AppTheme.secondaryNeon, size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Trên iPhone: Bấm nút bên dưới rồi chọn "Lưu video" để lưu vào Thư viện Ảnh.',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textPrimary, height: 1.3),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+
+                    // Nút Lưu video / Tải về (Cử chỉ người dùng trực tiếp cho iOS)
+                    if (isDone) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 8,
+                            shadowColor: const Color(0xFF10B981).withValues(alpha: 0.5),
+                          ),
+                          onPressed: () async {
+                            if (activeSession != null) {
+                              await activeSession!.saveOrShare(filename);
+                            }
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.download_rounded, size: 22),
+                              SizedBox(width: 8),
+                              Text(
+                                'LƯU VÀO THƯ VIỆN ẢNH / TẢI VỀ',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 42,
+                        child: TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text(
+                            'ĐÓNG',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.surfaceLight,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: null,
+                          child: const Text(
+                            'ĐANG XỬ LÝ 60 FPS...',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
