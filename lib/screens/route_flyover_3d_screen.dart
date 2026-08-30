@@ -40,6 +40,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final List<double> _sampledHeadings;
   late final Offset _startPinPixel;
   late final Offset _finishPinPixel;
+  late final double _routeCenterX;
+  late final double _routeCenterY;
+  late final double _spanW;
+  late final double _spanH;
 
   // Cache ảnh map tiles Google Maps lưu vĩnh viễn trong RAM (Load 0ms tức thì khi mở lại)
   static final Map<String, ui.Image> _globalTileMemoryCache = {};
@@ -113,6 +117,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // Vị trí chuẩn xác 100% của Điểm Bắt Đầu và Điểm Kết Thúc
     _startPinPixel = _sampledPositions.first;
     _finishPinPixel = _sampledPositions.last;
+
+    // Tiền tính toán Bounding Box một lần duy nhất (Zero runtime computation)
+    double minX = 99999999, maxX = -99999999;
+    double minY = 99999999, maxY = -99999999;
+    for (final pt in _cachedRoutePixels) {
+      if (pt.dx < minX) minX = pt.dx;
+      if (pt.dx > maxX) maxX = pt.dx;
+      if (pt.dy < minY) minY = pt.dy;
+      if (pt.dy > maxY) maxY = pt.dy;
+    }
+    _routeCenterX = (minX + maxX) / 2;
+    _routeCenterY = (minY + maxY) / 2;
+    _spanW = (maxX - minX).abs();
+    _spanH = (maxY - minY).abs();
 
     _milestones = _generateMilestonePins(_effectiveDistanceKm, _pathMetric, _totalPathLength, _smoothRoute);
 
@@ -823,6 +841,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 progress: _controller.value,
                                 tileCache: _tileCache,
                                 zoom: _zoomLevel,
+                                routeCenterX: _routeCenterX,
+                                routeCenterY: _routeCenterY,
+                                spanW: _spanW,
+                                spanH: _spanH,
                                 onTileRequested: _loadMapTile,
                               ),
                             );
@@ -1087,9 +1109,52 @@ class Real3DFlyoverPainter extends CustomPainter {
   final double progress;
   final Map<String, ui.Image> tileCache;
   final int zoom;
+  final double routeCenterX;
+  final double routeCenterY;
+  final double spanW;
+  final double spanH;
   final Function(int z, int x, int y) onTileRequested;
 
   static const double tileSize = 256.0;
+
+  // Cached Paint objects để không cấp phát bộ nhớ mỗi khung hình (Zero Garbage Collection / 60 FPS)
+  static final Paint _tilePaint = Paint()
+    ..isAntiAlias = true
+    ..filterQuality = FilterQuality.medium;
+
+  static final Paint _emptyTilePaint = Paint()..color = const Color(0xFFF1F5F9);
+
+  static final Paint _fullPathPaint = Paint()
+    ..isAntiAlias = true
+    ..color = Colors.black.withValues(alpha: 0.15)
+    ..strokeWidth = 3.6
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
+  static final Paint _shadowPaint = Paint()
+    ..isAntiAlias = true
+    ..color = Colors.black.withValues(alpha: 0.22)
+    ..strokeWidth = 5.2
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
+  static final Paint _activePathPaint = Paint()
+    ..isAntiAlias = true
+    ..color = const Color(0xFFFF2A42)
+    ..strokeWidth = 4.0
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
+  static final Paint _coreHighlightPaint = Paint()
+    ..isAntiAlias = true
+    ..color = const Color(0xFFFFB3C0)
+    ..strokeWidth = 1.4
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
 
   Real3DFlyoverPainter({
     required this.pixels,
@@ -1104,6 +1169,10 @@ class Real3DFlyoverPainter extends CustomPainter {
     required this.progress,
     required this.tileCache,
     required this.zoom,
+    required this.routeCenterX,
+    required this.routeCenterY,
+    required this.spanW,
+    required this.spanH,
     required this.onTileRequested,
   });
 
@@ -1123,21 +1192,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
-    // 2. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM DYNAMIC CHO QUÃNG ĐƯỜNG NGẮN / DÀI
-    double minX = 99999999, maxX = -99999999;
-    double minY = 99999999, maxY = -99999999;
-    for (final pt in pixels) {
-      if (pt.dx < minX) minX = pt.dx;
-      if (pt.dx > maxX) maxX = pt.dx;
-      if (pt.dy < minY) minY = pt.dy;
-      if (pt.dy > maxY) maxY = pt.dy;
-    }
-    final double routeCenterX = (minX + maxX) / 2;
-    final double routeCenterY = (minY + maxY) / 2;
-    final double spanW = (maxX - minX).abs();
-    final double spanH = (maxY - minY).abs();
-
-    // Hệ số Zoom Out thông minh: Quãng đường ngắn tự động phóng to to rõ 75% màn hình, quãng đường dài tự động bao quát vừa vặn
+    // 2. TÍNH TOÁN ZOOM DYNAMIC CHO QUÃNG ĐƯỜNG NGẮN / DÀI (Sử dụng Bounding Box đã tính trước)
     final double targetScaleX = (size.width * 0.74) / (spanW > 10 ? spanW : 80);
     final double targetScaleY = (size.height * 0.52) / (spanH > 10 ? spanH : 80);
     final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
@@ -1150,7 +1205,6 @@ class Real3DFlyoverPainter extends CustomPainter {
     final double outroT = Curves.easeOutCubic.transform(outroRaw);
 
     // Khóa camera bám thẳng vào người chạy trong suốt quá trình chạy (Triệt tiêu 100% lắc ngang)
-    // Khi về đích: Camera chuyển động tịnh tiến thẳng từ vạch đích về tâm toàn cảnh
     final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
     final double camScale = ui.lerpDouble(initialScale, targetScale, outroT)!;
@@ -1185,68 +1239,30 @@ class Real3DFlyoverPainter extends CustomPainter {
             img,
             Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
             tileRect,
-            Paint()
-              ..isAntiAlias = true
-              ..filterQuality = FilterQuality.high,
+            _tilePaint,
           );
         } else {
-          canvas.drawRect(tileRect, Paint()..color = const Color(0xFFF1F5F9));
+          canvas.drawRect(tileRect, _emptyTilePaint);
           onTileRequested(zoom, tx, ty);
         }
       }
     }
 
     // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mảnh mờ thanh lịch, sắc nét)
-    canvas.drawPath(
-      fullPath,
-      Paint()
-        ..isAntiAlias = true
-        ..color = Colors.black.withValues(alpha: 0.15)
-        ..strokeWidth = 3.6
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
+    canvas.drawPath(fullPath, _fullPathPaint);
 
     // 6. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Vector Thể Thao Liền Mạch Chuẩn Strava)
     if (currentDist > 1.0) {
       final Path activePath = pathMetric.extractPath(0.0, currentDist);
 
       // Lớp 1: Bóng đổ mặt đường tạo chiều sâu
-      canvas.drawPath(
-        activePath,
-        Paint()
-          ..isAntiAlias = true
-          ..color = Colors.black.withValues(alpha: 0.22)
-          ..strokeWidth = 5.2
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
+      canvas.drawPath(activePath, _shadowPaint);
 
       // Lớp 2: Vệt chạy đỏ Neon liền mạch chuẩn thể thao
-      canvas.drawPath(
-        activePath,
-        Paint()
-          ..isAntiAlias = true
-          ..color = const Color(0xFFFF2A42)
-          ..strokeWidth = 4.0
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
+      canvas.drawPath(activePath, _activePathPaint);
 
       // Lớp 3: Lõi sáng thể thao tinh tế
-      canvas.drawPath(
-        activePath,
-        Paint()
-          ..isAntiAlias = true
-          ..color = const Color(0xFFFFB3C0)
-          ..strokeWidth = 1.4
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
+      canvas.drawPath(activePath, _coreHighlightPaint);
     }
 
     // 8. VẼ CỘT MỐC KM CẮM NỔI 3D TRÊN TUYẾN ĐƯỜNG
