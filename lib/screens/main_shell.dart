@@ -459,7 +459,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
           child: Column(
             children: [
-              // 1. THẺ HỒ SƠ NGƯỜI DÙNG TINH GỌN (GỌN GÀNG, KHÔNG RƯỜM RÀ)
+              // 1. THẺ HỒ SƠ NGƯỜI DÙNG KÈM NÚT ĐĂNG XUẤT
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
@@ -558,12 +558,24 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         ],
                       ),
                     ),
+
+                    // Nút Đăng xuất ở thẻ Profile
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Đăng xuất',
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: AppTheme.danger,
+                        size: 22,
+                      ),
+                      onPressed: () => auth.logout(),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 18),
 
-              // 2. KHỐI CÀI ĐẶT HỆ THỐNG GỘP LIỀN MẠCH (CHUẨN APPLE SETTINGS)
+              // 2. KHỐI CÀI ĐẶT HỆ THỐNG GỘP LIỀN MẠCH (KHUNG GIỜ ĐƯA XUỐNG CUỐI)
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
@@ -572,7 +584,60 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
                 child: Column(
                   children: [
-                    // Mục 1: Khung giờ tự động chốt
+                    // Mục 1: Thông tin tài khoản
+                    _buildSettingsRowTile(
+                      icon: Icons.person_outline_rounded,
+                      iconColor: AppTheme.primaryNeon,
+                      title: 'Thông Tin Tài Khoản',
+                      subtitle: 'Họ tên & email cá nhân',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (ctx) => const AccountInfoScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+
+                    // Mục 2: Bảo mật & Mật khẩu
+                    _buildSettingsRowTile(
+                      icon: Icons.lock_reset_rounded,
+                      iconColor: AppTheme.primaryNeon,
+                      title: 'Bảo Mật & Mật Khẩu',
+                      subtitle: 'Đổi mật khẩu tài khoản',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (ctx) => const SecuritySettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Mục 3: Dành cho Admin (nếu có)
+                    if (user?.isAdmin == true) ...[
+                      const Divider(color: AppTheme.divider, height: 1, indent: 56),
+                      _buildSettingsRowTile(
+                        icon: Icons.admin_panel_settings_rounded,
+                        iconColor: AppTheme.primaryNeon,
+                        title: 'Trang Quản Trị Hệ Thống',
+                        subtitle: 'Quản lý runners & dữ liệu',
+                        statusText: 'ADMIN',
+                        statusColor: AppTheme.primaryNeon,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => const AdminDashboardScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+
+                    // Mục 4: Khung giờ tự động chốt (ĐƯA XUỐNG CUỐI)
                     Consumer<RunningProvider>(
                       builder: (context, running, _) {
                         final startStr =
@@ -602,88 +667,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
-
-                    // Mục 2: Thông tin tài khoản
-                    _buildSettingsRowTile(
-                      icon: Icons.person_outline_rounded,
-                      iconColor: AppTheme.primaryNeon,
-                      title: 'Thông Tin Tài Khoản',
-                      subtitle: 'Họ tên & email cá nhân',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (ctx) => const AccountInfoScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
-
-                    // Mục 3: Bảo mật & Mật khẩu
-                    _buildSettingsRowTile(
-                      icon: Icons.lock_reset_rounded,
-                      iconColor: AppTheme.primaryNeon,
-                      title: 'Bảo Mật & Mật Khẩu',
-                      subtitle: 'Đổi mật khẩu tài khoản',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (ctx) => const SecuritySettingsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-
-                    // Mục 4: Dành cho Admin (nếu có)
-                    if (user?.isAdmin == true) ...[
-                      const Divider(color: AppTheme.divider, height: 1, indent: 56),
-                      _buildSettingsRowTile(
-                        icon: Icons.admin_panel_settings_rounded,
-                        iconColor: AppTheme.primaryNeon,
-                        title: 'Trang Quản Trị Hệ Thống',
-                        subtitle: 'Quản lý runners & dữ liệu',
-                        statusText: 'ADMIN',
-                        statusColor: AppTheme.primaryNeon,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (ctx) => const AdminDashboardScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
                   ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 3. NÚT ĐĂNG XUẤT
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => auth.logout(),
-                  icon: const Icon(
-                    Icons.logout_rounded,
-                    color: AppTheme.danger,
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'ĐĂNG XUẤT',
-                    style: TextStyle(
-                      color: AppTheme.danger,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppTheme.danger, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(height: 30),
