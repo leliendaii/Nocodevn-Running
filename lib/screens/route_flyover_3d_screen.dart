@@ -634,33 +634,67 @@ class Real3DFlyoverPainter extends CustomPainter {
     final currentGeo = route[activeIdx];
     final currentPixel = pixels[activeIdx];
 
-    // 1. TÍNH TOÁN MA TRẬN PHỐI CẢNH 3D FLYCAM CHUẨN XÁC
+    // 1. TÍNH TOÁN BOUNDING BOX TOÀN BỘ TUYẾN ĐƯỜNG ĐỂ ZOOM OUT CUỐI VIDEO
+    double minX = 99999999, maxX = -99999999;
+    double minY = 99999999, maxY = -99999999;
+    for (final pt in pixels) {
+      if (pt.dx < minX) minX = pt.dx;
+      if (pt.dx > maxX) maxX = pt.dx;
+      if (pt.dy < minY) minY = pt.dy;
+      if (pt.dy > maxY) maxY = pt.dy;
+    }
+    final double routeCenterX = (minX + maxX) / 2;
+    final double routeCenterY = (minY + maxY) / 2;
+    final double spanW = (maxX - minX).abs();
+    final double spanH = (maxY - minY).abs();
+
+    // Hệ số zoom out khi về đích để bao quát 100% điểm Bắt Đầu và Kết Thúc
+    final double targetScaleX = (size.width * 0.72) / (spanW > 10 ? spanW : 100);
+    final double targetScaleY = (size.height * 0.50) / (spanH > 10 ? spanH : 100);
+    final double targetScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.0);
+
+    // Hiệu ứng chuyển động mượt mà khi kết thúc (Từ 85% -> 100%)
+    final double outroRaw = ((progress - 0.84) / 0.16).clamp(0.0, 1.0);
+    final double outroT = Curves.easeInOutCubic.transform(outroRaw);
+
+    final double camX = ui.lerpDouble(currentPixel.dx, routeCenterX, outroT)!;
+    final double camY = ui.lerpDouble(currentPixel.dy, routeCenterY, outroT)!;
+    final double camScale = ui.lerpDouble(1.0, targetScale, outroT)!;
+    final double camTilt = ui.lerpDouble(0.58, 0.20, outroT)!; // Nghiêng nhẹ 11° nhìn bao quát toàn bộ thành phố
+    final double camBearing = ui.lerpDouble(currentGeo.bearing, 0.0, outroT)!; // Xoay về hướng Bắc chuẩn bản đồ
+
+    // 2. TÍNH TOÁN MA TRẬN PHỐI CẢNH 3D FLYCAM CHUẨN XÁC
     final double screenCenterX = size.width / 2;
-    final double screenCenterY = size.height * 0.65;
+    final double screenCenterY = ui.lerpDouble(size.height * 0.65, size.height * 0.50, outroT)!;
 
     canvas.save();
 
-    // Dời gốc tọa độ về vị trí vận động viên trên màn hình
+    // Dời gốc tọa độ về tâm quan sát trên màn hình
     canvas.translate(screenCenterX, screenCenterY);
 
-    // Ma trận phối cảnh 3D Flycam mượt mà (Góc nghiêng 33 độ)
+    // Ma trận phối cảnh 3D Flycam mượt mà
     final perspectiveMatrix = Matrix4.identity()
       ..setEntry(3, 2, 0.0006)
-      ..rotateX(0.58);
+      ..rotateX(camTilt);
     canvas.transform(perspectiveMatrix.storage);
 
-    // Xoay bản đồ theo hướng vận động viên đang chạy
-    canvas.rotate(-currentGeo.bearing);
+    // Xoay bản đồ theo hướng vận động viên đang chạy (và từ từ quay về hướng Bắc khi kết thúc)
+    canvas.rotate(-camBearing);
 
-    // Dời tâm thế giới theo đúng pixel vận động viên
-    canvas.translate(-currentPixel.dx, -currentPixel.dy);
+    // Zoom out mượt mà để thấy toàn cảnh
+    canvas.scale(camScale, camScale);
 
-    // 2. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (5x7 Grid - Phủ kín 100% không còn khoảng trống)
-    final int centerTileX = (currentPixel.dx / tileSize).floor();
-    final int centerTileY = (currentPixel.dy / tileSize).floor();
+    // Dời tâm thế giới theo camera
+    canvas.translate(-camX, -camY);
 
-    for (int dx = -2; dx <= 2; dx++) {
-      for (int dy = -2; dy <= 4; dy++) {
+    // 3. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH
+    final int centerTileX = (camX / tileSize).floor();
+    final int centerTileY = (camY / tileSize).floor();
+    final int tileRadiusX = (2.2 / camScale).ceil().clamp(2, 5);
+    final int tileRadiusY = (3.2 / camScale).ceil().clamp(3, 6);
+
+    for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
+      for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
         final tx = centerTileX + dx;
         final ty = centerTileY + dy;
         final key = '$zoom/$tx/$ty';
@@ -689,7 +723,7 @@ class Real3DFlyoverPainter extends CustomPainter {
       }
     }
 
-    // 3. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mờ)
+    // 4. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mờ)
     final fullRoutePath = Path();
     for (int i = 0; i < pixels.length; i++) {
       final pt = pixels[i];
@@ -704,13 +738,13 @@ class Real3DFlyoverPainter extends CustomPainter {
       fullRoutePath,
       Paint()
         ..color = AppTheme.primaryNeon.withValues(alpha: 0.3)
-        ..strokeWidth = 5
+        ..strokeWidth = 5 / camScale.clamp(0.5, 1.0)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // 4. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Màu Đỏ Neon nổi bật)
+    // 5. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Màu Đỏ Neon nổi bật)
     if (activeIdx > 0) {
       final activeRoutePath = Path();
       for (int i = 0; i <= activeIdx; i++) {
@@ -727,7 +761,7 @@ class Real3DFlyoverPainter extends CustomPainter {
         activeRoutePath,
         Paint()
           ..color = Colors.black.withValues(alpha: 0.35)
-          ..strokeWidth = 8.5
+          ..strokeWidth = (8.5 / camScale.clamp(0.5, 1.0))
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
@@ -738,26 +772,23 @@ class Real3DFlyoverPainter extends CustomPainter {
         activeRoutePath,
         Paint()
           ..color = AppTheme.primaryNeon
-          ..strokeWidth = 6.0
+          ..strokeWidth = (6.0 / camScale.clamp(0.5, 1.0))
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
     }
 
-    // 5. VẼ CỘT MỐC KM CẮM NỔI 3D TRÊN TUYẾN ĐƯỜNG
+    // 6. VẼ CỘT MỐC KM CẮM NỔI 3D TRÊN TUYẾN ĐƯỜNG
     for (final m in milestones) {
       final pinPixel = m.pixel;
 
       canvas.save();
       canvas.translate(pinPixel.dx, pinPixel.dy);
-      canvas.rotate(currentGeo.bearing);
+      canvas.rotate(camBearing);
 
-      // Bóng chân cột mốc
       canvas.drawCircle(const Offset(0, 0), 4, Paint()..color = Colors.black38);
-      // Cột cắm
       canvas.drawLine(const Offset(0, 0), const Offset(0, -18), Paint()..color = Colors.black54..strokeWidth = 2);
-      // Biển mốc tròn
       canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = Colors.white);
       canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = AppTheme.primaryNeon..style = PaintingStyle.stroke..strokeWidth = 2);
 
@@ -773,7 +804,56 @@ class Real3DFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 6. VẼ ICON VẬN ĐỘNG VIÊN & CHÙM TIA SÁNG QUÉT PHÍA TRƯỚC
+    // 7. VẼ ĐIỂM XUẤT PHÁT (🟢 BẮT ĐẦU)
+    final startPt = pixels.first;
+    canvas.save();
+    canvas.translate(startPt.dx, startPt.dy);
+    canvas.rotate(camBearing);
+
+    // Huy hiệu Bắt đầu
+    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-36, -44, 72, 22), const Radius.circular(11)),
+      Paint()..color = const Color(0xFF10B981), // Xanh lá cây bắt đầu
+    );
+    final startText = TextPainter(
+      text: const TextSpan(
+        text: '🟢 START',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    startText.paint(canvas, Offset(-startText.width / 2, -44 + (22 - startText.height) / 2));
+    canvas.restore();
+
+    // 8. VẼ ĐIỂM KẾT THÚC (🏁 VỀ ĐÍCH) KHI GẦN VỀ ĐÍCH HOẶC ĐÃ HOÀN THÀNH
+    if (outroT > 0.05) {
+      final finishPt = pixels.last;
+      canvas.save();
+      canvas.translate(finishPt.dx, finishPt.dy);
+      canvas.rotate(camBearing);
+      canvas.scale(outroT, outroT);
+
+      // Huy hiệu Về đích hoàng kim
+      canvas.drawCircle(const Offset(0, 0), 7, Paint()..color = Colors.black54);
+      canvas.drawLine(const Offset(0, 0), const Offset(0, -26), Paint()..color = Colors.black87..strokeWidth = 2.5);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(const Rect.fromLTWH(-38, -50, 76, 24), const Radius.circular(12)),
+        Paint()..color = const Color(0xFFEF4444), // Đỏ Neon Về đích
+      );
+      final finishText = TextPainter(
+        text: const TextSpan(
+          text: '🏁 FINISH',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      finishText.paint(canvas, Offset(-finishText.width / 2, -50 + (24 - finishText.height) / 2));
+      canvas.restore();
+    }
+
+    // 9. VẼ ICON VẬN ĐỘNG VIÊN & CHÙM TIA SÁNG QUÉT PHÍA TRƯỚC
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
@@ -788,7 +868,7 @@ class Real3DFlyoverPainter extends CustomPainter {
         const Offset(0, 0),
         const Offset(0, 50),
         [
-          AppTheme.secondaryNeon.withValues(alpha: 0.45),
+          AppTheme.secondaryNeon.withValues(alpha: 0.45 * (1.0 - outroT)),
           AppTheme.secondaryNeon.withValues(alpha: 0.0),
         ],
       );
