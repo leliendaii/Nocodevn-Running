@@ -151,7 +151,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       ];
     }
 
-    return _interpolatePath(basePoints, 600);
+    return _interpolatePath(basePoints, 1000);
   }
 
   // Làm mượt đường cong & tính toán góc quay camera (Bearing Smoothing) chống giật lắc
@@ -176,8 +176,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       rawPoints.add(GeoPoint(lat, lng, bearing: bearing));
     }
 
-    // Làm mượt góc quay camera bằng bộ lọc trung bình động (Moving Average) 15 frames để camera lượn cua êm ái
-    const int window = 15;
+    // Làm mượt góc quay camera bằng bộ lọc trung bình động (Moving Average) 25 frames để camera lượn cua êm ái
+    const int window = 25;
     final List<GeoPoint> smoothed = [];
     for (int i = 0; i < rawPoints.length; i++) {
       double sinSum = 0.0;
@@ -726,20 +726,14 @@ class Real3DFlyoverPainter extends CustomPainter {
               ..filterQuality = FilterQuality.medium,
           );
         } else {
+          // Nền dự phòng mượt mà KHÔNG CÓ VIỀN KẺ KHUNG (Xóa sạch bàn cờ)
           canvas.drawRect(tileRect, Paint()..color = const Color(0xFFF1F5F9));
-          canvas.drawRect(
-            tileRect,
-            Paint()
-              ..color = const Color(0xFFCBD5E1)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 0.5,
-          );
           onTileRequested(zoom, tx, ty);
         }
       }
     }
 
-    // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mờ khử răng cưa)
+    // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mảnh mờ sắc nét)
     final fullRoutePath = Path();
     for (int i = 0; i < pixels.length; i++) {
       final pt = pixels[i];
@@ -755,27 +749,27 @@ class Real3DFlyoverPainter extends CustomPainter {
       Paint()
         ..isAntiAlias = true
         ..color = AppTheme.primaryNeon.withValues(alpha: 0.25)
-        ..strokeWidth = 5 / camScale.clamp(0.5, 1.0)
+        ..strokeWidth = 3.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // 6. KHI VỀ ĐÍCH: VẼ LẠI TOÀN BỘ CUNG ĐƯỜNG VỚI VỆT SÁNG CELEBRATION NỔI BẬT
+    // 6. KHI VỀ ĐÍCH: VẼ LẠI TOÀN BỘ CUNG ĐƯỜNG VỚI HÀO QUANG MƯỢT MÀ
     if (outroT > 0.05) {
       canvas.drawPath(
         fullRoutePath,
         Paint()
           ..isAntiAlias = true
-          ..color = AppTheme.secondaryNeon.withValues(alpha: 0.45 * outroT)
-          ..strokeWidth = (14.0 / camScale.clamp(0.5, 1.0))
+          ..color = AppTheme.secondaryNeon.withValues(alpha: 0.35 * outroT)
+          ..strokeWidth = 6.5
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
     }
 
-    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đa Lớp Vector Mịn Mượt, Không Vỡ Nét)
+    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Vector Chuẩn Sắc Nét, Không Bị Vỡ Pixels)
     if (baseIdx > 0 || subFrac > 0) {
       final activeRoutePath = Path();
       for (int i = 0; i <= baseIdx; i++) {
@@ -788,51 +782,37 @@ class Real3DFlyoverPainter extends CustomPainter {
       }
       activeRoutePath.lineTo(currentPixel.dx, currentPixel.dy);
 
-      final double scaleFactor = camScale.clamp(0.5, 1.0);
-
-      // Lớp 1: Viền bóng mờ dưới mặt đường
+      // Lớp 1: Bóng đổ nhẹ dưới mặt đường
       canvas.drawPath(
         activeRoutePath,
         Paint()
           ..isAntiAlias = true
-          ..color = Colors.black.withValues(alpha: 0.35)
-          ..strokeWidth = 8.5 / scaleFactor
+          ..color = Colors.black.withValues(alpha: 0.3)
+          ..strokeWidth = 6.0
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
 
-      // Lớp 2: Vệt hào quang đỏ neon rực rỡ
+      // Lớp 2: Vệt chạy đỏ Neon sắc nét chuẩn Strava
       canvas.drawPath(
         activeRoutePath,
         Paint()
           ..isAntiAlias = true
-          ..color = AppTheme.primaryNeon.withValues(alpha: 0.5)
-          ..strokeWidth = 9.0 / scaleFactor
+          ..color = const Color(0xFFFF3B30) // Màu đỏ thể thao sắc nét
+          ..strokeWidth = 4.5
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
 
-      // Lớp 3: Nét vẽ lõi đỏ sắc nét chuẩn Strava
+      // Lớp 3: Lõi sáng tinh tế giúp nét vẽ nổi khối mịn màng
       canvas.drawPath(
         activeRoutePath,
         Paint()
           ..isAntiAlias = true
-          ..color = AppTheme.primaryNeon
-          ..strokeWidth = 6.0 / scaleFactor
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round,
-      );
-
-      // Lớp 4: Lõi sáng trung tâm giúp đường cong nổi khối 3D
-      canvas.drawPath(
-        activeRoutePath,
-        Paint()
-          ..isAntiAlias = true
-          ..color = Colors.white.withValues(alpha: 0.75)
-          ..strokeWidth = 2.0 / scaleFactor
+          ..color = Colors.white.withValues(alpha: 0.65)
+          ..strokeWidth = 1.6
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
