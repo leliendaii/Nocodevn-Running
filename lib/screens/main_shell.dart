@@ -1081,70 +1081,72 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 6),
 
-          // Lưới ngày trong tháng (Gọn gàng)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: (firstDayWeekday - 1) + daysInMonth,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 4,
-              crossAxisSpacing: 4,
-              childAspectRatio: 1.15,
-            ),
-            itemBuilder: (context, index) {
-              if (index < firstDayWeekday - 1) {
-                return const SizedBox.shrink();
-              }
-              final day = index - (firstDayWeekday - 1) + 1;
-              final hasRun = activeDaysSet.contains(day);
-              final isToday = (isCurrentMonth && day == now.day);
+          // Lưới ngày trong tháng (Dùng Row/Column chuẩn hóa ổn định 100% không lỗi WebGL)
+          Builder(
+            builder: (context) {
+              final totalSlots = (firstDayWeekday - 1) + daysInMonth;
+              final totalWeeks = (totalSlots / 7).ceil();
+              final weekWidgets = <Widget>[];
 
-              Color bgColor;
-              Color textColor;
-              BoxBorder? border;
+              for (int w = 0; w < totalWeeks; w++) {
+                final dayCells = <Widget>[];
+                for (int d = 0; d < 7; d++) {
+                  final slotIndex = w * 7 + d;
+                  if (slotIndex < firstDayWeekday - 1 || slotIndex >= totalSlots) {
+                    dayCells.add(const Expanded(child: SizedBox(height: 28)));
+                  } else {
+                    final day = slotIndex - (firstDayWeekday - 1) + 1;
+                    final hasRun = activeDaysSet.contains(day);
+                    final isToday = (isCurrentMonth && day == now.day);
 
-              // "Đã chạy" dùng Màu Xanh Phụ AppTheme.secondaryNeon (#139EFE)
-              if (hasRun) {
-                bgColor = AppTheme.secondaryNeon;
-                textColor = Colors.white;
-                border = Border.all(color: AppTheme.secondaryNeon, width: 1.2);
-              } else if (isToday) {
-                bgColor = AppTheme.surfaceLight;
-                textColor = AppTheme.primaryNeon;
-                border = Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.9), width: 1.2);
-              } else {
-                bgColor = AppTheme.surfaceLight.withValues(alpha: 0.3);
-                textColor = (isCurrentMonth && day > now.day)
-                    ? AppTheme.textMuted.withValues(alpha: 0.3)
-                    : AppTheme.textMuted;
-              }
+                    Color bgColor;
+                    Color textColor;
+                    BoxBorder? border;
 
-              return Container(
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(8),
-                  border: border,
-                  boxShadow: hasRun
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.secondaryNeon.withValues(alpha: 0.35),
-                            blurRadius: 4,
+                    if (hasRun) {
+                      bgColor = AppTheme.secondaryNeon;
+                      textColor = Colors.white;
+                      border = Border.all(color: AppTheme.secondaryNeon, width: 1.2);
+                    } else if (isToday) {
+                      bgColor = AppTheme.surfaceLight;
+                      textColor = AppTheme.primaryNeon;
+                      border = Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.9), width: 1.2);
+                    } else {
+                      bgColor = AppTheme.surfaceLight.withValues(alpha: 0.3);
+                      textColor = (isCurrentMonth && day > now.day)
+                          ? AppTheme.textMuted.withValues(alpha: 0.3)
+                          : AppTheme.textMuted;
+                    }
+
+                    dayCells.add(
+                      Expanded(
+                        child: Container(
+                          height: 28,
+                          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: border,
                           ),
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: (hasRun || isToday) ? FontWeight.w900 : FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                ),
-              );
+                          child: Center(
+                            child: Text(
+                              '$day',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: (hasRun || isToday) ? FontWeight.w900 : FontWeight.w600,
+                                color: textColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                }
+                weekWidgets.add(Row(children: dayCells));
+              }
+
+              return Column(children: weekWidgets);
             },
           ),
           const SizedBox(height: 8),
