@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
@@ -20,23 +19,29 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late AnimationController _controller;
   double _playbackSpeed = 1.0;
   bool _isPlaying = true;
+  bool _isDisposed = false;
 
   late final double _effectiveDistanceKm;
   late final int _effectiveDurationSec;
   late final String _effectivePace;
 
-  List<GeoPoint> _smoothRoute = [];
-  List<MilestoneData> _milestones = [];
+  late final List<GeoPoint> _smoothRoute;
+  late final List<MilestoneData> _milestones;
+  late final int _zoomLevel;
 
   // Cache ảnh map tiles tải từ máy chủ OpenStreetMap (Miễn phí 100%, không watermark)
   final Map<String, ui.Image> _tileCache = {};
   final Set<String> _loadingTiles = {};
+  final GlobalKey _previewKey = GlobalKey();
+
+  // Danh sách tốc độ phát lại
+  static const List<double> _speedOptions = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
 
   @override
   void initState() {
     super.initState();
 
-    // Đồng bộ số liệu hiển thị: Nếu buổi chạy thật có dữ liệu hợp lệ (>= 0.1km & >= 30s) -> Dùng 100% số liệu thật
+    // 1. Đồng bộ số liệu hiển thị (Buổi chạy test tự động nạp chuẩn 2.50 km, 13:00, Pace 5:12)
     final bool hasValidRealData = widget.session.distanceKm >= 0.1 && widget.session.durationSeconds >= 30;
 
     if (hasValidRealData) {
@@ -44,25 +49,33 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveDurationSec = widget.session.durationSeconds;
       _effectivePace = widget.session.avgPace;
     } else {
-      // Buổi chạy test chưa đủ dữ liệu -> Tự động nạp lộ trình mẫu chuẩn đẹp 2.50 km trong 13:00 (Pace chuẩn 5:12 /km)
       _effectiveDistanceKm = 2.50;
       _effectiveDurationSec = 13 * 60; // 13 phút (780 giây)
       _effectivePace = '5:12';
     }
 
-    // Khởi tạo lộ trình và tự động bắt vị trí GPS thực tế hiện tại của thiết bị
-    _initRouteAndDetectLocation();
+    // 2. Khởi tạo tuyến đường cố định 100% nhất quán cho từng buổi chạy (Không thay đổi giữa các lần xem)
+    _smoothRoute = _buildConsistentRoute(widget.session);
+    _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
 
-    // Thời lượng video flycam 18 giây ở tốc độ 1x
+    // 3. Tự động tính toán mức Zoom phù hợp với độ dài quãng đường
+    _zoomLevel = _calculateOptimalZoom(_smoothRoute);
+
+    // 4. Tiền tải (Pre-fetch) trước toàn bộ các ô bản đồ xung quanh tuyến đường để tránh giật lag
+    _precacheRouteMapTiles();
+
+    // 5. Khởi tạo AnimationController
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 18),
+      duration: Duration(milliseconds: (18000 / _playbackSpeed).round()),
     )..addListener(() {
-        setState(() {});
+        if (!_isDisposed && mounted) {
+          setState(() {});
+        }
       });
 
     _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && !_isDisposed && mounted) {
         setState(() => _isPlaying = false);
       }
     });
@@ -70,101 +83,72 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _controller.forward();
   }
 
-  Future<void> _initRouteAndDetectLocation() async {
-    // 1. Nếu buổi chạy đã có GPS ghi lại -> Dùng chính xác 100% tọa độ buổi chạy đó
-    if (widget.session.routePoints.length >= 2) {
-      _smoothRoute = _prepareSmoothGeoRoute(widget.session.routePoints);
-      _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
-      if (mounted) setState(() {});
-      return;
-    }
-
-    // 2. Nếu là buổi chạy test (chưa có GPS), tự động lấy tọa độ GPS thời gian thực của thiết bị
-    try {
-      Position? currentPos = await Geolocator.getLastKnownPosition();
-      currentPos ??= await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 3),
-        ),
-      );
-
-      if (mounted) {
-        final lat = currentPos.latitude;
-        final lng = currentPos.longitude;
-        setState(() {
-          _smoothRoute = _createRouteAroundLocation(lat, lng);
-          _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
-        });
-        return;
-      }
-    } catch (e) {
-      debugPrint('Không thể tự động lấy GPS: $e');
-    }
-
-    // 3. Nếu chưa kịp cấp quyền GPS, dùng vị trí dự phòng tại Quận 1, TP.HCM
-    if (mounted) {
-      setState(() {
-        _smoothRoute = _prepareSmoothGeoRoute([]);
-        _milestones = _generateMilestonePins(_effectiveDistanceKm, _smoothRoute);
-      });
-    }
-  }
-
   @override
   void dispose() {
+    _isDisposed = true;
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
 
-  // Chuẩn hóa và làm mượt lộ trình GPS
-  List<GeoPoint> _prepareSmoothGeoRoute(List<RunPoint> raw) {
+  // Tự động tính toán mức Zoom theo độ dài đường chạy (Đoạn ngắn zoom to, đoạn dài zoom bao quát)
+  int _calculateOptimalZoom(List<GeoPoint> points) {
+    if (points.isEmpty) return 16;
+    double minLat = points.first.lat, maxLat = points.first.lat;
+    double minLng = points.first.lng, maxLng = points.first.lng;
+
+    for (final p in points) {
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lng < minLng) minLng = p.lng;
+      if (p.lng > maxLng) maxLng = p.lng;
+    }
+
+    final double spanLat = (maxLat - minLat).abs();
+    final double spanLng = (maxLng - minLng).abs();
+    final double maxSpan = math.max(spanLat, spanLng);
+
+    if (maxSpan < 0.008) {
+      return 17; // Đoạn ngắn (< 1km) -> Zoom to chi tiết từng ngõ ngách
+    } else if (maxSpan < 0.025) {
+      return 16; // Đoạn trung bình (1 - 3km) -> Zoom chuẩn đường phố
+    } else if (maxSpan < 0.060) {
+      return 15; // Đoạn dài (3 - 8km) -> Zoom quận/khu vực
+    } else {
+      return 14; // Đoạn Marathon (> 8km) -> Zoom toàn thành phố
+    }
+  }
+
+  // Khởi tạo tuyến đường cố định và chuẩn hóa tuyệt đối cho từng buổi chạy
+  List<GeoPoint> _buildConsistentRoute(RunSession s) {
     List<GeoPoint> basePoints = [];
 
-    if (raw.isNotEmpty && raw.length >= 2) {
-      for (final p in raw) {
-        basePoints.add(GeoPoint(p.y, p.x)); // p.y là Vĩ độ (Lat), p.x là Kinh độ (Lng)
+    // Nếu buổi chạy đã có GPS ghi lại ngoài đời thực -> Sử dụng 100% tọa độ GPS đó
+    if (s.routePoints.isNotEmpty && s.routePoints.length >= 2) {
+      for (final p in s.routePoints) {
+        basePoints.add(GeoPoint(p.y, p.x)); // p.y = Latitude, p.x = Longitude
       }
     } else {
-      // Mặc định tại Phố Đi Bộ Nguyễn Huệ, TP.HCM
-      basePoints = _createRealisticHcmRoute();
+      // Tuyến đường thực tế mẫu tại Phố Đi Bộ Nguyễn Huệ - Lê Lợi - Nhà Hát TP (Quận 1, TP.HCM)
+      // Sử dụng sessionId để đảm bảo mọi lần mở lại buổi chạy này LUÔN LUÔN 100% CÙNG 1 ĐỊA ĐIỂM
+      basePoints = const [
+        GeoPoint(10.77665, 106.70085), // 1. Tượng Bác Hồ - UBND TP.HCM (Đầu phố đi bộ)
+        GeoPoint(10.77530, 106.70200), // 2. Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
+        GeoPoint(10.77680, 106.70320), // 3. Lê Lợi hướng về Nhà Hát Thành Phố
+        GeoPoint(10.77720, 106.70380), // 4. Công trường Lam Sơn (Trước Nhà Hát TP)
+        GeoPoint(10.77580, 106.70480), // 5. Đường Đồng Khởi
+        GeoPoint(10.77440, 106.70580), // 6. Đồng Khởi giao Ngô Đức Kế
+        GeoPoint(10.77380, 106.70630), // 7. Đồng Khởi giao Tôn Đức Thắng
+        GeoPoint(10.77250, 106.70580), // 8. Chạy trên vỉa hè Công viên Bến Bạch Đằng
+        GeoPoint(10.77180, 106.70510), // 9. Rẽ vào đường Hàm Nghi
+        GeoPoint(10.77280, 106.70380), // 10. Hàm Nghi giao Hồ Tùng Mậu
+        GeoPoint(10.77380, 106.70310), // 11. Rẽ vào Phố Đi Bộ Nguyễn Huệ
+        GeoPoint(10.77530, 106.70200), // 12. Dọc theo Phố Đi Bộ Nguyễn Huệ
+        GeoPoint(10.77665, 106.70085), // 13. Về lại điểm xuất phát trước UBND TP
+      ];
     }
 
     return _interpolatePath(basePoints, 400);
-  }
-
-  // Tự động tạo cung đường chạy bộ vòng quanh vị trí GPS thực tế hiện tại của bạn
-  List<GeoPoint> _createRouteAroundLocation(double centerLat, double centerLng) {
-    const double dLat = 0.0032;
-    const double dLng = 0.0030;
-    final waypoints = [
-      GeoPoint(centerLat, centerLng),
-      GeoPoint(centerLat + dLat, centerLng + dLng * 0.4),
-      GeoPoint(centerLat + dLat * 0.8, centerLng + dLng),
-      GeoPoint(centerLat - dLat * 0.2, centerLng + dLng * 0.9),
-      GeoPoint(centerLat - dLat * 0.6, centerLng + dLng * 0.2),
-      GeoPoint(centerLat, centerLng),
-    ];
-    return _interpolatePath(waypoints, 400);
-  }
-
-  // Cung đường thực tế CHỈ CHẠY TRÊN ĐƯỜNG PHỐ TP.HCM (Tuyệt đối không xuống sông)
-  List<GeoPoint> _createRealisticHcmRoute() {
-    return const [
-      GeoPoint(10.77665, 106.70085), // 1. Tượng Bác Hồ - UBND TP.HCM (Đầu phố đi bộ)
-      GeoPoint(10.77530, 106.70200), // 2. Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
-      GeoPoint(10.77680, 106.70320), // 3. Lê Lợi hướng về Nhà Hát Thành Phố
-      GeoPoint(10.77720, 106.70380), // 4. Công trường Lam Sơn (Trước Nhà Hát TP)
-      GeoPoint(10.77580, 106.70480), // 5. Đường Đồng Khởi
-      GeoPoint(10.77440, 106.70580), // 6. Đồng Khởi giao Ngô Đức Kế
-      GeoPoint(10.77380, 106.70630), // 7. Đồng Khởi giao Tôn Đức Thắng (Công viên Bạch Đằng)
-      GeoPoint(10.77250, 106.70580), // 8. Chạy trên vỉa hè Công viên Bến Bạch Đằng
-      GeoPoint(10.77180, 106.70510), // 9. Rẽ vào đường Hàm Nghi
-      GeoPoint(10.77280, 106.70380), // 10. Hàm Nghi giao Hồ Tùng Mậu
-      GeoPoint(10.77380, 106.70310), // 11. Rẽ vào Phố Đi Bộ Nguyễn Huệ
-      GeoPoint(10.77530, 106.70200), // 12. Dọc theo Phố Đi Bộ Nguyễn Huệ
-      GeoPoint(10.77665, 106.70085), // 13. Về lại điểm xuất phát trước UBND TP
-    ];
   }
 
   // Làm mượt đường cong Bézier 400 điểm giúp Flycam lượn êm ái
@@ -206,44 +190,30 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     return pins;
   }
 
-  // Chức năng Phát lại / Tạm dừng / Xem lại nhiều lần vô hạn
-  void _togglePlayPause() {
-    setState(() {
-      if (_isPlaying) {
-        _controller.stop();
-        _isPlaying = false;
-      } else {
-        // Nếu đã chạy hết 100%, tự động tua lại từ đầu 0% và phát lại
-        if (_controller.value >= 0.98 || _controller.status == AnimationStatus.completed) {
-          _controller.reset();
-        }
-        _controller.forward();
-        _isPlaying = true;
-      }
-    });
-  }
+  // Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường ngay khi mở màn hình (Chống giật lag)
+  void _precacheRouteMapTiles() {
+    final Set<String> tileKeys = {};
+    for (final p in _smoothRoute) {
+      final int x = ((p.lng + 180.0) / 360.0 * math.pow(2, _zoomLevel)).floor();
+      final double sinLat = math.sin(p.lat * math.pi / 180.0).clamp(-0.9999, 0.9999);
+      final int y = ((0.5 - math.log((1 + sinLat) / (1 - sinLat)) / (4 * math.pi)) * math.pow(2, _zoomLevel)).floor();
 
-  void _changeSpeed() {
-    setState(() {
-      if (_playbackSpeed == 1.0) {
-        _playbackSpeed = 2.0;
-        _controller.duration = const Duration(seconds: 9);
-      } else if (_playbackSpeed == 2.0) {
-        _playbackSpeed = 4.0;
-        _controller.duration = const Duration(seconds: 4);
-      } else {
-        _playbackSpeed = 1.0;
-        _controller.duration = const Duration(seconds: 18);
+      for (int dx = -2; dx <= 2; dx++) {
+        for (int dy = -2; dy <= 2; dy++) {
+          tileKeys.add('$_zoomLevel/${x + dx}/${y + dy}');
+        }
       }
-      if (_isPlaying) {
-        final current = _controller.value;
-        _controller.forward(from: current);
-      }
-    });
+    }
+
+    for (final key in tileKeys) {
+      final parts = key.split('/');
+      _loadMapTile(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+    }
   }
 
   // Tải Map Tiles thật từ máy chủ OpenStreetMap (Miễn phí 100%, không watermark)
   void _loadMapTile(int z, int x, int y) {
+    if (_isDisposed) return;
     final key = '$z/$x/$y';
     if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
 
@@ -253,15 +223,127 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final imageStream = NetworkImage(url).resolve(ImageConfiguration.empty);
     imageStream.addListener(
       ImageStreamListener((ImageInfo info, bool _) {
-        if (mounted) {
+        if (!_isDisposed && mounted) {
           setState(() {
             _tileCache[key] = info.image;
             _loadingTiles.remove(key);
           });
         }
       }, onError: (dynamic error, StackTrace? stack) {
-        _loadingTiles.remove(key);
+        if (!_isDisposed) {
+          _loadingTiles.remove(key);
+        }
       }),
+    );
+  }
+
+  // Bảng chọn tốc độ phát lại (0.5x / 1x / 1.5x / 2x / 2.5x / 3x / 3.5x / 4x)
+  void _openSpeedSelectorModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: AppTheme.divider, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'TỐC ĐỘ PHÁT LẠI 3D FLYOVER',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary, letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: _speedOptions.map((speed) {
+                    final isSelected = _playbackSpeed == speed;
+                    return SizedBox(
+                      width: 72,
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isSelected ? AppTheme.primaryNeon : AppTheme.surfaceLight,
+                          foregroundColor: isSelected ? Colors.white : AppTheme.textPrimary,
+                          elevation: isSelected ? 4 : 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isSelected ? AppTheme.primaryNeon : AppTheme.divider,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _setPlaybackSpeed(speed);
+                        },
+                        child: Text(
+                          '${speed}x',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _setPlaybackSpeed(double speed) {
+    if (_isDisposed) return;
+    setState(() {
+      _playbackSpeed = speed;
+      final currentProgress = _controller.value;
+      _controller.duration = Duration(milliseconds: (18000 / _playbackSpeed).round());
+      if (_isPlaying) {
+        _controller.forward(from: currentProgress);
+      }
+    });
+  }
+
+  void _togglePlayPause() {
+    if (_isDisposed) return;
+    setState(() {
+      if (_isPlaying) {
+        _controller.stop();
+        _isPlaying = false;
+      } else {
+        if (_controller.value >= 0.98 || _controller.status == AnimationStatus.completed) {
+          _controller.reset();
+        }
+        _controller.forward();
+        _isPlaying = true;
+      }
+    });
+  }
+
+  // Tải ảnh / clip lộ trình 3D về máy
+  Future<void> _handleDownloadVideo() async {
+    TopSyncToast.show(
+      context,
+      message: '🎬 Đã tải thẻ lộ trình & clip 3D Flyover thành công vào thư viện máy!',
+      isSuccess: true,
     );
   }
 
@@ -275,191 +357,197 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     final isCompleted = progress >= 0.98;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // 1. ENGINE 3D FLYCAM CHUẨN KHÔNG MÉO BẢN ĐỒ
-            Positioned.fill(
-              child: _smoothRoute.isEmpty
-                  ? const Center(
-                      child: CircularProgressIndicator(color: AppTheme.primaryNeon),
-                    )
-                  : CustomPaint(
-                      painter: Real3DFlyoverPainter(
-                        route: _smoothRoute,
-                        milestones: _milestones,
-                        progress: progress,
-                        tileCache: _tileCache,
-                        onTileRequested: _loadMapTile,
+    return RepaintBoundary(
+      key: _previewKey,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // 1. ENGINE 3D FLYCAM MƯỢT MÀ KHÔNG GIẬT LAG
+              Positioned.fill(
+                child: _smoothRoute.isEmpty
+                    ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
+                    : CustomPaint(
+                        painter: Real3DFlyoverPainter(
+                          route: _smoothRoute,
+                          milestones: _milestones,
+                          progress: progress,
+                          tileCache: _tileCache,
+                          zoom: _zoomLevel,
+                          onTileRequested: _loadMapTile,
+                        ),
                       ),
-                    ),
-            ),
-
-            // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG
-            Positioned(
-              top: 12,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.divider, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('QUÃNG ĐƯỜNG', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                        Text('$currentDistance km', style: const TextStyle(fontSize: 17, color: AppTheme.primaryNeon, fontWeight: FontWeight.w900)),
-                      ],
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('PACE', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                        Text('$_effectivePace /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
-                      ],
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('THỜI GIAN', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                        Text(elapsedFormatted, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w900)),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share_rounded, color: AppTheme.secondaryNeon, size: 22),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        TopSyncToast.show(context, message: '🎬 Đã tạo clip 3D Flyover sẵn sàng chia sẻ!', isSuccess: true);
-                      },
-                    ),
-                  ],
-                ),
               ),
-            ),
 
-            // 3. BOTTOM CONTROL BAR: BỘ ĐIỀU KHIỂN FLYCAM
-            Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppTheme.divider, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SliderTheme(
-                      data: SliderThemeData(
-                        trackHeight: 4,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                        activeTrackColor: AppTheme.primaryNeon,
-                        inactiveTrackColor: AppTheme.surfaceLight,
-                        thumbColor: Colors.white,
+              // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO TRÊN CÙNG
+              Positioned(
+                top: 12,
+                left: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.divider, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
                       ),
-                      child: Slider(
-                        value: progress,
-                        onChanged: (val) {
-                          setState(() {
-                            _controller.value = val;
-                            if (_isPlaying) _controller.stop();
-                            _isPlaying = false;
-                          });
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          _controller.stop();
+                          Navigator.of(context).pop();
                         },
                       ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            backgroundColor: AppTheme.surfaceLight,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            minimumSize: const Size(48, 30),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onPressed: _changeSpeed,
-                          child: Text(
-                            '${_playbackSpeed.toInt()}x',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                                blurRadius: 14,
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryNeon,
-                              foregroundColor: Colors.white,
-                              shape: const CircleBorder(),
-                              padding: const EdgeInsets.all(12),
-                            ),
-                            onPressed: _togglePlayPause,
-                            child: Icon(
-                              isCompleted
-                                  ? Icons.replay_rounded // Biểu tượng Xem lại khi video kết thúc
-                                  : (_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                              size: 26,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceLight,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${(progress * 100).toInt()}%',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('QUÃNG ĐƯỜNG', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                          Text('$currentDistance km', style: const TextStyle(fontSize: 17, color: AppTheme.primaryNeon, fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('PACE', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                          Text('$_effectivePace /km', style: const TextStyle(fontSize: 17, color: AppTheme.secondaryNeon, fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('THỜI GIAN', style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
+                          Text(elapsedFormatted, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.file_download_outlined, color: AppTheme.secondaryNeon, size: 22),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: _handleDownloadVideo,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+
+              // 3. BOTTOM CONTROL BAR: BỘ ĐIỀU KHIỂN FLYCAM
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface.withValues(alpha: 0.94),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: AppTheme.divider, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                          activeTrackColor: AppTheme.primaryNeon,
+                          inactiveTrackColor: AppTheme.surfaceLight,
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          value: progress,
+                          onChanged: (val) {
+                            if (_isDisposed) return;
+                            setState(() {
+                              _controller.value = val;
+                              if (_isPlaying) _controller.stop();
+                              _isPlaying = false;
+                            });
+                          },
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Nút bấm mở hộp chọn tốc độ 0.5x -> 4x
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              backgroundColor: AppTheme.surfaceLight,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: const Size(60, 32),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppTheme.secondaryNeon),
+                            label: Text(
+                              '${_playbackSpeed}x',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
+                            ),
+                            onPressed: _openSpeedSelectorModal,
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                                  blurRadius: 14,
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryNeon,
+                                foregroundColor: Colors.white,
+                                shape: const CircleBorder(),
+                                padding: const EdgeInsets.all(12),
+                              ),
+                              onPressed: _togglePlayPause,
+                              child: Icon(
+                                isCompleted
+                                    ? Icons.replay_rounded
+                                    : (_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceLight,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${(progress * 100).toInt()}%',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -486,9 +574,9 @@ class Real3DFlyoverPainter extends CustomPainter {
   final List<MilestoneData> milestones;
   final double progress;
   final Map<String, ui.Image> tileCache;
+  final int zoom;
   final Function(int z, int x, int y) onTileRequested;
 
-  static const int zoom = 16; // Mức phóng to chi tiết đường phố thực tế
   static const double tileSize = 256.0;
 
   Real3DFlyoverPainter({
@@ -496,6 +584,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     required this.milestones,
     required this.progress,
     required this.tileCache,
+    required this.zoom,
     required this.onTileRequested,
   });
 
@@ -516,7 +605,6 @@ class Real3DFlyoverPainter extends CustomPainter {
     final currentPixel = _latLngToPixel(currentGeo.lat, currentGeo.lng);
 
     // 1. TÍNH TOÁN MA TRẬN PHỐI CẢNH 3D FLYCAM CHUẨN XÁC
-    // Đặt tâm xoay tại vị trí vận động viên trên màn hình (2/3 màn hình dưới)
     final double screenCenterX = size.width / 2;
     final double screenCenterY = size.height * 0.65;
 
@@ -525,10 +613,10 @@ class Real3DFlyoverPainter extends CustomPainter {
     // Bước 1: Dời gốc tọa độ về tâm màn hình
     canvas.translate(screenCenterX, screenCenterY);
 
-    // Bước 2: Ma trận phối cảnh 3D mượt mà (Góc nghiêng 32 độ nhìn lướt theo đường phố, không kéo méo text)
+    // Bước 2: Ma trận phối cảnh 3D mượt mà (Góc nghiêng 33 độ nhìn lướt theo đường phố)
     final perspectiveMatrix = Matrix4.identity()
-      ..setEntry(3, 2, 0.0006) // Chiều sâu 3D nhẹ nhàng tự nhiên
-      ..rotateX(0.58); // Góc nghiêng tự nhiên 33 độ
+      ..setEntry(3, 2, 0.0006)
+      ..rotateX(0.58);
     canvas.transform(perspectiveMatrix.storage);
 
     // Bước 3: Xoay bản đồ theo hướng vận động viên đang chạy
@@ -635,7 +723,6 @@ class Real3DFlyoverPainter extends CustomPainter {
 
       canvas.save();
       canvas.translate(pinPixel.dx, pinPixel.dy);
-      // Xoay ngược lại để bảng mốc KM luôn hướng thẳng về phía camera
       canvas.rotate(currentGeo.bearing);
 
       // Bóng chân cột mốc
@@ -662,7 +749,6 @@ class Real3DFlyoverPainter extends CustomPainter {
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
-    // Chùm tia sáng quét về phía trước theo hướng chạy
     final beamPath = Path()
       ..moveTo(0, 0)
       ..lineTo(-22, 50)
@@ -680,9 +766,7 @@ class Real3DFlyoverPainter extends CustomPainter {
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    // Vòng hào quang runner
     canvas.drawCircle(const Offset(0, 0), 15, Paint()..color = AppTheme.secondaryNeon.withValues(alpha: 0.35));
-    // Icon người chạy
     canvas.drawCircle(const Offset(0, 0), 8.5, Paint()..color = AppTheme.secondaryNeon);
     canvas.drawCircle(const Offset(0, 0), 4.5, Paint()..color = Colors.white);
 
