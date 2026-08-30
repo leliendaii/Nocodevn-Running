@@ -830,4 +830,31 @@ class RunningProvider with ChangeNotifier {
 
     return points;
   }
+
+  // Danh sách tất cả buổi chạy
+  List<RunSession> get sessions => List.unmodifiable(_sessions);
+
+  // Lấy tổng quãng đường (KM) của riêng một User (kèm cộng dồn khi đang chạy)
+  double getUserTotalDistance(String? userId) {
+    final history = (userId == null || userId.isEmpty)
+        ? _sessions.fold(0.0, (sum, s) => sum + s.distanceKm)
+        : _sessions.where((s) => s.userId == userId).fold(0.0, (sum, s) => sum + s.distanceKm);
+    return history + (isRunning ? _distanceKm : 0.0);
+  }
+
+  // Lấy tổng thời gian (giây) của riêng một User (kèm cộng dồn khi đang chạy)
+  int getUserTotalDurationSeconds(String? userId) {
+    final history = (userId == null || userId.isEmpty)
+        ? _sessions.fold(0, (sum, s) => sum + s.durationSeconds)
+        : _sessions.where((s) => s.userId == userId).fold(0, (sum, s) => sum + s.durationSeconds);
+    return history + (isRunning ? _durationSeconds : 0);
+  }
+
+  // Lấy tổng Calo của riêng một User (kèm cộng dồn khi đang chạy)
+  int getUserTotalCalories(String? userId) {
+    final history = (userId == null || userId.isEmpty)
+        ? _sessions.fold(0, (sum, s) => sum + s.calories)
+        : _sessions.where((s) => s.userId == userId).fold(0, (sum, s) => sum + s.calories);
+    return history + (isRunning ? _calories : 0);
+  }
 }

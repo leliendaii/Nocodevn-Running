@@ -573,9 +573,81 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // 2. KHỐI THỐNG KÊ TỔNG THÀNH TÍCH CHẠY BỘ (TỔNG KM, TỔNG GIỜ, TỔNG CALO)
+              Consumer<RunningProvider>(
+                builder: (context, running, _) {
+                  // Tính tổng dồn từ lịch sử của user + phiên chạy đang diễn ra (nếu có)
+                  final totalKm = running.getUserTotalDistance(user?.id);
+                  final totalSeconds = running.getUserTotalDurationSeconds(user?.id);
+                  final totalCalories = running.getUserTotalCalories(user?.id);
+
+                  final hoursValue = totalSeconds >= 3600
+                      ? (totalSeconds / 3600).toStringAsFixed(1)
+                      : (totalSeconds / 60).toStringAsFixed(0);
+                  final hoursUnit = totalSeconds >= 3600 ? 'giờ' : 'phút';
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: AppTheme.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        // Cột 1: Tổng KM
+                        Expanded(
+                          child: _buildProfileStatItem(
+                            icon: Icons.directions_run_rounded,
+                            iconColor: AppTheme.primaryNeon,
+                            title: 'TỔNG KM',
+                            value: totalKm.toStringAsFixed(2),
+                            unit: 'km',
+                          ),
+                        ),
+                        Container(
+                          height: 36,
+                          width: 1,
+                          color: AppTheme.divider,
+                        ),
+                        // Cột 2: Tổng Giờ Chạy
+                        Expanded(
+                          child: _buildProfileStatItem(
+                            icon: Icons.timer_outlined,
+                            iconColor: AppTheme.secondaryNeon,
+                            title: 'TỔNG GIỜ',
+                            value: hoursValue,
+                            unit: hoursUnit,
+                          ),
+                        ),
+                        Container(
+                          height: 36,
+                          width: 1,
+                          color: AppTheme.divider,
+                        ),
+                        // Cột 3: Tổng Calories
+                        Expanded(
+                          child: _buildProfileStatItem(
+                            icon: Icons.local_fire_department_rounded,
+                            iconColor: AppTheme.primaryNeon,
+                            title: 'TỔNG CALO',
+                            value: '$totalCalories',
+                            unit: 'kcal',
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 18),
 
-              // 2. KHỐI CÀI ĐẶT HỆ THỐNG GỘP LIỀN MẠCH (KHUNG GIỜ ĐƯA XUỐNG CUỐI)
+              // 3. KHỐI CÀI ĐẶT HỆ THỐNG GỘP LIỀN MẠCH (KHUNG GIỜ ĐƯA XUỐNG CUỐI)
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
@@ -678,7 +750,62 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-
+  Widget _buildProfileStatItem({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String value,
+    required String unit,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 13, color: iconColor),
+            const SizedBox(width: 4),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                color: AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: value,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              if (unit.isNotEmpty) ...[
+                const TextSpan(text: ' '),
+                TextSpan(
+                  text: unit,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildSettingsRowTile({
     required IconData icon,
