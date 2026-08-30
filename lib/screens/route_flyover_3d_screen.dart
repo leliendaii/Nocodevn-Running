@@ -1,12 +1,9 @@
-import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
-import '../services/file_downloader.dart';
+import '../services/route_video_recorder.dart';
 
 class RouteFlyover3DScreen extends StatefulWidget {
   final RunSession session;
@@ -461,62 +458,38 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     });
   }
 
-  Future<List<int>?> _captureFlyoverRenderedBytes() async {
-    try {
-      final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.5);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
-    } catch (e) {
-      debugPrint('Lỗi chụp khung hình 3D: $e');
-      return null;
-    }
-  }
-
   void _handleDownloadVideo() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         double progress = 0.0;
-        String status = 'Đang khởi tạo trình kết xuất 3D...';
+        String status = 'Đang khởi tạo trình kết xuất video 3D...';
         bool isDone = false;
-        Timer? exportTimer;
+        bool isStarted = false;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Tự động khởi chạy tiến trình render và download
-            if (progress == 0.0 && !isDone && exportTimer == null) {
-              int step = 0;
-              const totalSteps = 30;
-              exportTimer = Timer.periodic(const Duration(milliseconds: 65), (t) async {
-                step++;
-                final double currentProg = (step / totalSteps).clamp(0.0, 1.0);
+            // Tự động khởi chạy tiến trình quay và xuất video MP4
+            if (!isStarted) {
+              isStarted = true;
+              final routeMapList = _cachedRoutePixels.map((p) => {'x': p.dx, 'y': p.dy}).toList();
 
-                String currentStatus = '📍 Đang xử lý 2.000 điểm khung hình 3D...';
-                if (currentProg > 0.30 && currentProg <= 0.70) {
-                  currentStatus = '🎥 Đang kết xuất Flycam tốc độ ${_formatSpeed(_playbackSpeed)}...';
-                } else if (currentProg > 0.70 && currentProg < 1.0) {
-                  currentStatus = '💎 Đang tối ưu hình ảnh Full HD 60 FPS...';
-                } else if (currentProg >= 1.0) {
-                  currentStatus = '🎉 Đã lưu thành công vào Thư viện máy!';
-                  t.cancel();
-                  isDone = true;
-
-                  // KÍCH HOẠT CHỤP KHUNG HÌNH 3D THẬT & TẢI XUỐNG THIẾT BỊ / IPHONE PHOTOS
-                  final realBytes = await _captureFlyoverRenderedBytes();
-                  if (realBytes != null && realBytes.isNotEmpty) {
-                    final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.png';
-                    await FileDownloader.download(realBytes, filename, mimeType: 'image/png');
-                  }
-                }
-
-                setDialogState(() {
-                  progress = currentProg;
-                  status = currentStatus;
-                });
-              });
+              RouteVideoRecorder.recordAndExport(
+                routePoints: routeMapList,
+                distanceKm: _effectiveDistanceKm,
+                durationSeconds: _effectiveDurationSec,
+                pace: _effectivePace,
+                speed: _playbackSpeed,
+                sessionId: widget.session.id,
+                onProgress: (prog, stat) {
+                  setDialogState(() {
+                    progress = prog;
+                    status = stat;
+                    if (prog >= 1.0) isDone = true;
+                  });
+                },
+              );
             }
 
             return Dialog(
@@ -621,7 +594,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                         onPressed: isDone
                             ? () {
-                                exportTimer?.cancel();
                                 Navigator.of(ctx).pop();
                               }
                             : null,
