@@ -381,14 +381,34 @@ class RunningProvider with ChangeNotifier {
           );
         }
 
+        // 1. Lấy ngay vị trí xuất phát tức thì tại thời điểm bấm bắt đầu (Gò Vấp / Điểm thật)
+        try {
+          Geolocator.getCurrentPosition(
+            locationSettings: locationSettings,
+          ).then((initialPos) {
+            if (_state == TrackingState.running && _currentRoute.isEmpty) {
+              _lastPosition = initialPos;
+              _lastPositionTime = DateTime.now();
+              _currentRoute.add(RunPoint(initialPos.longitude, initialPos.latitude));
+              saveActiveCheckpointNow();
+              notifyListeners();
+            }
+          }).catchError((e) {
+            debugPrint('Lấy vị trí GPS ban đầu: $e');
+          });
+        } catch (e) {
+          debugPrint('Lỗi khởi tạo GPS ban đầu: $e');
+        }
+
+        // 2. Lắng nghe dòng tọa độ di chuyển liên tục
         _positionStream?.cancel();
         _positionStream = Geolocator.getPositionStream(
           locationSettings: locationSettings,
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // 1. Lọc bỏ tọa độ kém chính xác (nhiễu nhà cao tầng hoặc GPS chưa ổn định > 25m)
-          if (position.accuracy > 25.0) {
+          // Lọc bỏ tọa độ quá nhiễu (> 30m)
+          if (position.accuracy > 30.0) {
             return;
           }
 

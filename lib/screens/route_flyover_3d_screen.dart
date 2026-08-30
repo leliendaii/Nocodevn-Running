@@ -233,21 +233,48 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       for (final p in s.routePoints) {
         basePoints.add(GeoPoint(p.y, p.x));
       }
-    } else {
-      // Tuyến đường thực tế bám 100% theo tim đường & vỉa hè các đại lộ lớn
-      basePoints = const [
-        GeoPoint(10.77665, 106.70085), // 1. BẮT ĐẦU: Trước UBND TP (Đầu Phố Đi Bộ Nguyễn Huệ)
-        GeoPoint(10.77490, 106.70225), // 2. Thẳng theo Phố Đi Bộ Nguyễn Huệ giao Lê Lợi
-        GeoPoint(10.77350, 106.70340), // 3. Thẳng theo Phố Đi Bộ Nguyễn Huệ giao Ngô Đức Kế
-        GeoPoint(10.77195, 106.70465), // 4. Cuối Phố Đi Bộ Nguyễn Huệ giao Tôn Đức Thắng
-        GeoPoint(10.77110, 106.70535), // 5. Rẽ phải dọc đường Tôn Đức Thắng (Công viên Bến Bạch Đằng)
-        GeoPoint(10.77245, 106.70385), // 6. Rẽ phải vào Đại lộ Hàm Nghi giao Hồ Tùng Mậu
-        GeoPoint(10.77395, 106.70220), // 7. Thẳng theo Hàm Nghi giao Pasteur
-        GeoPoint(10.77525, 106.70080), // 8. Rẽ phải vào đường Pasteur giao Lê Lợi
-        GeoPoint(10.77655, 106.69940), // 9. Thẳng theo Pasteur giao Lê Thánh Tôn
-        GeoPoint(10.77690, 106.70050), // 10. KẾT THÚC: Về đích trước Công viên Tượng đài Bác Hồ
-      ];
+      return basePoints;
     }
+
+    if (s.routePoints.length == 1) {
+      // Nếu chỉ có 1 điểm GPS (ở Gò Vấp hay bất cứ đâu): Vẽ lộ trình khép kín quanh chính tọa độ đó
+      final centerLat = s.routePoints.first.y;
+      final centerLng = s.routePoints.first.x;
+      const double radius = 0.0025; // ~250m
+      for (int i = 0; i <= 16; i++) {
+        final double rad = (i / 16) * 2 * math.pi;
+        basePoints.add(GeoPoint(
+          centerLat + radius * math.sin(rad),
+          centerLng + radius * math.cos(rad) * 1.2,
+        ));
+      }
+      return basePoints;
+    }
+
+    // Tuyến đường mẫu bám khít 100% theo tim đường và vỉa hè (21 điểm chi tiết, KHÔNG BAO GIỜ cắt chéo xuyên nhà)
+    basePoints = const [
+      GeoPoint(10.77665, 106.70085), // 1. BẮT ĐẦU: Trước UBND TP (Đầu Phố Đi Bộ Nguyễn Huệ)
+      GeoPoint(10.77580, 106.70155), // 2. Thẳng theo Phố Đi Bộ Nguyễn Huệ
+      GeoPoint(10.77490, 106.70225), // 3. Nguyễn Huệ giao Lê Lợi
+      GeoPoint(10.77420, 106.70285), // 4. Nguyễn Huệ giao Huỳnh Thúc Kháng
+      GeoPoint(10.77350, 106.70340), // 5. Nguyễn Huệ giao Ngô Đức Kế
+      GeoPoint(10.77270, 106.70405), // 6. Nguyễn Huệ giao Mạc Thị Bưởi
+      GeoPoint(10.77195, 106.70465), // 7. Cuối Phố Đi Bộ Nguyễn Huệ giao Tôn Đức Thắng
+      GeoPoint(10.77150, 106.70500), // 8. Vỉa hè Công viên Bến Bạch Đằng
+      GeoPoint(10.77110, 106.70535), // 9. Tôn Đức Thắng
+      GeoPoint(10.77065, 106.70495), // 10. Rẽ phải từ Tôn Đức Thắng vào Đại lộ Hàm Nghi
+      GeoPoint(10.77140, 106.70440), // 11. Đại lộ Hàm Nghi
+      GeoPoint(10.77245, 106.70385), // 12. Đại lộ Hàm Nghi giao Hồ Tùng Mậu
+      GeoPoint(10.77320, 106.70305), // 13. Đại lộ Hàm Nghi giao Nam Kỳ Khởi Nghĩa
+      GeoPoint(10.77395, 106.70220), // 14. Đại lộ Hàm Nghi giao Pasteur
+      GeoPoint(10.77460, 106.70150), // 15. Rẽ phải vào đường Pasteur
+      GeoPoint(10.77525, 106.70080), // 16. Đường Pasteur giao Lê Lợi
+      GeoPoint(10.77590, 106.70010), // 17. Đường Pasteur
+      GeoPoint(10.77655, 106.69940), // 18. Đường Pasteur giao Lê Thánh Tôn
+      GeoPoint(10.77675, 106.69995), // 19. Rẽ phải vào đường Lê Thánh Tôn
+      GeoPoint(10.77690, 106.70050), // 20. Lê Thánh Tôn trước UBND TP
+      GeoPoint(10.77665, 106.70085), // 21. KẾT THÚC: Trở về điểm xuất phát theo đúng lòng đường
+    ];
 
     return basePoints;
   }
