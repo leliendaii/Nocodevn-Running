@@ -46,18 +46,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       debugPrint(
-        '📱 [LIFECYCLE] Người dùng quay lại App -> Tự động làm mới dữ liệu mới nhất!',
+        '📱 [LIFECYCLE] Người dùng quay lại App từ chạy nền -> Tiếp tục theo dõi bình thường!',
       );
-      _refreshAllAppData();
+      _refreshAllAppData(isResumedFromBackground: true);
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
-      // Lưu checkpoint ngay lập tức khi app bị ẩn hoặc chuẩn bị đóng
+      // Lưu checkpoint trạng thái phòng trường hợp máy bị sập nguồn / hệ thống kill
       context.read<RunningProvider>().saveActiveCheckpointNow();
     }
   }
 
-  void _refreshAllAppData() async {
+  void _refreshAllAppData({bool isResumedFromBackground = false}) async {
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
     auth.refreshProfileFromServer();
@@ -66,14 +66,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       running.loadAutoEndConfigForUser(auth.currentUser!.id);
     }
 
-    // Tự động khôi phục và lưu buổi chạy nếu lần trước bị vuốt tắt app / sập nguồn
-    final recovered = await running.recoverUnfinishedRunSession();
-    if (recovered != null && mounted) {
-      TopSyncToast.show(
-        context,
-        message:
-            '🛡️ Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km - ${recovered.formattedDuration}) do thoát app!',
-      );
+    // CHỈ khôi phục buổi chạy cũ khi App KHỞI ĐỘNG LẠI TỪ ĐẦU (Cold start & state idle)
+    // TUYỆT ĐỐI KHÔNG được tự ý chốt lưu buổi chạy khi người dùng chỉ ẩn app chạy nền!
+    if (!isResumedFromBackground && running.isIdle) {
+      final recovered = await running.recoverUnfinishedRunSession();
+      if (recovered != null && mounted) {
+        TopSyncToast.show(
+          context,
+          message:
+              '🛡️ Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km) do máy bị đóng đột ngột!',
+        );
+      }
     }
 
     running.refreshAllData();

@@ -374,17 +374,17 @@ class RunningProvider with ChangeNotifier {
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // 1. Lọc bỏ tọa độ kém chính xác (nhiễu nhà cao tầng hoặc GPS chưa ổn định > 15m)
-          if (position.accuracy > 15.0) {
+          // 1. Lọc bỏ tọa độ kém chính xác (nhiễu nhà cao tầng hoặc GPS chưa ổn định > 25m)
+          if (position.accuracy > 25.0) {
             return;
           }
 
           final now = DateTime.now();
           _updateDurationFromWallClock();
 
-          // Lấy vận tốc tức thời trực tiếp từ chipset GPS phần cứng (m/s)
-          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 3.0) 
-              ? position.speed 
+          // Lấy vận tốc tức thời từ chipset GPS phần cứng (m/s)
+          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 5.0)
+              ? position.speed
               : -1.0;
 
           if (_lastPosition != null) {
@@ -395,30 +395,29 @@ class RunningProvider with ChangeNotifier {
               position.longitude,
             );
 
-            final double timeDeltaSec = _lastPositionTime != null 
-                ? now.difference(_lastPositionTime!).inMilliseconds / 1000.0 
+            final double timeDeltaSec = _lastPositionTime != null
+                ? (now.difference(_lastPositionTime!).inMilliseconds / 1000.0).clamp(0.1, 30.0)
                 : 1.0;
 
-            final double calcSpeedMps = timeDeltaSec > 0 ? (distanceInMeters / timeDeltaSec) : 0.0;
-            final double effectiveSpeedMps = hwSpeedMps >= 0.0 ? hwSpeedMps : calcSpeedMps;
+            final double calcSpeedMps = distanceInMeters / timeDeltaSec;
+            final double effectiveSpeedMps = (hwSpeedMps >= 0.2) ? hwSpeedMps : calcSpeedMps;
             final double speedKmh = (effectiveSpeedMps * 3.6).clamp(0.0, 35.0);
 
-            // Cập nhật Vận tốc tức thời phản hồi nhanh
-            if (speedKmh < 1.0 || (distanceInMeters < 1.5 && effectiveSpeedMps < 0.3)) {
-              _instantSpeedKmh = 0.0;
-            } else {
+            // Cập nhật Vận tốc tức thời mượt mà (không bị kẹt về 0 khi giảm tốc đột ngột)
+            if (speedKmh >= 0.5) {
               _instantSpeedKmh = speedKmh;
+            } else if (distanceInMeters < 1.0 && timeDeltaSec > 3.0) {
+              _instantSpeedKmh = 0.0;
             }
 
-            // BỘ LỌC CHỐNG TRÔI GPS & LOẠI BỎ NHIỄU ĐỨNG YÊN (ZERO-VELOCITY FILTER):
-            // - Nếu tốc độ < 0.4 m/s và khoảng cách < 3.5m -> Người dùng đang đứng yên, bỏ qua cộng dồn KM.
-            // - Nếu khoảng cách nhỏ hơn bán kính sai số (accuracy * 0.35) và tốc độ < 0.7 m/s -> Nhiễu trôi, bỏ qua.
-            // - Nếu tốc độ tính toán phi thực tế (> 11.5 m/s ~ 41.4 km/h) hoặc khoảng cách nhảy vọt > 50m -> Điểm ảo.
-            final bool isStationaryNoise = (effectiveSpeedMps < 0.4 && distanceInMeters < 3.5) ||
-                                          (distanceInMeters < (position.accuracy * 0.35) && effectiveSpeedMps < 0.7);
-            final bool isAbnormalJump = calcSpeedMps > 11.5 || distanceInMeters > 50.0;
+            // BỘ LỌC CHỐNG TRÔI GPS & TÍNH KM THỰC TẾ:
+            // 1. Loại bỏ nhảy ảo (tốc độ vô lý > 45 km/h hoặc khoảng cách nhảy vọt > 80m trong tích tắc)
+            final bool isAbnormalJump = calcSpeedMps > 13.0 || distanceInMeters > 80.0;
+            
+            // 2. Chống trôi khi đứng yên hoàn toàn (khoảng cách cực nhỏ < 1.2m và tốc độ < 0.25 m/s)
+            final bool isCompletelyStationary = distanceInMeters < 1.2 && effectiveSpeedMps < 0.25;
 
-            if (!isStationaryNoise && !isAbnormalJump && distanceInMeters >= 2.0) {
+            if (!isAbnormalJump && !isCompletelyStationary && distanceInMeters >= 1.5) {
               _distanceKm += distanceInMeters / 1000.0;
               _calories = CalorieCalculator.calculate(
                 distanceKm: _distanceKm,
@@ -427,8 +426,8 @@ class RunningProvider with ChangeNotifier {
               _currentRoute.add(RunPoint(position.longitude, position.latitude));
               _lastPosition = position;
               _lastPositionTime = now;
-            } else if (!isAbnormalJump && distanceInMeters >= 4.0) {
-              // Cập nhật mốc tọa độ để tránh hiện tượng cộng dồn nhảy bước
+            } else if (!isAbnormalJump && distanceInMeters >= 3.0) {
+              // Cập nhật mốc tọa độ liên tục để không bị kẹt lũy kế
               _lastPosition = position;
               _lastPositionTime = now;
             }
@@ -437,7 +436,7 @@ class RunningProvider with ChangeNotifier {
             _currentRoute.add(RunPoint(position.longitude, position.latitude));
             _lastPosition = position;
             _lastPositionTime = now;
-            _instantSpeedKmh = hwSpeedMps > 0.3 ? (hwSpeedMps * 3.6) : 0.0;
+            _instantSpeedKmh = (hwSpeedMps >= 0.2) ? (hwSpeedMps * 3.6) : 0.0;
           }
 
           notifyListeners();
@@ -554,8 +553,13 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tự động khôi phục và lưu buổi chạy nếu người dùng vô tình vuốt tắt app hoặc máy sập nguồn
+  /// Tự động khôi phục và lưu buổi chạy nếu người dùng vô tình vuốt tắt hẳn app hoặc máy sập nguồn (Cold Start)
   Future<RunSession?> recoverUnfinishedRunSession() async {
+    // Nếu app đang trong phiên chạy (đang chạy nền / tạm dừng), TUYỆT ĐỐI KHÔNG can thiệp!
+    if (_state != TrackingState.idle) {
+      return null;
+    }
+
     try {
       final checkpoint = await LocalStorageService.loadActiveTrackingCheckpoint();
       if (checkpoint == null) return null;
