@@ -450,18 +450,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     AppUser? user,
   ) {
     return Scaffold(
-      appBar: AppBar(title: const Text('HỒ SƠ CÁ NHÂN')),
+      appBar: AppBar(
+        title: const Text('HỒ SƠ CÁ NHÂN'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
           child: Column(
             children: [
-              // THẺ HỒ SƠ NGƯỜI DÙNG BỐ TRÍ NGANG (GỌN GÀNG, HIỆN ĐẠI)
+              // 1. THẺ HỒ SƠ NGƯỜI DÙNG TINH GỌN (GỌN GÀNG, KHÔNG RƯỜM RÀ)
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: AppTheme.divider),
                 ),
                 child: Row(
@@ -472,7 +475,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         UserAvatar(
                           avatarUrl: user?.avatarUrl,
                           name: user?.name ?? 'Người dùng',
-                          radius: 36,
+                          radius: 28,
                           isAdmin: user?.isAdmin == true,
                           onTap: () => AvatarPickerDialog.show(context, auth),
                         ),
@@ -482,7 +485,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           child: GestureDetector(
                             onTap: () => AvatarPickerDialog.show(context, auth),
                             child: Container(
-                              padding: const EdgeInsets.all(6),
+                              padding: const EdgeInsets.all(5),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: AppTheme.primaryNeon,
@@ -493,7 +496,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                               ),
                               child: const Icon(
                                 Icons.camera_alt_rounded,
-                                size: 14,
+                                size: 12,
                                 color: Colors.white,
                               ),
                             ),
@@ -501,35 +504,48 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         ),
                       ],
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 14),
 
-                    // Thông tin User (Tên, username/email, Badge chức vụ)
+                    // Tên hiển thị + Email + Role
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            user?.name ?? 'Người dùng',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          if (user?.username != null &&
-                              user!.username.isNotEmpty) ...[
-                            Text(
-                              '@${user.username}',
-                              style: const TextStyle(
-                                color: AppTheme.secondaryNeon,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  user?.name ?? 'Người dùng',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                          ],
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  user?.isAdmin == true ? '🛡️ Admin' : '🏃 Runner',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.primaryNeon,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           Text(
                             user?.email ?? '',
                             style: const TextStyle(
@@ -539,97 +555,61 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryNeon.withValues(
-                                alpha: 0.15,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: AppTheme.primaryNeon.withValues(
-                                  alpha: 0.3,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              user?.isAdmin == true
-                                  ? '🛡️ QUẢN TRỊ VIÊN'
-                                  : '🏃 VẬN ĐỘNG VIÊN',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.primaryNeon,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // ==========================================
-              // KHỐI 1: ⏰ CÀI ĐẶT CHẠY BỘ
-              // ==========================================
-              _buildSettingsSectionHeader('CÀI ĐẶT CHẠY BỘ'),
-              const SizedBox(height: 8),
-              Consumer<RunningProvider>(
-                builder: (context, running, _) {
-                  final startStr =
-                      '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
-                  final endStr =
-                      '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
-                  final subtitle = running.autoEndEnabled
-                      ? 'Đang bật: $startStr ➔ $endStr (Chống quên)'
-                      : 'Đang tắt tự động chốt';
-
-                  return _buildSettingsMenuTile(
-                    icon: Icons.timer_off_outlined,
-                    iconColor: AppTheme.primaryNeon,
-                    title: 'Khung Giờ Tự Động Chốt',
-                    subtitle: subtitle,
-                    statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
-                    statusColor: running.autoEndEnabled
-                        ? AppTheme.primaryNeon
-                        : AppTheme.textMuted,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (ctx) => const AutoEndScheduleScreen(),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // ==========================================
-              // KHỐI 2: 👤 TÀI KHOẢN & BẢO MẬT
-              // ==========================================
-              _buildSettingsSectionHeader('TÀI KHOẢN & BẢO MẬT'),
-              const SizedBox(height: 8),
+              // 2. KHỐI CÀI ĐẶT HỆ THỐNG GỘP LIỀN MẠCH (CHUẨN APPLE SETTINGS)
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: AppTheme.divider),
                 ),
                 child: Column(
                   children: [
+                    // Mục 1: Khung giờ tự động chốt
+                    Consumer<RunningProvider>(
+                      builder: (context, running, _) {
+                        final startStr =
+                            '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
+                        final endStr =
+                            '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
+                        final subtitle = running.autoEndEnabled
+                            ? '$startStr ➔ $endStr (Chống quên)'
+                            : 'Đang tắt tự động chốt';
+
+                        return _buildSettingsRowTile(
+                          icon: Icons.timer_off_outlined,
+                          iconColor: AppTheme.primaryNeon,
+                          title: 'Khung Giờ Tự Động Chốt',
+                          subtitle: subtitle,
+                          statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
+                          statusColor: running.autoEndEnabled
+                              ? AppTheme.primaryNeon
+                              : AppTheme.textMuted,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (ctx) => const AutoEndScheduleScreen(),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+
+                    // Mục 2: Thông tin tài khoản
                     _buildSettingsRowTile(
                       icon: Icons.person_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
                       title: 'Thông Tin Tài Khoản',
-                      subtitle:
-                          '${user?.name ?? ''} (@${user?.username ?? ''})',
+                      subtitle: 'Họ tên & email cá nhân',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -638,16 +618,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                    const Divider(
-                      color: AppTheme.divider,
-                      height: 1,
-                      indent: 56,
-                    ),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+
+                    // Mục 3: Bảo mật & Mật khẩu
                     _buildSettingsRowTile(
                       icon: Icons.lock_reset_rounded,
                       iconColor: AppTheme.primaryNeon,
                       title: 'Bảo Mật & Mật Khẩu',
-                      subtitle: 'Đổi mật khẩu đăng nhập',
+                      subtitle: 'Đổi mật khẩu tài khoản',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -656,37 +634,32 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
+
+                    // Mục 4: Dành cho Admin (nếu có)
+                    if (user?.isAdmin == true) ...[
+                      const Divider(color: AppTheme.divider, height: 1, indent: 56),
+                      _buildSettingsRowTile(
+                        icon: Icons.admin_panel_settings_rounded,
+                        iconColor: AppTheme.primaryNeon,
+                        title: 'Trang Quản Trị Hệ Thống',
+                        subtitle: 'Quản lý runners & dữ liệu',
+                        statusText: 'ADMIN',
+                        statusColor: AppTheme.primaryNeon,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => const AdminDashboardScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // ==========================================
-              // KHỐI 3: 🛡️ DÀNH CHO QUẢN TRỊ VIÊN (NẾU LÀ ADMIN)
-              // ==========================================
-              if (user?.isAdmin == true) ...[
-                _buildSettingsSectionHeader('DÀNH CHO QUẢN TRỊ VIÊN'),
-                const SizedBox(height: 8),
-                _buildSettingsMenuTile(
-                  icon: Icons.admin_panel_settings_rounded,
-                  iconColor: AppTheme.primaryNeon,
-                  title: 'Trang Quản Trị Hệ Thống',
-                  subtitle: 'Quản lý runner & chỉnh sửa số liệu',
-                  isHighlighted: true,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (ctx) => const AdminDashboardScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // ==========================================
-              // NÚT ĐĂNG XUẤT
-              // ==========================================
+              // 3. NÚT ĐĂNG XUẤT
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -694,24 +667,26 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   icon: const Icon(
                     Icons.logout_rounded,
                     color: AppTheme.danger,
+                    size: 18,
                   ),
                   label: const Text(
-                    'ĐĂNG XUẤT TÀI KHOẢN',
+                    'ĐĂNG XUẤT',
                     style: TextStyle(
                       color: AppTheme.danger,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppTheme.danger),
+                    side: const BorderSide(color: AppTheme.danger, width: 1.2),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
             ],
           ),
         ),
@@ -719,135 +694,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildSettingsSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.0,
-          color: AppTheme.textMuted,
-        ),
-      ),
-    );
-  }
 
-  Widget _buildSettingsMenuTile({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    String? statusText,
-    Color? statusColor,
-    bool isHighlighted = false,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isHighlighted
-              ? iconColor.withValues(alpha: 0.8)
-              : AppTheme.divider,
-          width: isHighlighted ? 1.5 : 1.0,
-        ),
-        boxShadow: isHighlighted
-            ? [
-                BoxShadow(
-                  color: iconColor.withValues(alpha: 0.15),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: iconColor, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: isHighlighted
-                              ? iconColor
-                              : AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (statusText != null) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (statusColor ?? AppTheme.textMuted).withValues(
-                        alpha: 0.15,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      statusText,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: statusColor ?? AppTheme.textMuted,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: AppTheme.textMuted,
-                  size: 14,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildSettingsRowTile({
     required IconData icon,
     required Color iconColor,
     required String title,
     required String subtitle,
+    String? statusText,
+    Color? statusColor,
     required VoidCallback onTap,
   }) {
     return Material(
@@ -891,6 +746,29 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+              if (statusText != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (statusColor ?? AppTheme.textMuted).withValues(
+                      alpha: 0.15,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: statusColor ?? AppTheme.textMuted,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               const Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: AppTheme.textMuted,
