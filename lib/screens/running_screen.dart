@@ -67,49 +67,140 @@ class _RunningScreenState extends State<RunningScreen>
     if (running.distanceKm < 0.05 && running.durationSeconds < 20) {
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => Dialog(
           backgroundColor: AppTheme.surface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: AppTheme.danger, width: 1.5),
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppTheme.danger, width: 1.2),
           ),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 24),
-              SizedBox(width: 8),
-              Text('Buổi chạy quá ngắn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppTheme.danger,
+                      size: 20,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Buổi chạy quá ngắn',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Quãng đường < 50m. Bạn có muốn hủy bỏ để tránh lưu dữ liệu rác không?',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppTheme.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // 3 NÚT NẰM TRÊN 1 HÀNG GỌN GÀNG (XANH, ĐỎ, CAM)
+                Row(
+                  children: [
+                    // 1. NÚT MÀU XANH: TIẾP TỤC
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.secondaryNeon,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text(
+                            'TIẾP TỤC',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 2. NÚT MÀU ĐỎ: HỦY
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.danger,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () {
+                            running.resetTracking();
+                            Navigator.of(ctx).pop();
+                            TopSyncToast.show(
+                              context,
+                              message: 'Đã hủy buổi chạy ngắn!',
+                              isSuccess: false,
+                            );
+                          },
+                          child: const Text(
+                            'HỦY BỎ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 3. NÚT MÀU KHÁC (CAM/VÀNG THỂ THAO): VẪN LƯU
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.accentOrange,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _openSaveRunDialogModal(context, running, userId, userName);
+                          },
+                          child: const Text(
+                            'VẪN LƯU',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          content: const Text(
-            'Quãng đường ghi nhận dưới 50m. Bạn có muốn HỦY để tránh lưu dữ liệu rác không?',
-            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('TIẾP TỤC CHẠY', style: TextStyle(color: AppTheme.textMuted)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.danger,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {
-                running.resetTracking();
-                Navigator.of(ctx).pop();
-                TopSyncToast.show(context, message: 'Đã hủy buổi chạy ngắn!', isSuccess: false);
-              },
-              child: const Text('HỦY BỎ'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _openSaveRunDialogModal(context, running, userId, userName);
-              },
-              child: const Text('VẪN LƯU', style: TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold)),
-            ),
-          ],
         ),
       );
       return;
