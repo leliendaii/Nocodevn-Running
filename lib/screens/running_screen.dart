@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
+import '../services/voice_coach_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/user_avatar.dart';
-import '../widgets/running/live_mini_map.dart';
 
 class RunningScreen extends StatefulWidget {
   const RunningScreen({super.key});
@@ -33,12 +33,16 @@ class _RunningScreenState extends State<RunningScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Đăng ký thông báo Rung Haptic & Chúc mừng mỗi khi hoàn thành 1 KM (Giống Strava / Nike Run Club)
+    // Khởi tạo Huấn luyện viên giọng nói tiếng Việt
+    VoiceCoachService.initialize();
+
+    // Đăng ký thông báo Rung Haptic & Voice Coach mỗi khi hoàn thành 1 KM
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final running = context.read<RunningProvider>();
         running.onKilometerMilestone = (int kmCount, String pace) {
           HapticFeedback.heavyImpact();
+          VoiceCoachService.speakMilestone(kmCount, pace);
           if (mounted) {
             TopSyncToast.show(
               context,
@@ -352,6 +356,9 @@ class _RunningScreenState extends State<RunningScreen>
                           ),
                         ),
                         onPressed: () {
+                          final double savedKm = running.distanceKm;
+                          final int savedSec = running.durationSeconds;
+                          VoiceCoachService.speakFinish(savedKm, savedSec);
                           running.stopAndSaveTracking(
                             userId: userId,
                             userName: userName,
@@ -362,7 +369,8 @@ class _RunningScreenState extends State<RunningScreen>
                           Navigator.of(ctx).pop();
                           TopSyncToast.show(
                             context,
-                            message: 'Đã lưu & đồng bộ lên Cloud!',
+                            message: '🎉 Chúc mừng! Đã lưu buổi chạy thành công!',
+                            isSuccess: true,
                           );
                         },
                         child: const Text(
@@ -410,23 +418,8 @@ class _RunningScreenState extends State<RunningScreen>
 
   @override
   Widget build(BuildContext context) {
-    final running = context.watch<RunningProvider>();
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
-
-    if (running.wasAutoFinished) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          TopSyncToast.show(
-            context,
-            message: '⏰ Đã tự động chốt & lưu buổi chạy theo khung giờ cài đặt của bạn!',
-            isSuccess: true,
-            duration: const Duration(seconds: 5),
-          );
-          running.clearAutoFinishedFlag();
-        }
-      });
-    }
 
     return Scaffold(
       body: SafeArea(
@@ -434,7 +427,7 @@ class _RunningScreenState extends State<RunningScreen>
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
           child: Column(
             children: [
-              // HEADER GỘP: THÔNG TIN USER + TRẠNG THÁI + NÚT ĐĂNG XUẤT
+              // HEADER GỘP: THÔNG TIN USER + TRẠNG THÁI + NÚT VOICE COACH + NÚT ĐĂNG XUẤT
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -481,62 +474,98 @@ class _RunningScreenState extends State<RunningScreen>
                         ],
                       ),
                     ),
-                    // Badge Trạng thái Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: running.isRunning
-                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                            : (running.isPaused
-                                  ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
-                                  : AppTheme.surfaceLight),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: running.isRunning
-                              ? const Color(0xFF10B981)
-                              : (running.isPaused
-                                    ? const Color(0xFFF59E0B)
-                                    : AppTheme.divider),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: running.isRunning
+                    // Badge Trạng thái Header Tối ưu bằng Selector
+                    Selector<RunningProvider, (bool, bool)>(
+                      selector: (_, p) => (p.isRunning, p.isPaused),
+                      builder: (context, state, _) {
+                        final isRunning = state.$1;
+                        final isPaused = state.$2;
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isRunning
+                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                : (isPaused
+                                      ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                                      : AppTheme.surfaceLight),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isRunning
                                   ? const Color(0xFF10B981)
-                                  : (running.isPaused
+                                  : (isPaused
                                         ? const Color(0xFFF59E0B)
-                                        : AppTheme.textMuted),
+                                        : AppTheme.divider),
+                              width: 1,
                             ),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            running.isRunning
-                                ? 'ĐANG CHẠY'
-                                : (running.isPaused ? 'TẠM DỪNG' : 'SẴN SÀNG'),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: running.isRunning
-                                  ? const Color(0xFF10B981)
-                                  : (running.isPaused
-                                        ? const Color(0xFFF59E0B)
-                                        : AppTheme.textMuted),
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isRunning
+                                      ? const Color(0xFF10B981)
+                                      : (isPaused
+                                            ? const Color(0xFFF59E0B)
+                                            : AppTheme.textMuted),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                isRunning
+                                    ? 'ĐANG CHẠY'
+                                    : (isPaused ? 'TẠM DỪNG' : 'SẴN SÀNG'),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: isRunning
+                                      ? const Color(0xFF10B981)
+                                      : (isPaused
+                                            ? const Color(0xFFF59E0B)
+                                            : AppTheme.textMuted),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(width: 6),
+                    // Nút Bật/Tắt Voice Coach
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      tooltip: VoiceCoachService.isEnabled ? 'Tắt Voice Coach' : 'Bật Voice Coach',
+                      icon: Icon(
+                        VoiceCoachService.isEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                        color: VoiceCoachService.isEnabled ? AppTheme.secondaryNeon : AppTheme.textMuted,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          VoiceCoachService.toggleVoiceCoach(!VoiceCoachService.isEnabled);
+                        });
+                        TopSyncToast.show(
+                          context,
+                          message: VoiceCoachService.isEnabled
+                              ? '🎙️ Đã bật Huấn luyện viên giọng nói tiếng Việt!'
+                              : '🔇 Đã tắt Voice Coach.',
+                          isSuccess: VoiceCoachService.isEnabled,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 2),
                     // Nút Đăng xuất gọn gàng
                     IconButton(
                       visualDensity: VisualDensity.compact,
@@ -563,7 +592,7 @@ class _RunningScreenState extends State<RunningScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // 1. Khung Thời gian chạy (Thoáng đãng, thanh lịch)
+                    // 1. Khung Thời gian chạy (Tối ưu bằng Selector)
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -577,131 +606,145 @@ class _RunningScreenState extends State<RunningScreen>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          running.formattedCurrentDuration,
-                          style: const TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3.0,
-                            color: AppTheme.textPrimary,
-                          ),
+                        Selector<RunningProvider, String>(
+                          selector: (_, p) => p.formattedCurrentDuration,
+                          builder: (context, durationStr, _) {
+                            return Text(
+                              durationStr,
+                              style: const TextStyle(
+                                fontSize: 44,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 3.0,
+                                color: AppTheme.textPrimary,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
 
-                    // 2. Khối Quãng đường HERO (0.00 KM) - Cực lớn, thoáng đãng, trung tâm
-                    AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: running.isRunning
-                              ? _pulseAnimation.value
-                              : 1.0,
-                          child: child,
+                    // 2. Khối Quãng đường HERO (0.00 KM) - Tối ưu bằng Selector
+                    Selector<RunningProvider, (double, bool)>(
+                      selector: (_, p) => (p.distanceKm, p.isRunning),
+                      builder: (context, data, child) {
+                        final distanceKm = data.$1;
+                        final isRunning = data.$2;
+
+                        return AnimatedBuilder(
+                          animation: _pulseAnimation,
+                          builder: (context, _) {
+                            return Transform.scale(
+                              scale: isRunning ? _pulseAnimation.value : 1.0,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    distanceKm.toStringAsFixed(2),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 96,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.primaryNeon,
+                                      height: 0.95,
+                                      letterSpacing: -2.0,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'KILOMET',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.primaryNeon,
+                                      letterSpacing: 3.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  // Badge trạng thái hoạt động
+                                  Selector<RunningProvider, (String, double, bool)>(
+                                    selector: (_, p) => (p.currentActivityType, p.instantSpeedKmh, p.isRunning),
+                                    builder: (context, activityData, _) {
+                                      final activity = activityData.$1;
+                                      final speed = activityData.$2;
+                                      final runningState = activityData.$3;
+
+                                      IconData icon;
+                                      Color color;
+
+                                      switch (activity) {
+                                        case 'Đứng yên':
+                                          icon = Icons.pause_circle_outline_rounded;
+                                          color = AppTheme.textMuted;
+                                          break;
+                                        case 'Đi bộ':
+                                          icon = Icons.directions_walk_rounded;
+                                          color = AppTheme.secondaryNeon;
+                                          break;
+                                        case 'Chạy bộ':
+                                          icon = Icons.directions_run_rounded;
+                                          color = AppTheme.primaryNeon;
+                                          break;
+                                        case 'Bứt tốc':
+                                          icon = Icons.bolt_rounded;
+                                          color = AppTheme.accentOrange;
+                                          break;
+                                        default:
+                                          icon = Icons.directions_run_rounded;
+                                          color = AppTheme.primaryNeon;
+                                      }
+
+                                      final String labelText = runningState && speed > 0.5
+                                          ? '${activity.toUpperCase()} • ${speed.toStringAsFixed(1)} KM/H'
+                                          : activity.toUpperCase();
+
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 7,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surface,
+                                          borderRadius: BorderRadius.circular(24),
+                                          border: Border.all(
+                                            color: color.withValues(alpha: 0.5),
+                                            width: 1.2,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: color.withValues(alpha: 0.15),
+                                              blurRadius: 16,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(icon, size: 16, color: color),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              labelText,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w900,
+                                                color: color,
+                                                letterSpacing: 1.0,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         );
                       },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            running.distanceKm.toStringAsFixed(2),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 96,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.primaryNeon,
-                              height: 0.95,
-                              letterSpacing: -2.0,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'KILOMET',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.primaryNeon,
-                              letterSpacing: 3.5,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          // Badge trạng thái hoạt động thể chất thời gian thực
-                          Builder(
-                            builder: (context) {
-                              final activity = running.currentActivityType;
-                              IconData icon;
-                              Color color;
-
-                              switch (activity) {
-                                case 'Đứng yên':
-                                  icon = Icons.pause_circle_outline_rounded;
-                                  color = AppTheme.textMuted;
-                                  break;
-                                case 'Đi bộ':
-                                  icon = Icons.directions_walk_rounded;
-                                  color = AppTheme.secondaryNeon;
-                                  break;
-                                case 'Chạy bộ':
-                                  icon = Icons.directions_run_rounded;
-                                  color = AppTheme.primaryNeon;
-                                  break;
-                                case 'Bứt tốc':
-                                  icon = Icons.bolt_rounded;
-                                  color = AppTheme.accentOrange;
-                                  break;
-                                default:
-                                  icon = Icons.directions_run_rounded;
-                                  color = AppTheme.primaryNeon;
-                              }
-
-                              final String labelText = running.isRunning && running.instantSpeedKmh > 0.5
-                                  ? '${activity.toUpperCase()} • ${running.instantSpeedKmh.toStringAsFixed(1)} KM/H'
-                                  : activity.toUpperCase();
-
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surface,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: color.withValues(alpha: 0.5),
-                                    width: 1.2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: color.withValues(alpha: 0.15),
-                                      blurRadius: 16,
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(icon, size: 16, color: color),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      labelText,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                        color: color,
-                                        letterSpacing: 1.0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
                     ),
 
-                    // 3. 2 Thẻ Chỉ số Dưới: PACE TB & CALORIES (Riêng biệt, thoáng, cao cấp)
+                    // 3. 2 Thẻ Chỉ số Dưới: PACE TB & CALORIES (Tối ưu bằng Selector)
                     Row(
                       children: [
                         // Thẻ Pace TB
@@ -739,13 +782,18 @@ class _RunningScreenState extends State<RunningScreen>
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                Text(
-                                  '${running.currentPace} /km',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.textPrimary,
-                                  ),
+                                Selector<RunningProvider, String>(
+                                  selector: (_, p) => p.currentPace,
+                                  builder: (context, pace, _) {
+                                    return Text(
+                                      '$pace /km',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -788,13 +836,18 @@ class _RunningScreenState extends State<RunningScreen>
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                Text(
-                                  '${running.calories} kcal',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.textPrimary,
-                                  ),
+                                Selector<RunningProvider, int>(
+                                  selector: (_, p) => p.calories,
+                                  builder: (context, calories, _) {
+                                    return Text(
+                                      '$calories kcal',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -802,230 +855,237 @@ class _RunningScreenState extends State<RunningScreen>
                         ),
                       ],
                     ),
-                    if (running.isRunning || running.isPaused) ...[
-                      const SizedBox(height: 12),
-                      LiveMiniMap(
-                        routePoints: running.currentRoute,
-                        isRunning: running.isRunning,
-                      ),
-                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY
-              if (running.isIdle ||
-                  running.state == TrackingState.finished) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 58,
-                  child: ElevatedButton(
-                    onPressed: () => running.startTracking(user?.id),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryNeon,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      elevation: 8,
-                      shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.play_arrow_rounded,
-                          size: 28,
-                          color: Colors.white,
+              // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY (Tối ưu bằng Selector)
+              Selector<RunningProvider, TrackingState>(
+                selector: (_, p) => p.state,
+                builder: (context, state, _) {
+                  final running = context.read<RunningProvider>();
+
+                  if (state == TrackingState.idle || state == TrackingState.finished) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 58,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          VoiceCoachService.speakStart();
+                          running.startTracking(user?.id);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryNeon,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          elevation: 8,
+                          shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          'BẮT ĐẦU CHẠY',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.play_arrow_rounded,
+                              size: 28,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'BẮT ĐẦU CHẠY',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else if (state == TrackingState.running) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 58,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                VoiceCoachService.speakPause();
+                                running.pauseTracking();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: AppTheme.secondaryNeon,
+                                  width: 1.5,
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.pause_rounded,
+                                    size: 22,
+                                    color: AppTheme.secondaryNeon,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'TẠM DỪNG',
+                                    style: TextStyle(
+                                      color: AppTheme.secondaryNeon,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 58,
+                            child: ElevatedButton(
+                              onPressed: () => _showSaveRunDialog(
+                                context,
+                                running,
+                                user?.id ?? 'user_default',
+                                user?.name ?? 'Người chạy',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.accentOrange,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                elevation: 8,
+                                shadowColor: AppTheme.accentOrange.withValues(alpha: 0.5),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.stop_rounded,
+                                    size: 22,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'KẾT THÚC',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-              ] else if (running.isRunning) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 58,
-                        child: OutlinedButton(
-                          onPressed: () => running.pauseTracking(),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                              color: AppTheme.secondaryNeon,
-                              width: 1.5,
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.pause_rounded,
-                                color: AppTheme.secondaryNeon,
-                                size: 22,
-                              ),
-                              SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'TẠM DỪNG',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: AppTheme.secondaryNeon,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                    );
+                  } else {
+                    // Trạng thái TẠM DỪNG (Paused)
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 58,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                VoiceCoachService.speakResume();
+                                running.resumeTracking();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.secondaryNeon,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
+                                elevation: 8,
+                                shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.5),
                               ),
-                            ],
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.play_arrow_rounded,
+                                    size: 22,
+                                    color: Colors.black,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'TIẾP TỤC',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
-                        height: 58,
-                        child: ElevatedButton(
-                          onPressed: () => _showSaveRunDialog(
-                            context,
-                            running,
-                            user?.id ?? '',
-                            user?.name ?? '',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryNeon,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.stop_rounded,
-                                color: Colors.white,
-                                size: 22,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 58,
+                            child: ElevatedButton(
+                              onPressed: () => _showSaveRunDialog(
+                                context,
+                                running,
+                                user?.id ?? 'user_default',
+                                user?.name ?? 'Người chạy',
                               ),
-                              SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'KẾT THÚC',
-                                  maxLines: 1,
-                                  style: TextStyle(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.accentOrange,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                elevation: 8,
+                                shadowColor: AppTheme.accentOrange.withValues(alpha: 0.5),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.stop_rounded,
+                                    size: 22,
                                     color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
                                   ),
-                                ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'KẾT THÚC',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ] else if (running.isPaused) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 58,
-                        child: ElevatedButton(
-                          onPressed: () => running.resumeTracking(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.secondaryNeon,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
                             ),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                              SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'TIẾP TỤC',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
-                        height: 58,
-                        child: ElevatedButton(
-                          onPressed: () => _showSaveRunDialog(
-                            context,
-                            running,
-                            user?.id ?? '',
-                            user?.name ?? '',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryNeon,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.stop_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                              SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'KẾT THÚC',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                      ],
+                    );
+                  }
+                },
+              ),
             ],
           ),
         ),

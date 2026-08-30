@@ -9,7 +9,6 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
-import 'services/voice_coach_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +17,6 @@ void main() async {
     await initializeDateFormatting('vi', null);
   } catch (_) {}
   await SupabaseService.initialize();
-  await VoiceCoachService.initialize();
   runApp(
     DevicePreview(
       enabled: !kReleaseMode, // Bật khung điện thoại ảo khi chạy debug trên Chrome / Windows

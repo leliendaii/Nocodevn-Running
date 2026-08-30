@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../services/file_downloader.dart';
-import '../services/map_tile_cache_service.dart';
 
 class RouteFlyover3DScreen extends StatefulWidget {
   final RunSession session;
@@ -328,26 +327,25 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final key = '$z/$x/$y';
     if (_tileCache.containsKey(key) || _loadingTiles.contains(key)) return;
 
-    // 1. Kiểm tra trong bộ nhớ đệm Offline Cache (0ms)
-    final cached = MapTileCacheService.getCachedImage(z, x, y);
-    if (cached != null) {
-      _tileCache[key] = cached;
-      return;
-    }
-
     _loadingTiles.add(key);
-    MapTileCacheService.loadTile(z, x, y).then((img) {
-      if (!_isDisposed && mounted) {
-        setState(() {
-          _tileCache[key] = img;
+    final int serverId = (x.abs() + y.abs()) % 4;
+    final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z';
+
+    final imageStream = NetworkImage(url).resolve(ImageConfiguration.empty);
+    imageStream.addListener(
+      ImageStreamListener((ImageInfo info, bool _) {
+        if (!_isDisposed && mounted) {
+          setState(() {
+            _tileCache[key] = info.image;
+            _loadingTiles.remove(key);
+          });
+        }
+      }, onError: (dynamic error, StackTrace? stack) {
+        if (!_isDisposed) {
           _loadingTiles.remove(key);
-        });
-      }
-    }).catchError((_) {
-      if (!_isDisposed) {
-        _loadingTiles.remove(key);
-      }
-    });
+        }
+      }),
+    );
   }
 
   String _formatSpeed(double speed) {

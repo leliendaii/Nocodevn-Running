@@ -3,28 +3,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'voice_coach_stub.dart'
     if (dart.library.html) 'voice_coach_web.dart';
 
+/// Huấn luyện viên giọng nói tiếng Việt chuyên nghiệp (Voice Coach)
 class VoiceCoachService {
-  static bool _isEnabled = true;
-  static const double _volume = 1.0;
-  static const double _speechRate = 1.0;
   static const String _prefKey = 'voice_coach_enabled';
+  static bool _isEnabled = true;
+  static bool _isInitialized = false;
 
   static bool get isEnabled => _isEnabled;
-  static double get volume => _volume;
-  static double get speechRate => _speechRate;
 
-  /// Khởi tạo trạng thái Voice Coach từ bộ nhớ máy
   static Future<void> initialize() async {
+    if (_isInitialized) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       _isEnabled = prefs.getBool(_prefKey) ?? true;
+      _isInitialized = true;
     } catch (_) {
       _isEnabled = true;
     }
   }
 
-  /// Bật / Tắt Voice Coach
-  static Future<void> setEnabled(bool enabled) async {
+  static Future<void> toggleVoiceCoach(bool enabled) async {
     _isEnabled = enabled;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -32,43 +30,54 @@ class VoiceCoachService {
     } catch (_) {}
   }
 
-  /// Phát giọng đọc tiếng Việt bất kỳ
-  static void speak(String text) {
+  /// Phát âm thanh trực tiếp
+  static void speak(String text, {double rate = 1.05}) {
     if (!_isEnabled) return;
     try {
-      platformSpeak(text, rate: _speechRate, volume: _volume);
+      speakTextNative(text, rate: rate);
     } catch (e) {
       debugPrint('Lỗi Voice Coach: $e');
     }
   }
 
-  /// 🚀 Khi bắt đầu chạy
+  /// 1. Bắt đầu chạy
   static void speakStart() {
-    speak('Buổi chạy bắt đầu. Chúc bạn có một buổi tập tràn đầy năng lượng!');
+    speak('Ba, hai, một... Bắt đầu buổi chạy bộ. Chúc bạn có một buổi chạy thật tuyệt vời!');
   }
 
-  /// 📍 Khi đạt mốc Kilomet (1.0km, 2.0km, 3.0km...)
-  static void speakMilestone(int km, String duration, String pace) {
-    speak('Bạn vừa hoàn thành Kilomet số $km. Thời gian: $duration. Tốc độ: $pace mỗi kilomet. Hãy tiếp tục duy trì nhé!');
-  }
-
-  /// ⏸️ Khi tạm dừng
+  /// 2. Tạm dừng
   static void speakPause() {
-    speak('Đã tạm dừng buổi chạy.');
+    speak('Buổi chạy đã tạm dừng.');
   }
 
-  /// ▶️ Khi tiếp tục
+  /// 3. Tiếp tục chạy
   static void speakResume() {
-    speak('Tiếp tục buổi chạy.');
+    speak('Tiếp tục chạy bộ.');
   }
 
-  /// 🏆 Khi hoàn thành buổi chạy
-  static void speakFinish({
-    required double distanceKm,
-    required String duration,
-    required int calories,
-  }) {
-    final kmStr = distanceKm.toStringAsFixed(1);
-    speak('Chúc mừng bạn đã hoàn thành buổi chạy! Tổng quãng đường: $kmStr kilomet. Thời gian: $duration. Tiêu hao: $calories calo. Bạn làm rất tuyệt vời!');
+  /// 4. Thông báo mốc 1 KM (Giống Strava / Nike Run Club)
+  static void speakMilestone(int kmCount, String pace) {
+    // Chuyển pace từ dạng "5:20" thành tiếng Việt "5 phút 20 giây"
+    String paceSpeech = pace;
+    if (pace.contains(':')) {
+      final parts = pace.split(':');
+      if (parts.length == 2) {
+        final min = int.tryParse(parts[0]) ?? 0;
+        final sec = int.tryParse(parts[1]) ?? 0;
+        paceSpeech = '$min phút $sec giây';
+      }
+    }
+
+    final message = 'Bạn đã hoàn thành ki-lô-mét thứ $kmCount. Pace trung bình $paceSpeech mỗi ki-lô-mét. Cố lên!';
+    speak(message);
+  }
+
+  /// 5. Kết thúc buổi chạy
+  static void speakFinish(double distanceKm, int durationSeconds) {
+    final int min = durationSeconds ~/ 60;
+    final int sec = durationSeconds % 60;
+    final String kmStr = distanceKm.toStringAsFixed(2);
+    final message = 'Chúc mừng bạn đã hoàn thành buổi chạy! Tổng quãng đường $kmStr ki-lô-mét trong $min phút $sec giây. Bạn làm rất tốt!';
+    speak(message);
   }
 }
