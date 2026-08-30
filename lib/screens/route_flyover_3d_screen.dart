@@ -720,22 +720,22 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 Icon(Icons.photo_library_outlined, color: AppTheme.secondaryNeon, size: 18),
                                 SizedBox(width: 8),
                                 Text(
-                                  'Hướng dẫn lưu video vào iPhone:',
+                                  'Lưu vào Thư viện Ảnh (Camera Roll):',
                                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '• Bấm "LƯU VÀO ALBUM ẢNH" bên dưới -> Chọn "Lưu video" trên bảng chia sẻ của iPhone.\n• Hoặc bấm "TẢI VÀO THƯ MỤC TỆP" để tải vào app Tệp (Files).',
-                              style: TextStyle(fontSize: 11, color: AppTheme.textPrimary.withValues(alpha: 0.9), height: 1.4),
+                              'Bấm nút bên dưới rồi chọn "Lưu video" trên bảng của iPhone để video vào thẳng Album Ảnh của Camera!',
+                              style: TextStyle(fontSize: 11.5, color: AppTheme.textPrimary.withValues(alpha: 0.9), height: 1.4),
                             ),
                           ],
                         ),
                       ),
 
                     if (isDone) ...[
-                      // Nút 1: Lưu vào Album Ảnh (Camera Roll)
+                      // Nút duy nhất: Lưu vào Album Ảnh (Camera Roll)
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -765,12 +765,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.photo_library_rounded, size: 20, color: Color(0xFF0F172A)),
+                              Icon(Icons.photo_library_rounded, size: 22, color: Color(0xFF0F172A)),
                               SizedBox(width: 8),
                               Text(
-                                'LƯU VÀO ALBUM ẢNH (PHOTOS)',
+                                'LƯU VÀO ALBUM ẢNH (CAMERA)',
                                 style: TextStyle(
-                                  fontSize: 13.5,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A),
                                   letterSpacing: 0.5,
@@ -782,59 +782,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
                       const SizedBox(height: 10),
 
-                      // Nút 2: Tải vào Thư mục Tệp (Files / Downloads)
+                      // Nút Đóng modal
                       SizedBox(
                         width: double.infinity,
-                        height: 44,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF475569)),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          onPressed: () async {
-                            if (activeSession != null) {
-                              final result = await activeSession!.downloadToFiles(filename);
-                              if (!ctx.mounted) return;
-                              if (mounted) {
-                                TopSyncToast.show(
-                                  context,
-                                  message: result.message,
-                                  isSuccess: result.isSuccess,
-                                );
-                              }
-                            }
-                          },
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.folder_open_rounded, size: 18, color: Colors.white70),
-                              SizedBox(width: 8),
-                              Text(
-                                'TẢI VÀO THƯ MỤC TỆP (FILES)',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Nút 3: Đóng modal
-                      SizedBox(
-                        width: double.infinity,
-                        height: 38,
+                        height: 40,
                         child: TextButton(
                           onPressed: () => Navigator.of(ctx).pop(),
                           child: const Text(
                             'HOÀN TẤT / ĐÓNG',
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                           ),
                         ),
                       ),
