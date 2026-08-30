@@ -27,12 +27,212 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.dispose();
   }
 
-  // Hộp thoại Tạo Mới Buổi Chạy Thủ Công Cho User (Tính năng Admin)
+  // Modal Bottom Sheet Tìm kiếm & Chọn Vận Động Viên (Hỗ trợ hàng trăm user mượt mà)
+  void _showUserSelectorSheet(BuildContext context, List<Map<String, dynamic>> userList) {
+    String sheetSearch = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final filteredUsers = userList.where((u) {
+              if (sheetSearch.isEmpty) return true;
+              final name = (u['name']?.toString() ?? '').toLowerCase();
+              final username = (u['username']?.toString() ?? '').toLowerCase();
+              final q = sheetSearch.toLowerCase();
+              return name.contains(q) || username.contains(q);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(sheetCtx).size.height * 0.7,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                MediaQuery.of(sheetCtx).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Thanh kéo handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.divider,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Tiêu đề
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'CHỌN ĐỐI TƯỢNG THỐNG KÊ',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      Text(
+                        '${userList.length} VĐV',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.secondaryNeon, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Ô tìm kiếm User
+                  TextField(
+                    autofocus: false,
+                    style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                    onChanged: (val) => setModalState(() => sheetSearch = val),
+                    decoration: InputDecoration(
+                      hintText: 'Nhập tên hoặc username để tìm...',
+                      prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                      suffixIcon: sheetSearch.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16, color: AppTheme.textMuted),
+                              onPressed: () => setModalState(() => sheetSearch = ''),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Danh sách lựa chọn
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        // Tùy chọn: Tất cả vận động viên
+                        ListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          tileColor: _selectedUserId == null
+                              ? AppTheme.primaryNeon.withValues(alpha: 0.15)
+                              : Colors.transparent,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _selectedUserId == null
+                                  ? AppTheme.primaryNeon
+                                  : AppTheme.surfaceLight,
+                            ),
+                            child: Icon(
+                              Icons.groups_rounded,
+                              size: 20,
+                              color: _selectedUserId == null ? Colors.white : AppTheme.textSecondary,
+                            ),
+                          ),
+                          title: Text(
+                            'TẤT CẢ VẬN ĐỘNG VIÊN',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: _selectedUserId == null ? AppTheme.primaryNeon : AppTheme.textPrimary,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Xem thống kê tổng hợp toàn hệ thống',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          ),
+                          trailing: _selectedUserId == null
+                              ? const Icon(Icons.check_circle_rounded, color: AppTheme.primaryNeon, size: 18)
+                              : null,
+                          onTap: () {
+                            setState(() => _selectedUserId = null);
+                            Navigator.of(sheetCtx).pop();
+                          },
+                        ),
+                        const Divider(height: 12, color: AppTheme.divider),
+
+                        // Danh sách từng Runner
+                        if (filteredUsers.isEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.all(24.0),
+                            child: Center(
+                              child: Text(
+                                'Không tìm thấy vận động viên nào',
+                                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          ...filteredUsers.map((u) {
+                            final uid = u['id']?.toString() ?? '';
+                            final name = u['name']?.toString() ?? 'Runner';
+                            final avatar = u['avatar_url']?.toString() ?? '';
+                            final isAdmin = (u['role']?.toString().toLowerCase() == 'admin');
+                            final isSelected = _selectedUserId == uid;
+
+                            return ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              tileColor: isSelected
+                                  ? AppTheme.secondaryNeon.withValues(alpha: 0.15)
+                                  : Colors.transparent,
+                              leading: UserAvatar(
+                                avatarUrl: avatar,
+                                name: name,
+                                radius: 18,
+                                isAdmin: isAdmin,
+                              ),
+                              title: Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? AppTheme.secondaryNeon : AppTheme.textPrimary,
+                                ),
+                              ),
+                              subtitle: Text(
+                                isAdmin ? '🛡️ Quản trị viên' : '🏃 Vận động viên',
+                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(Icons.check_circle_rounded, color: AppTheme.secondaryNeon, size: 18)
+                                  : null,
+                              onTap: () {
+                                setState(() => _selectedUserId = uid);
+                                Navigator.of(sheetCtx).pop();
+                              },
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Hộp thoại Tạo Mới Buổi Chạy Thủ Công Cho User (Padding tinh gọn, không chiếm tràn màn hình)
   void _showCreateRunDialog(BuildContext context, RunningProvider running) {
     final profiles = running.allUserProfiles;
     final List<Map<String, dynamic>> userList = profiles.values.toList();
 
-    // Nếu profiles trống, lấy danh sách userId duy nhất từ sessions
     if (userList.isEmpty) {
       final userIds = running.allSessions.map((s) => s.userId).toSet();
       for (final uid in userIds) {
@@ -62,7 +262,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final hoursController = TextEditingController(text: '0');
     final minutesController = TextEditingController(text: '30');
     final secondsController = TextEditingController(text: '00');
-    final notesController = TextEditingController(text: 'Do Quản trị viên tạo bổ sung');
+    final notesController = TextEditingController(text: 'Do Quản trị viên tạo');
 
     showDialog(
       context: context,
@@ -85,26 +285,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             }
 
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
               backgroundColor: AppTheme.surface,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 side: const BorderSide(color: AppTheme.primaryNeon, width: 1.5),
               ),
+              titlePadding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              contentPadding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
               title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.add_task_rounded, color: AppTheme.primaryNeon, size: 22),
+                    child: const Icon(Icons.add_task_rounded, color: AppTheme.primaryNeon, size: 18),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
                       'Tạo Dữ Liệu Chạy Mới',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -116,21 +320,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   children: [
                     // 1. Chọn Vận Động Viên
                     const Text(
-                      'Chọn Vận Động Viên:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      'Vận Động Viên:',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: AppTheme.divider),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: selectedUid,
                           isExpanded: true,
+                          isDense: true,
                           dropdownColor: AppTheme.surface,
                           items: userList.map((u) {
                             final uid = u['id']?.toString() ?? '';
@@ -145,15 +350,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   UserAvatar(
                                     avatarUrl: avatar,
                                     name: name,
-                                    radius: 14,
+                                    radius: 12,
                                     isAdmin: isAdmin,
                                   ),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       name,
                                       style: const TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.textPrimary,
                                       ),
@@ -173,14 +378,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
                     // 2. Chọn Ngày & Giờ Chạy
                     const Text(
-                      'Thời Gian Thực Hiện:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      'Thời Gian Chạy:',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         // Chọn ngày
@@ -197,22 +402,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 setDialogState(() => selectedDate = picked);
                               }
                             },
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               decoration: BoxDecoration(
                                 color: AppTheme.surfaceLight,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: AppTheme.divider),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.secondaryNeon),
+                                  const Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.secondaryNeon),
                                   const SizedBox(width: 6),
                                   Flexible(
                                     child: Text(
                                       DateFormat('dd/MM/yyyy').format(selectedDate),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
@@ -220,7 +425,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         // Chọn giờ
                         Expanded(
                           child: InkWell(
@@ -233,22 +438,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 setDialogState(() => selectedTime = picked);
                               }
                             },
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               decoration: BoxDecoration(
                                 color: AppTheme.surfaceLight,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: AppTheme.divider),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.access_time_rounded, size: 16, color: AppTheme.secondaryNeon),
+                                  const Icon(Icons.access_time_rounded, size: 14, color: AppTheme.secondaryNeon),
                                   const SizedBox(width: 6),
                                   Flexible(
                                     child: Text(
                                       selectedTime.format(dialogCtx),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
@@ -258,33 +463,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
                     // 3. Quãng đường (KM)
                     const Text(
                       'Quãng Đường (KM):',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     TextField(
                       controller: distanceController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold, fontSize: 15),
+                      style: const TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold, fontSize: 14),
                       onChanged: (_) => setDialogState(() {}),
                       decoration: const InputDecoration(
+                        isDense: true,
                         suffixText: 'KM',
-                        prefixIcon: Icon(Icons.straighten_rounded, color: AppTheme.primaryNeon, size: 20),
-                        contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                        prefixIcon: Icon(Icons.straighten_rounded, color: AppTheme.primaryNeon, size: 18),
+                        contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
                     // 4. Thời gian chạy
                     const Text(
-                      'Thời Gian Chạy (Giờ : Phút : Giây):',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      'Thời Gian (Giờ : Phút : Giây):',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         Expanded(
@@ -293,16 +499,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
                             onChanged: (_) => setDialogState(() {}),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                             decoration: const InputDecoration(
+                              isDense: true,
                               labelText: 'Giờ',
-                              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                              contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                             ),
                           ),
                         ),
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(':', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          padding: EdgeInsets.symmetric(horizontal: 2),
+                          child: Text(':', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                         ),
                         Expanded(
                           child: TextField(
@@ -310,16 +517,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
                             onChanged: (_) => setDialogState(() {}),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                             decoration: const InputDecoration(
+                              isDense: true,
                               labelText: 'Phút',
-                              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                              contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                             ),
                           ),
                         ),
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(':', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          padding: EdgeInsets.symmetric(horizontal: 2),
+                          child: Text(':', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                         ),
                         Expanded(
                           child: TextField(
@@ -327,50 +535,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
                             onChanged: (_) => setDialogState(() {}),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                             decoration: const InputDecoration(
+                              isDense: true,
                               labelText: 'Giây',
-                              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                              contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
 
                     // Thẻ Pace ước tính
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Pace dự kiến:', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                          const Text('Pace dự kiến:', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
                           Text(
                             '$previewPace /km',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
                     // 5. Ghi chú
                     const Text(
                       'Ghi Chú:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     TextField(
                       controller: notesController,
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 12),
                       decoration: const InputDecoration(
-                        hintText: 'Lý do tạo bổ sung / Ghi chú...',
-                        prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.secondaryNeon, size: 20),
-                        contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                        isDense: true,
+                        hintText: 'Lý do tạo bổ sung...',
+                        prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.secondaryNeon, size: 18),
+                        contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                       ),
                     ),
                   ],
@@ -379,13 +589,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
+                  child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryNeon,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () async {
                     if (dist <= 0 || totalSeconds <= 0) {
@@ -424,7 +635,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       );
                     }
                   },
-                  child: const Text('TẠO BUỔI CHẠY', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('TẠO BUỔI CHẠY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ],
             );
@@ -450,26 +661,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
           backgroundColor: AppTheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             side: const BorderSide(color: AppTheme.secondaryNeon, width: 1.5),
           ),
+          titlePadding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          contentPadding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
           title: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.edit_note_rounded, color: AppTheme.secondaryNeon, size: 22),
+                child: const Icon(Icons.edit_note_rounded, color: AppTheme.secondaryNeon, size: 18),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               const Expanded(
                 child: Text(
                   'Chỉnh Sửa Buổi Chạy',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -481,37 +696,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   'Vận động viên: ${session.userName}',
-                  style: const TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(color: AppTheme.primaryNeon, fontWeight: FontWeight.bold, fontSize: 12),
                 ),
                 Text(
                   'Ngày chạy: ${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)}',
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Chỉnh sửa Quãng đường (KM)
                 const Text(
                   'Quãng đường chạy (KM):',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 TextField(
                   controller: distanceController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
                   decoration: const InputDecoration(
+                    isDense: true,
                     suffixText: 'KM',
-                    prefixIcon: Icon(Icons.straighten_rounded, color: AppTheme.secondaryNeon, size: 20),
+                    prefixIcon: Icon(Icons.straighten_rounded, color: AppTheme.secondaryNeon, size: 18),
+                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
 
                 // Chỉnh sửa Thời gian
                 const Text(
-                  'Thời gian chạy (Giờ : Phút : Giây):',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                  'Thời gian (Giờ : Phút : Giây):',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Expanded(
@@ -519,52 +736,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         controller: hoursController,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(labelText: 'Giờ'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          labelText: 'Giờ',
+                          contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                        ),
                       ),
                     ),
                     const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(':', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      padding: EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(':', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                     Expanded(
                       child: TextField(
                         controller: minutesController,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(labelText: 'Phút'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          labelText: 'Phút',
+                          contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                        ),
                       ),
                     ),
                     const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(':', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      padding: EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(':', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                     Expanded(
                       child: TextField(
                         controller: secondsController,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(labelText: 'Giây'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          labelText: 'Giây',
+                          contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
 
                 // Chỉnh sửa Ghi chú
                 const Text(
                   'Ghi chú bổ sung:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 TextField(
                   controller: notesController,
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(fontSize: 12),
                   decoration: const InputDecoration(
-                    hintText: 'Lý do chỉnh sửa / ghi chú của Admin...',
-                    prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.secondaryNeon, size: 20),
+                    isDense: true,
+                    hintText: 'Lý do chỉnh sửa...',
+                    prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.secondaryNeon, size: 18),
+                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                   ),
                 ),
               ],
@@ -573,13 +804,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
+              child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.secondaryNeon,
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () {
                 final double? newDistance = double.tryParse(distanceController.text.replaceAll(',', '.'));
@@ -607,7 +839,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Navigator.of(ctx).pop();
                 TopSyncToast.show(context, message: 'Đã cập nhật lên Supabase Cloud!');
               },
-              child: const Text('LƯU THAY ĐỔI', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('LƯU THAY ĐỔI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
             ),
           ],
         );
@@ -621,16 +853,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Xác nhận xóa', style: TextStyle(color: AppTheme.danger)),
-        content: Text('Bạn có chắc chắn muốn xóa buổi chạy (${session.formattedDistance} km) của ${session.userName}?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Xác nhận xóa', style: TextStyle(color: AppTheme.danger, fontSize: 16)),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa buổi chạy (${session.formattedDistance} km) của ${session.userName}?',
+          style: const TextStyle(fontSize: 13),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('HỦY', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
               context.read<RunningProvider>().deleteRunSession(session.id);
               Navigator.of(ctx).pop();
@@ -685,25 +924,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final hours = totalSec ~/ 3600;
     final minutes = (totalSec % 3600) ~/ 60;
 
-    // Tên của đối tượng đang lọc
+    // Tên và avatar của đối tượng đang lọc
     final selectedRunnerName = _selectedUserId == null
         ? 'Tất cả vận động viên'
         : running.getUserRealName(_selectedUserId!, 'Vận động viên');
+    final selectedRunnerAvatar = _selectedUserId != null
+        ? running.getUserRealAvatar(_selectedUserId!)
+        : '';
+    final isSelectedRunnerAdmin = _selectedUserId != null
+        ? running.isUserAdmin(_selectedUserId!)
+        : false;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('QUẢN TRỊ & THỐNG KÊ'),
+        title: const Text(
+          'QUẢN TRỊ & THỐNG KÊ',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+        ),
         actions: [
           // Nút Thêm Buổi Chạy Mới Thủ Công
           IconButton(
             tooltip: 'Tạo buổi chạy mới',
-            icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.primaryNeon, size: 24),
+            icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.primaryNeon, size: 22),
             onPressed: () => _showCreateRunDialog(context, running),
           ),
           // Nút Làm Mới Dữ Liệu từ Supabase Cloud
           IconButton(
             tooltip: 'Làm mới dữ liệu Cloud',
-            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary, size: 22),
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary, size: 20),
             onPressed: () async {
               await running.refreshAllData();
               if (context.mounted) {
@@ -716,93 +964,127 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateRunDialog(context, running),
         backgroundColor: AppTheme.primaryNeon,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
         label: const Text(
           'THÊM BUỔI CHẠY',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. THANH CHỌN ĐỐI TƯỢNG (TẤT CẢ HOẶC TỪNG RUNNER)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'ĐỐI TƯỢNG THỐNG KÊ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                      color: AppTheme.textSecondary,
+              // 1. THANH CHỌN ĐỐI TƯỢNG GỌN GÀNG & CÓ TÌM KIẾM
+              InkWell(
+                onTap: () => _showUserSelectorSheet(context, userList),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _selectedUserId != null ? AppTheme.secondaryNeon : AppTheme.divider,
+                      width: _selectedUserId != null ? 1.2 : 1.0,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.divider),
-                    ),
-                    child: Text(
-                      selectedRunnerName,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.secondaryNeon,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Danh sách cuộn ngang chọn User
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    // Chip Tất cả
-                    _buildUserFilterChip(
-                      label: 'TẤT CẢ VẬN ĐỘNG VIÊN',
-                      userId: null,
-                      isSelected: _selectedUserId == null,
-                      icon: Icons.groups_rounded,
-                    ),
-                    const SizedBox(width: 8),
-                    // Từng Runner
-                    ...userList.map((u) {
-                      final uid = u['id']?.toString() ?? '';
-                      final name = u['name']?.toString() ?? 'Runner';
-                      final avatar = u['avatar_url']?.toString() ?? '';
-                      final isAdmin = (u['role']?.toString().toLowerCase() == 'admin');
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: _buildUserFilterChip(
-                          label: name,
-                          userId: uid,
-                          avatarUrl: avatar,
-                          isAdmin: isAdmin,
-                          isSelected: _selectedUserId == uid,
+                  child: Row(
+                    children: [
+                      if (_selectedUserId == null) ...[
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                          ),
+                          child: const Icon(Icons.groups_rounded, size: 18, color: AppTheme.primaryNeon),
                         ),
-                      );
-                    }),
-                  ],
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ĐỐI TƯỢNG THỐNG KÊ',
+                                style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 1),
+                              Text(
+                                'Tất cả vận động viên',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        UserAvatar(
+                          avatarUrl: selectedRunnerAvatar,
+                          name: selectedRunnerName,
+                          radius: 16,
+                          isAdmin: isSelectedRunnerAdmin,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'VẬN ĐỘNG VIÊN ĐANG CHỌN',
+                                style: TextStyle(fontSize: 10, color: AppTheme.secondaryNeon, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                selectedRunnerName,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.close_rounded, size: 16, color: AppTheme.textMuted),
+                          tooltip: 'Xem tất cả',
+                          onPressed: () => setState(() => _selectedUserId = null),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Đổi VĐV',
+                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textSecondary, size: 16),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // 2. THANH CHỌN MỐC THỜI GIAN (HÔM NAY, TUẦN NÀY, THÁNG NÀY, NĂM NÀY)
+              // 2. THANH CHỌN MỐC THỜI GIAN (HÔM NAY, TUẦN NÀY, THÁNG NÀY, NĂM NAY)
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppTheme.divider),
                 ),
                 child: Row(
@@ -814,7 +1096,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
 
               // 3. 4 THẺ CHỈ SỐ KPI TỔNG QUAN (ĐỒNG BỘ THEO BỘ LỌC)
               Row(
@@ -838,7 +1120,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -867,14 +1149,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // 4. BIỂU ĐỒ TRỰC QUAN THỐNG KÊ QUÃNG ĐƯỜNG (fl_chart)
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppTheme.divider),
                 ),
                 child: Column(
@@ -887,7 +1169,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: Text(
                             'BIỂU ĐỒ KM - ${_getFilterTitle(_selectedFilter).toUpperCase()}',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.8,
                               color: AppTheme.textPrimary,
@@ -897,7 +1179,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
@@ -909,9 +1191,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     SizedBox(
-                      height: 180,
+                      height: 160,
                       child: chartData.isEmpty
                           ? const Center(
                               child: Text(
@@ -1015,7 +1297,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // 5. DANH SÁCH QUẢN LÝ & CHỈNH SỬA BUỔI CHẠY
               Row(
@@ -1024,7 +1306,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const Text(
                     'QUẢN LÝ DỮ LIỆU CHẠY',
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.8,
                     ),
@@ -1035,7 +1317,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
               // Ô tìm kiếm User
               TextField(
@@ -1043,12 +1325,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 onChanged: (val) => setState(() => _searchQuery = val),
                 style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  hintText: 'Tìm kiếm theo tên vận động viên hoặc ghi chú...',
-                  prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted, size: 20),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  hintText: 'Tìm theo tên vận động viên hoặc ghi chú...',
+                  prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted, size: 18),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  isDense: true,
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
+                          icon: const Icon(Icons.clear, color: AppTheme.textMuted, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -1057,13 +1340,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       : null,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // Danh sách từng buổi chạy với nút SỬA & XÓA
               if (displaySessions.isEmpty) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(16),
@@ -1071,11 +1354,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                   child: const Column(
                     children: [
-                      Icon(Icons.directions_run_outlined, size: 40, color: AppTheme.textMuted),
-                      SizedBox(height: 10),
+                      Icon(Icons.directions_run_outlined, size: 36, color: AppTheme.textMuted),
+                      SizedBox(height: 8),
                       Text(
                         'Chưa có dữ liệu buổi chạy nào phù hợp',
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                       ),
                     ],
                   ),
@@ -1093,9 +1376,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     final isAdmin = running.isUserAdmin(session.userId);
 
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
+                      margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
-                        padding: const EdgeInsets.all(12.0),
+                        padding: const EdgeInsets.all(10.0),
                         child: Column(
                           children: [
                             Row(
@@ -1103,10 +1386,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 UserAvatar(
                                   avatarUrl: realAvatar,
                                   name: realName,
-                                  radius: 18,
+                                  radius: 16,
                                   isAdmin: isAdmin,
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1119,7 +1402,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       ),
                                       Text(
                                         dateFormat.format(session.startTime),
-                                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 10),
                                       ),
                                     ],
                                   ),
@@ -1129,30 +1412,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   tooltip: 'Chỉnh sửa KM & Thời gian',
                                   style: IconButton.styleFrom(
                                     backgroundColor: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(6),
                                   ),
-                                  icon: const Icon(Icons.edit_rounded, color: AppTheme.secondaryNeon, size: 16),
+                                  icon: const Icon(Icons.edit_rounded, color: AppTheme.secondaryNeon, size: 15),
                                   onPressed: () => _showEditRunDialog(context, session),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 // Nút XÓA
                                 IconButton(
                                   tooltip: 'Xóa buổi chạy',
                                   style: IconButton.styleFrom(
                                     backgroundColor: AppTheme.danger.withValues(alpha: 0.15),
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(6),
                                   ),
-                                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 16),
+                                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 15),
                                   onPressed: () => _confirmDelete(context, session),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                               decoration: BoxDecoration(
                                 color: AppTheme.surfaceLight,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1165,7 +1448,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                             ),
                             if (session.notes.isNotEmpty) ...[
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
@@ -1191,67 +1474,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildUserFilterChip({
-    required String label,
-    required String? userId,
-    String? avatarUrl,
-    bool isAdmin = false,
-    required bool isSelected,
-    IconData? icon,
-  }) {
-    return InkWell(
-      onTap: () => setState(() => _selectedUserId = userId),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryNeon : AppTheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppTheme.primaryNeon : AppTheme.divider,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: isSelected ? Colors.white : AppTheme.textSecondary),
-              const SizedBox(width: 6),
-            ] else ...[
-              UserAvatar(
-                avatarUrl: avatarUrl,
-                name: label,
-                radius: 9,
-                isAdmin: isAdmin,
-                showBorder: false,
-              ),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : AppTheme.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildFilterTab(String label, TimeFilter filter) {
     final isSelected = _selectedFilter == filter;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedFilter = filter),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 9),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? AppTheme.primaryNeon : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
             label,
@@ -1269,10 +1501,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildKpiCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(
@@ -1283,15 +1515,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
               ),
-              Icon(icon, color: color, size: 16),
+              Icon(icon, color: color, size: 15),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
           ),
         ],
       ),
