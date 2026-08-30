@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../services/route_video_recorder.dart';
@@ -458,35 +460,60 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     });
   }
 
+  Future<Uint8List?> _captureScreenFrame(double t) async {
+    if (_isDisposed || !mounted) return null;
+    _controller.value = t;
+    await Future.delayed(const Duration(milliseconds: 25));
+    try {
+      final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final ui.Image image = await boundary.toImage(pixelRatio: 1.5);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Lỗi chụp khung hình màn hình 3D: $e');
+      return null;
+    }
+  }
+
   void _handleDownloadVideo() {
+    final double previousValue = _controller.value;
+    final bool previousPlaying = _isPlaying;
+    _controller.stop();
+    setState(() => _isPlaying = false);
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         double progress = 0.0;
-        String status = 'Đang khởi tạo trình kết xuất video 3D...';
+        String status = 'Đang chuẩn bị quay video 3D màn hình thực tế...';
         bool isDone = false;
         bool isStarted = false;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Tự động khởi chạy tiến trình quay và xuất video MP4
+            // Tự động khởi chạy tiến trình quay video màn hình 3D thực tế
             if (!isStarted) {
               isStarted = true;
-              final routeMapList = _cachedRoutePixels.map((p) => {'x': p.dx, 'y': p.dy}).toList();
 
-              RouteVideoRecorder.recordAndExport(
-                routePoints: routeMapList,
-                distanceKm: _effectiveDistanceKm,
-                durationSeconds: _effectiveDurationSec,
-                pace: _effectivePace,
+              RouteVideoRecorder.recordExactScreen(
+                frameProvider: _captureScreenFrame,
+                totalFrames: 45,
                 speed: _playbackSpeed,
                 sessionId: widget.session.id,
                 onProgress: (prog, stat) {
                   setDialogState(() {
                     progress = prog;
                     status = stat;
-                    if (prog >= 1.0) isDone = true;
+                    if (prog >= 1.0) {
+                      isDone = true;
+                      if (previousPlaying && mounted && !_isDisposed) {
+                        _controller.value = previousValue;
+                        _controller.forward();
+                        setState(() => _isPlaying = true);
+                      }
+                    }
                   });
                 },
               );

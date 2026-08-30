@@ -1,11 +1,10 @@
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:async';
+import 'dart:typed_data';
 
-Future<bool> recordAndExportFlyoverVideo({
-  required List<Map<String, double>> routePoints,
-  required double distanceKm,
-  required int durationSeconds,
-  required String pace,
+Future<bool> recordAndExportExactFlyoverVideo({
+  required Future<Uint8List?> Function(double t) frameProvider,
+  required int totalFrames,
   required double speed,
   required String sessionId,
   required Function(double progress, String status) onProgress,
