@@ -25,6 +25,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   TimeFilter _personalFilter = TimeFilter.week;
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
   void initState() {
@@ -655,19 +656,19 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 16),
 
-              // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY TRONG THÁNG (ACTIVITY HEATMAP)
+              // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY (ACTIVITY HEATMAP - CHUYỂN ĐƯỢC THÁNG)
               Consumer<RunningProvider>(
                 builder: (context, running, _) {
                   return _buildActivityCalendar(context, running, user);
                 },
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
 
-              // 4. KHỐI CÀI ĐẶT HỆ THỐNG & TIỆN ÍCH
+              // 4. KHỐI CÀI ĐẶT & TIỆN ÍCH (GỌN GÀNG, NHÓM HỢP LÝ)
               Container(
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppTheme.divider),
                 ),
                 child: Column(
@@ -686,40 +687,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 52),
 
-                    // Mục 2: Nhắc nhở luyện tập hàng ngày
-                    _buildSettingsRowTile(
-                      icon: Icons.notifications_active_outlined,
-                      iconColor: AppTheme.primaryNeon,
-                      title: 'Nhắc Nhở Luyện Tập',
-                      subtitle: 'Thông báo & giờ chạy mỗi ngày',
-                      onTap: () => _showWorkoutReminderDialog(context),
-                    ),
-
-                    // Mục 3: Dành cho Admin (nếu có)
-                    if (user?.isAdmin == true) ...[
-                      const Divider(color: AppTheme.divider, height: 1, indent: 56),
-                      _buildSettingsRowTile(
-                        icon: Icons.admin_panel_settings_rounded,
-                        iconColor: AppTheme.primaryNeon,
-                        title: 'Trang Quản Trị Hệ Thống',
-                        subtitle: 'Quản lý runners & dữ liệu',
-                        statusText: 'ADMIN',
-                        statusColor: AppTheme.primaryNeon,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (ctx) => const AdminDashboardScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
-
-                    // Mục 4: Khung giờ tự động chốt
+                    // Mục 2: Khung giờ tự động chốt
                     Consumer<RunningProvider>(
                       builder: (context, running, _) {
                         final startStr =
@@ -749,7 +719,38 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+                    const Divider(color: AppTheme.divider, height: 1, indent: 52),
+
+                    // Mục 3: Nhắc nhở luyện tập hàng ngày
+                    _buildSettingsRowTile(
+                      icon: Icons.notifications_active_outlined,
+                      iconColor: AppTheme.primaryNeon,
+                      title: 'Nhắc Nhở Luyện Tập',
+                      subtitle: 'Thông báo & giờ chạy mỗi ngày',
+                      onTap: () => _showWorkoutReminderDialog(context),
+                    ),
+
+                    // Mục 4: Dành cho Admin (nếu có)
+                    if (user?.isAdmin == true) ...[
+                      const Divider(color: AppTheme.divider, height: 1, indent: 52),
+                      _buildSettingsRowTile(
+                        icon: Icons.admin_panel_settings_rounded,
+                        iconColor: AppTheme.primaryNeon,
+                        title: 'Trang Quản Trị Hệ Thống',
+                        subtitle: 'Quản lý runners & dữ liệu',
+                        statusText: 'ADMIN',
+                        statusColor: AppTheme.primaryNeon,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => const AdminDashboardScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+
+                    const Divider(color: AppTheme.divider, height: 1, indent: 52),
 
                     // Mục 5: Về ứng dụng & Thông tin phiên bản
                     _buildSettingsRowTile(
@@ -860,20 +861,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: iconColor, size: 20),
+                child: Icon(icon, color: iconColor, size: 18),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -882,15 +883,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       title,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 13,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Text(
                       subtitle,
                       style: const TextStyle(
                         color: AppTheme.textSecondary,
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -900,14 +901,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               if (statusText != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
+                    horizontal: 7,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: (statusColor ?? AppTheme.textMuted).withValues(
                       alpha: 0.15,
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     statusText,
@@ -918,12 +919,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
               const Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: AppTheme.textMuted,
-                size: 14,
+                size: 13,
               ),
             ],
           ),
@@ -932,78 +933,125 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY TRONG THÁNG (ACTIVITY HEATMAP)
+  // 3. LỊCH VẬN ĐỘNG & CHUỖI NGÀY CHẠY (CHUYỂN THÁNG, MÀU XANH PHỤ, GỌN GÀNG)
   Widget _buildActivityCalendar(
     BuildContext context,
     RunningProvider running,
     AppUser? user,
   ) {
     final now = DateTime.now();
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-    final firstDayWeekday = DateTime(now.year, now.month, 1).weekday; // 1: Mon, 7: Sun
+    final year = _calendarMonth.year;
+    final month = _calendarMonth.month;
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final firstDayWeekday = DateTime(year, month, 1).weekday; // 1: Mon, 7: Sun
 
-    // Lọc các ngày mà user đã chạy trong tháng hiện tại
-    final userSessionsThisMonth = running.sessions.where((s) {
+    // Lọc các ngày mà user đã chạy trong tháng được chọn
+    final userSessionsInMonth = running.sessions.where((s) {
       final isSameUser = (user?.id != null && user!.id.isNotEmpty)
           ? s.userId == user.id
           : true;
       return isSameUser &&
-          s.startTime.year == now.year &&
-          s.startTime.month == now.month;
+          s.startTime.year == year &&
+          s.startTime.month == month;
     }).toList();
 
-    final activeDaysSet = userSessionsThisMonth.map((s) => s.startTime.day).toSet();
-    if (running.isRunning) {
+    final activeDaysSet = userSessionsInMonth.map((s) => s.startTime.day).toSet();
+    if (running.isRunning && year == now.year && month == now.month) {
       activeDaysSet.add(now.day);
     }
 
     const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    final isCurrentMonth = (year == now.year && month == now.month);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tiêu đề Lịch & Badge số ngày chạy
+          // Tiêu đề Lịch kèm Nút chuyển tháng trước/sau
           Row(
             children: [
-              const Icon(Icons.calendar_month_rounded, color: AppTheme.primaryNeon, size: 18),
+              // Nút tháng trước
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _calendarMonth = DateTime(year, month - 1);
+                  });
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.chevron_left_rounded, color: AppTheme.textPrimary, size: 18),
+                ),
+              ),
               const SizedBox(width: 8),
+
               Text(
-                'LỊCH CHẠY THÁNG ${now.month}/${now.year}',
+                'THÁNG $month/$year',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 0.8,
+                  letterSpacing: 0.5,
                   color: AppTheme.textPrimary,
                 ),
               ),
+              const SizedBox(width: 8),
+
+              // Nút tháng sau
+              InkWell(
+                onTap: isCurrentMonth
+                    ? null
+                    : () {
+                        setState(() {
+                          _calendarMonth = DateTime(year, month + 1);
+                        });
+                      },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: isCurrentMonth ? AppTheme.surfaceLight.withValues(alpha: 0.3) : AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: isCurrentMonth ? AppTheme.textMuted.withValues(alpha: 0.3) : AppTheme.textPrimary,
+                    size: 18,
+                  ),
+                ),
+              ),
+
               const Spacer(),
+              // Badge số ngày chạy (Màu xanh phụ #139EFE)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                    color: AppTheme.secondaryNeon.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.local_fire_department_rounded, size: 12, color: AppTheme.primaryNeon),
+                    const Icon(Icons.directions_run_rounded, size: 12, color: AppTheme.secondaryNeon),
                     const SizedBox(width: 4),
                     Text(
                       '${activeDaysSet.length} NGÀY',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
-                        color: AppTheme.primaryNeon,
+                        color: AppTheme.secondaryNeon,
                       ),
                     ),
                   ],
@@ -1011,7 +1059,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
 
           // Hàng thứ trong tuần (T2 -> CN)
           Row(
@@ -1022,7 +1070,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: Text(
                     w,
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.textMuted,
                     ),
@@ -1031,18 +1079,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               );
             }).toList(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          // Lưới ngày trong tháng
+          // Lưới ngày trong tháng (Gọn gàng)
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: (firstDayWeekday - 1) + daysInMonth,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              mainAxisSpacing: 6,
-              crossAxisSpacing: 6,
-              childAspectRatio: 1.0,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+              childAspectRatio: 1.15,
             ),
             itemBuilder: (context, index) {
               if (index < firstDayWeekday - 1) {
@@ -1050,35 +1098,38 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               }
               final day = index - (firstDayWeekday - 1) + 1;
               final hasRun = activeDaysSet.contains(day);
-              final isToday = day == now.day;
+              final isToday = (isCurrentMonth && day == now.day);
 
               Color bgColor;
               Color textColor;
               BoxBorder? border;
 
+              // "Đã chạy" dùng Màu Xanh Phụ AppTheme.secondaryNeon (#139EFE)
               if (hasRun) {
-                bgColor = AppTheme.primaryNeon;
+                bgColor = AppTheme.secondaryNeon;
                 textColor = Colors.white;
-                border = Border.all(color: AppTheme.primaryNeon, width: 1.5);
+                border = Border.all(color: AppTheme.secondaryNeon, width: 1.2);
               } else if (isToday) {
                 bgColor = AppTheme.surfaceLight;
                 textColor = AppTheme.primaryNeon;
-                border = Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.8), width: 1.5);
+                border = Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.9), width: 1.2);
               } else {
-                bgColor = AppTheme.surfaceLight.withValues(alpha: 0.4);
-                textColor = day > now.day ? AppTheme.textMuted.withValues(alpha: 0.4) : AppTheme.textMuted;
+                bgColor = AppTheme.surfaceLight.withValues(alpha: 0.3);
+                textColor = (isCurrentMonth && day > now.day)
+                    ? AppTheme.textMuted.withValues(alpha: 0.3)
+                    : AppTheme.textMuted;
               }
 
               return Container(
                 decoration: BoxDecoration(
                   color: bgColor,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(8),
                   border: border,
                   boxShadow: hasRun
                       ? [
                           BoxShadow(
-                            color: AppTheme.primaryNeon.withValues(alpha: 0.35),
-                            blurRadius: 6,
+                            color: AppTheme.secondaryNeon.withValues(alpha: 0.35),
+                            blurRadius: 4,
                           ),
                         ]
                       : null,
@@ -1087,7 +1138,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: Text(
                     '$day',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: (hasRun || isToday) ? FontWeight.w900 : FontWeight.w600,
                       color: textColor,
                     ),
@@ -1096,39 +1147,39 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // Chú thích nhỏ bên dưới
+          // Chú thích nhỏ bên dưới (Màu xanh phụ #139EFE cho Đã chạy)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 decoration: const BoxDecoration(
-                  color: AppTheme.primaryNeon,
+                  color: AppTheme.secondaryNeon,
                   shape: BoxShape.circle,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               const Text(
                 'Đã chạy',
-                style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
               ),
               const SizedBox(width: 14),
               Container(
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 decoration: BoxDecoration(
                   color: Colors.transparent,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.primaryNeon, width: 1.2),
+                  border: Border.all(color: AppTheme.primaryNeon, width: 1.0),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               const Text(
                 'Hôm nay',
-                style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
               ),
             ],
           ),
