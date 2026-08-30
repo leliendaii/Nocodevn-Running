@@ -198,35 +198,41 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Logo & Tiêu đề ứng dụng
+                // Logo hiển thị trọn vẹn (Bo tròn nhẹ, không cắt xén)
                 Center(
                   child: Container(
-                    width: 96,
-                    height: 96,
-                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(
+                      maxWidth: 220,
+                      maxHeight: 110,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      color: AppTheme.surface.withValues(alpha: 0.6),
                       border: Border.all(
-                        color: AppTheme.primaryNeon.withValues(alpha: 0.5),
-                        width: 2,
+                        color: AppTheme.primaryNeon.withValues(alpha: 0.35),
+                        width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.primaryNeon.withValues(alpha: 0.25),
+                          color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                           blurRadius: 24,
-                          spreadRadius: 2,
+                          spreadRadius: 1,
                         ),
                       ],
                     ),
-                    child: ClipOval(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
                       child: Image.asset(
                         'assets/images/logo.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
                           return const Icon(
                             Icons.directions_run_rounded,
-                            size: 48,
+                            size: 56,
                             color: AppTheme.primaryNeon,
                           );
                         },
@@ -234,18 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'NOCODE RUNNING',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.0,
-                    color: AppTheme.primaryNeon,
-                  ),
-                ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 16),
                 Text(
                   _isRegisterMode
                       ? 'Tạo tài khoản người dùng mới'
@@ -253,10 +248,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,
+                    fontWeight: FontWeight.w500,
                     color: AppTheme.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // Tab chuyển đổi: ĐĂNG NHẬP / ĐĂNG KÝ
                 Container(

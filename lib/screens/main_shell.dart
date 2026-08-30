@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/user_model.dart';
@@ -44,11 +45,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      debugPrint('📱 [LIFECYCLE] Người dùng quay lại App -> Tự động làm mới dữ liệu mới nhất!');
+      debugPrint(
+        '📱 [LIFECYCLE] Người dùng quay lại App -> Tự động làm mới dữ liệu mới nhất!',
+      );
       _refreshAllAppData();
-    } else if (state == AppLifecycleState.paused || 
-               state == AppLifecycleState.inactive || 
-               state == AppLifecycleState.detached) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
       // Lưu checkpoint ngay lập tức khi app bị ẩn hoặc chuẩn bị đóng
       context.read<RunningProvider>().saveActiveCheckpointNow();
     }
@@ -68,7 +71,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (recovered != null && mounted) {
       TopSyncToast.show(
         context,
-        message: '🛡️ Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km - ${recovered.formattedDuration}) do thoát app!',
+        message:
+            '🛡️ Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km - ${recovered.formattedDuration}) do thoát app!',
       );
     }
 
@@ -88,10 +92,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppTheme.surface,
@@ -107,23 +108,44 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           },
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.directions_run_outlined, color: AppTheme.textSecondary),
-              selectedIcon: Icon(Icons.directions_run, color: AppTheme.primaryNeon),
+              icon: Icon(
+                Icons.directions_run_outlined,
+                color: AppTheme.textSecondary,
+              ),
+              selectedIcon: Icon(
+                Icons.directions_run,
+                color: AppTheme.primaryNeon,
+              ),
               label: 'Chạy',
             ),
             NavigationDestination(
               icon: Icon(Icons.history_rounded, color: AppTheme.textSecondary),
-              selectedIcon: Icon(Icons.history_rounded, color: AppTheme.primaryNeon),
+              selectedIcon: Icon(
+                Icons.history_rounded,
+                color: AppTheme.primaryNeon,
+              ),
               label: 'Lịch sử',
             ),
             NavigationDestination(
-              icon: Icon(Icons.bar_chart_rounded, color: AppTheme.textSecondary),
-              selectedIcon: Icon(Icons.bar_chart_rounded, color: AppTheme.primaryNeon),
+              icon: Icon(
+                Icons.bar_chart_rounded,
+                color: AppTheme.textSecondary,
+              ),
+              selectedIcon: Icon(
+                Icons.bar_chart_rounded,
+                color: AppTheme.primaryNeon,
+              ),
               label: 'Thống kê',
             ),
             NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded, color: AppTheme.textSecondary),
-              selectedIcon: Icon(Icons.person_rounded, color: AppTheme.primaryNeon),
+              icon: Icon(
+                Icons.person_outline_rounded,
+                color: AppTheme.textSecondary,
+              ),
+              selectedIcon: Icon(
+                Icons.person_rounded,
+                color: AppTheme.primaryNeon,
+              ),
               label: 'Cá nhân',
             ),
           ],
@@ -146,9 +168,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final minutes = (totalSec % 3600) ~/ 60;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('THỐNG KÊ CỦA TÔI'),
-      ),
+      appBar: AppBar(title: const Text('THỐNG KÊ CỦA TÔI')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -178,11 +198,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               Row(
                 children: [
                   Expanded(
-                    child: _buildMetricCard('TỔNG QUÃNG ĐƯỜNG', '${totalKm.toStringAsFixed(1)} KM', Icons.straighten, AppTheme.primaryNeon),
+                    child: _buildMetricCard(
+                      'TỔNG QUÃNG ĐƯỜNG',
+                      '${totalKm.toStringAsFixed(1)} KM',
+                      Icons.straighten,
+                      AppTheme.primaryNeon,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildMetricCard('THỜI GIAN CHẠY', '${hours}h ${minutes}p', Icons.timer_outlined, AppTheme.secondaryNeon),
+                    child: _buildMetricCard(
+                      'THỜI GIAN CHẠY',
+                      '${hours}h ${minutes}p',
+                      Icons.timer_outlined,
+                      AppTheme.secondaryNeon,
+                    ),
                   ),
                 ],
               ),
@@ -190,11 +220,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               Row(
                 children: [
                   Expanded(
-                    child: _buildMetricCard('TỔNG CALO TIÊU THỤ', '$totalCal kcal', Icons.local_fire_department_outlined, AppTheme.accentOrange),
+                    child: _buildMetricCard(
+                      'TỔNG CALO TIÊU THỤ',
+                      '$totalCal kcal',
+                      Icons.local_fire_department_outlined,
+                      AppTheme.accentOrange,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildMetricCard('TỔNG SỐ BUỔI CHẠY', '${userRuns.length} buổi', Icons.directions_run_rounded, AppTheme.success),
+                    child: _buildMetricCard(
+                      'TỔNG SỐ BUỔI CHẠY',
+                      '${userRuns.length} buổi',
+                      Icons.directions_run_rounded,
+                      AppTheme.success,
+                    ),
                   ),
                 ],
               ),
@@ -216,9 +256,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       children: [
                         Text(
                           'BIỂU ĐỒ QUÃNG ĐƯỜNG (KM)',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                        Icon(Icons.bar_chart_rounded, color: AppTheme.primaryNeon),
+                        Icon(
+                          Icons.bar_chart_rounded,
+                          color: AppTheme.primaryNeon,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -226,37 +273,63 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       height: 200,
                       child: chartData.isEmpty || totalKm == 0
                           ? const Center(
-                              child: Text('Chưa có dữ liệu cho khoảng thời gian này', style: TextStyle(color: AppTheme.textMuted)),
+                              child: Text(
+                                'Chưa có dữ liệu cho khoảng thời gian này',
+                                style: TextStyle(color: AppTheme.textMuted),
+                              ),
                             )
                           : BarChart(
                               BarChartData(
                                 alignment: BarChartAlignment.spaceAround,
-                                maxY: (chartData.map((e) => e.distanceKm).reduce((a, b) => a > b ? a : b) * 1.3).clamp(5.0, 100.0),
+                                maxY:
+                                    (chartData
+                                                .map((e) => e.distanceKm)
+                                                .reduce(
+                                                  (a, b) => a > b ? a : b,
+                                                ) *
+                                            1.3)
+                                        .clamp(5.0, 100.0),
                                 barTouchData: BarTouchData(
                                   touchTooltipData: BarTouchTooltipData(
-                                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                                      return BarTooltipItem(
-                                        '${chartData[groupIndex].label}\n${rod.toY.toStringAsFixed(2)} km',
-                                        const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                      );
-                                    },
+                                    getTooltipItem:
+                                        (group, groupIndex, rod, rodIndex) {
+                                          return BarTooltipItem(
+                                            '${chartData[groupIndex].label}\n${rod.toY.toStringAsFixed(2)} km',
+                                            const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        },
                                   ),
                                 ),
                                 titlesData: FlTitlesData(
-                                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  leftTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
                                   bottomTitles: AxisTitles(
                                     sideTitles: SideTitles(
                                       showTitles: true,
                                       getTitlesWidget: (val, meta) {
                                         final index = val.toInt();
-                                        if (index >= 0 && index < chartData.length) {
+                                        if (index >= 0 &&
+                                            index < chartData.length) {
                                           return Padding(
-                                            padding: const EdgeInsets.only(top: 8.0),
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
                                             child: Text(
                                               chartData[index].label,
-                                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                              style: const TextStyle(
+                                                color: AppTheme.textMuted,
+                                                fontSize: 11,
+                                              ),
                                             ),
                                           );
                                         }
@@ -267,19 +340,27 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                                 ),
                                 gridData: const FlGridData(show: false),
                                 borderData: FlBorderData(show: false),
-                                barGroups: chartData.asMap().entries.map((entry) {
+                                barGroups: chartData.asMap().entries.map((
+                                  entry,
+                                ) {
                                   return BarChartGroupData(
                                     x: entry.key,
                                     barRods: [
                                       BarChartRodData(
                                         toY: entry.value.distanceKm,
                                         gradient: const LinearGradient(
-                                          colors: [AppTheme.primaryNeon, AppTheme.secondaryNeon],
+                                          colors: [
+                                            AppTheme.primaryNeon,
+                                            AppTheme.secondaryNeon,
+                                          ],
                                           begin: Alignment.bottomCenter,
                                           end: Alignment.topCenter,
                                         ),
                                         width: 14,
-                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              top: Radius.circular(6),
+                                            ),
                                       ),
                                     ],
                                   );
@@ -322,7 +403,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -335,20 +421,36 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         children: [
           Icon(icon, color: color, size: 22),
           const SizedBox(height: 10),
-          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textMuted,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
   }
 
   // TAB 4: MÀN HÌNH HỒ SƠ CÁ NHÂN & CÀI ĐẶT
-  Widget _buildProfileTab(BuildContext context, AuthProvider auth, AppUser? user) {
+  Widget _buildProfileTab(
+    BuildContext context,
+    AuthProvider auth,
+    AppUser? user,
+  ) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('HỒ SƠ CÁ NHÂN'),
-      ),
+      appBar: AppBar(title: const Text('HỒ SƠ CÁ NHÂN')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -374,10 +476,19 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
-                            border: Border.all(color: AppTheme.background, width: 2),
+                            color: user?.isAdmin == true
+                                ? AppTheme.secondaryNeon
+                                : AppTheme.primaryNeon,
+                            border: Border.all(
+                              color: AppTheme.background,
+                              width: 2,
+                            ),
                           ),
-                          child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -387,22 +498,35 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               const SizedBox(height: 14),
               Text(
                 user?.name ?? 'Người dùng',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (user?.username != null && user!.username.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
                   '@${user.username}',
-                  style: const TextStyle(color: AppTheme.secondaryNeon, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: AppTheme.secondaryNeon,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
               Text(
                 user?.email ?? '',
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: user?.isAdmin == true
                       ? AppTheme.secondaryNeon.withValues(alpha: 0.15)
@@ -410,11 +534,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  user?.isAdmin == true ? '🛡️ QUẢN TRỊ VIÊN' : '🏃 VẬN ĐỘNG VIÊN',
+                  user?.isAdmin == true
+                      ? '🛡️ QUẢN TRỊ VIÊN'
+                      : '🏃 VẬN ĐỘNG VIÊN',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
-                    color: user?.isAdmin == true ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                    color: user?.isAdmin == true
+                        ? AppTheme.secondaryNeon
+                        : AppTheme.primaryNeon,
                   ),
                 ),
               ),
@@ -429,8 +557,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               Consumer<RunningProvider>(
                 builder: (context, running, _) {
-                  final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
-                  final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
+                  final startStr =
+                      '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
+                  final endStr =
+                      '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
                   final subtitle = running.autoEndEnabled
                       ? 'Đang bật: $startStr ➔ $endStr (Chống quên)'
                       : 'Đang tắt tự động chốt';
@@ -441,10 +571,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     title: 'Khung Giờ Tự Động Chốt',
                     subtitle: subtitle,
                     statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
-                    statusColor: running.autoEndEnabled ? AppTheme.secondaryNeon : AppTheme.textMuted,
+                    statusColor: running.autoEndEnabled
+                        ? AppTheme.secondaryNeon
+                        : AppTheme.textMuted,
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (ctx) => const AutoEndScheduleScreen()),
+                        MaterialPageRoute(
+                          builder: (ctx) => const AutoEndScheduleScreen(),
+                        ),
                       );
                     },
                   );
@@ -469,14 +603,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       icon: Icons.person_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
                       title: 'Thông Tin Tài Khoản',
-                      subtitle: '${user?.name ?? ''} (@${user?.username ?? ''})',
+                      subtitle:
+                          '${user?.name ?? ''} (@${user?.username ?? ''})',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (ctx) => const AccountInfoScreen()),
+                          MaterialPageRoute(
+                            builder: (ctx) => const AccountInfoScreen(),
+                          ),
                         );
                       },
                     ),
-                    const Divider(color: AppTheme.divider, height: 1, indent: 56),
+                    const Divider(
+                      color: AppTheme.divider,
+                      height: 1,
+                      indent: 56,
+                    ),
                     _buildSettingsRowTile(
                       icon: Icons.lock_reset_rounded,
                       iconColor: AppTheme.secondaryNeon,
@@ -484,7 +625,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       subtitle: 'Đổi mật khẩu đăng nhập',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (ctx) => const SecuritySettingsScreen()),
+                          MaterialPageRoute(
+                            builder: (ctx) => const SecuritySettingsScreen(),
+                          ),
                         );
                       },
                     ),
@@ -507,7 +650,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   isHighlighted: true,
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => const AdminDashboardScreen()),
+                      MaterialPageRoute(
+                        builder: (ctx) => const AdminDashboardScreen(),
+                      ),
                     );
                   },
                 ),
@@ -521,12 +666,23 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => auth.logout(),
-                  icon: const Icon(Icons.logout_rounded, color: AppTheme.danger),
-                  label: const Text('ĐĂNG XUẤT TÀI KHOẢN', style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.bold)),
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    color: AppTheme.danger,
+                  ),
+                  label: const Text(
+                    'ĐĂNG XUẤT TÀI KHOẢN',
+                    style: TextStyle(
+                      color: AppTheme.danger,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppTheme.danger),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
               ),
@@ -568,7 +724,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isHighlighted ? iconColor.withValues(alpha: 0.8) : AppTheme.divider,
+          color: isHighlighted
+              ? iconColor.withValues(alpha: 0.8)
+              : AppTheme.divider,
           width: isHighlighted ? 1.5 : 1.0,
         ),
         boxShadow: isHighlighted
@@ -603,17 +761,37 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isHighlighted ? iconColor : AppTheme.textPrimary)),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: isHighlighted
+                              ? iconColor
+                              : AppTheme.textPrimary,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(subtitle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 if (statusText != null) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: (statusColor ?? AppTheme.textMuted).withValues(alpha: 0.15),
+                      color: (statusColor ?? AppTheme.textMuted).withValues(
+                        alpha: 0.15,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -627,7 +805,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   ),
                   const SizedBox(width: 8),
                 ],
-                const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.textMuted, size: 14),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: AppTheme.textMuted,
+                  size: 14,
+                ),
               ],
             ),
           ),
@@ -665,13 +847,30 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12), overflow: TextOverflow.ellipsis),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.textMuted, size: 14),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: AppTheme.textMuted,
+                size: 14,
+              ),
             ],
           ),
         ),
