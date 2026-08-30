@@ -189,6 +189,7 @@ class LocalStorageService {
         'distance_km': session.distanceKm,
         'calories': session.calories,
         'notes': session.notes,
+        'route_points': session.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
       };
 
       // Tránh trùng lặp
@@ -210,6 +211,15 @@ class LocalStorageService {
 
       final List<RunSession> sessions = [];
       for (final item in list) {
+        final List<RunPoint> routePoints = [];
+        if (item['route_points'] is List) {
+          for (final pt in item['route_points']) {
+            if (pt is Map && pt['x'] != null && pt['y'] != null) {
+              routePoints.add(RunPoint((pt['x'] as num).toDouble(), (pt['y'] as num).toDouble()));
+            }
+          }
+        }
+
         sessions.add(
           RunSession(
             id: item['id'].toString(),
@@ -221,6 +231,7 @@ class LocalStorageService {
             distanceKm: (item['distance_km'] as num?)?.toDouble() ?? 0.0,
             calories: (item['calories'] as num?)?.toInt() ?? 0,
             notes: item['notes'] ?? '',
+            routePoints: routePoints,
           ),
         );
       }
@@ -244,7 +255,7 @@ class LocalStorageService {
     }
   }
 
-  /// Cache toàn bộ lịch sử chạy bộ vào máy
+  /// Cache toàn bộ lịch sử chạy bộ vào máy (bao gồm cả tọa độ GPS route_points)
   static Future<void> cacheAllRunSessions(List<RunSession> sessions) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -258,6 +269,7 @@ class LocalStorageService {
         'distance_km': s.distanceKm,
         'calories': s.calories,
         'notes': s.notes,
+        'route_points': s.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
       }).toList();
 
       await prefs.setString(_keyCachedSessions, jsonEncode(list));
@@ -266,7 +278,7 @@ class LocalStorageService {
     }
   }
 
-  /// Tải lịch sử chạy bộ từ cache khi chưa có mạng
+  /// Tải lịch sử chạy bộ từ cache khi chưa có mạng (Khôi phục đầy đủ tọa độ GPS)
   static Future<List<RunSession>> loadCachedRunSessions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -275,6 +287,15 @@ class LocalStorageService {
 
       final List<RunSession> sessions = [];
       for (final item in list) {
+        final List<RunPoint> routePoints = [];
+        if (item['route_points'] is List) {
+          for (final pt in item['route_points']) {
+            if (pt is Map && pt['x'] != null && pt['y'] != null) {
+              routePoints.add(RunPoint((pt['x'] as num).toDouble(), (pt['y'] as num).toDouble()));
+            }
+          }
+        }
+
         sessions.add(
           RunSession(
             id: item['id'].toString(),
@@ -286,6 +307,7 @@ class LocalStorageService {
             distanceKm: (item['distance_km'] as num?)?.toDouble() ?? 0.0,
             calories: (item['calories'] as num?)?.toInt() ?? 0,
             notes: item['notes'] ?? '',
+            routePoints: routePoints,
           ),
         );
       }

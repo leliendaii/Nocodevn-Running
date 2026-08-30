@@ -394,6 +394,15 @@ class SupabaseService {
 
       final List<RunSession> list = [];
       for (final item in data) {
+        final List<RunPoint> routePoints = [];
+        if (item['route_points'] is List) {
+          for (final pt in item['route_points']) {
+            if (pt is Map && pt['x'] != null && pt['y'] != null) {
+              routePoints.add(RunPoint((pt['x'] as num).toDouble(), (pt['y'] as num).toDouble()));
+            }
+          }
+        }
+
         list.add(
           RunSession(
             id: item['id'].toString(),
@@ -405,6 +414,7 @@ class SupabaseService {
             distanceKm: (item['distance_km'] as num?)?.toDouble() ?? 0.0,
             calories: (item['calories'] as num?)?.toInt() ?? 0,
             notes: item['notes'] ?? '',
+            routePoints: routePoints,
           ),
         );
       }
@@ -421,7 +431,7 @@ class SupabaseService {
     if (supa == null) return false;
 
     try {
-      await supa.from('run_sessions').insert({
+      final payload = <String, dynamic>{
         'id': session.id,
         'user_id': session.userId,
         'user_name': session.userName,
@@ -431,7 +441,12 @@ class SupabaseService {
         'distance_km': session.distanceKm,
         'calories': session.calories,
         'notes': session.notes,
-      }).timeout(const Duration(seconds: 4));
+      };
+      if (session.routePoints.isNotEmpty) {
+        payload['route_points'] = session.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList();
+      }
+
+      await supa.from('run_sessions').insert(payload).timeout(const Duration(seconds: 4));
       return true;
     } catch (e) {
       debugPrint('Lỗi thêm buổi chạy Supabase: $e');

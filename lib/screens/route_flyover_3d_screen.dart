@@ -208,11 +208,11 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       if (ty > maxTy) maxTy = ty;
     }
 
-    // Mở rộng thêm 1 tile xung quanh bounding box
-    minTx -= 1;
-    maxTx += 1;
-    minTy -= 1;
-    maxTy += 1;
+    // Mở rộng thêm 2 tile xung quanh bounding box để bao phủ trọn vẹn góc nhìn 3D Flycam
+    minTx -= 2;
+    maxTx += 2;
+    minTy -= 2;
+    maxTy += 3;
 
     for (int x = minTx; x <= maxTx; x++) {
       for (int y = minTy; y <= maxTy; y++) {
@@ -381,6 +381,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               progress: _controller.value,
                               tileCache: _tileCache,
                               zoom: _zoomLevel,
+                              onTileRequested: _loadMapTile,
                             ),
                           );
                         },
@@ -611,6 +612,7 @@ class Real3DFlyoverPainter extends CustomPainter {
   final double progress;
   final Map<String, ui.Image> tileCache;
   final int zoom;
+  final Function(int z, int x, int y) onTileRequested;
 
   static const double tileSize = 256.0;
 
@@ -621,6 +623,7 @@ class Real3DFlyoverPainter extends CustomPainter {
     required this.progress,
     required this.tileCache,
     required this.zoom,
+    required this.onTileRequested,
   });
 
   @override
@@ -652,12 +655,12 @@ class Real3DFlyoverPainter extends CustomPainter {
     // Dời tâm thế giới theo đúng pixel vận động viên
     canvas.translate(-currentPixel.dx, -currentPixel.dy);
 
-    // 2. VẼ 9 MAP TILES XUNG QUANH VẬN ĐỘNG VIÊN (3x3 Grid - Giảm 65% tải GPU)
+    // 2. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (5x7 Grid - Phủ kín 100% không còn khoảng trống)
     final int centerTileX = (currentPixel.dx / tileSize).floor();
     final int centerTileY = (currentPixel.dy / tileSize).floor();
 
-    for (int dx = -1; dx <= 1; dx++) {
-      for (int dy = -1; dy <= 1; dy++) {
+    for (int dx = -2; dx <= 2; dx++) {
+      for (int dy = -2; dy <= 4; dy++) {
         final tx = centerTileX + dx;
         final ty = centerTileY + dy;
         final key = '$zoom/$tx/$ty';
@@ -670,7 +673,7 @@ class Real3DFlyoverPainter extends CustomPainter {
             img,
             Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
             tileRect,
-            Paint()..filterQuality = FilterQuality.low, // FilterQuality.low để render cực nhanh 60 FPS
+            Paint()..filterQuality = FilterQuality.low,
           );
         } else {
           canvas.drawRect(tileRect, Paint()..color = const Color(0xFFF1F5F9));
@@ -681,6 +684,7 @@ class Real3DFlyoverPainter extends CustomPainter {
               ..style = PaintingStyle.stroke
               ..strokeWidth = 0.5,
           );
+          onTileRequested(zoom, tx, ty);
         }
       }
     }
