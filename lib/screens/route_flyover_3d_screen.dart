@@ -1032,20 +1032,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 ),
 
                 // 3. THẺ TỔNG KẾT VINH DANH THÀNH TÍCH 3D (XUẤT HIỆN TỰ ĐỘNG KHI VỀ ĐÍCH - ACT 3)
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, _) {
-                    final double outroRaw = ((_controller.value - 0.78) / 0.22).clamp(0.0, 1.0);
-                    if (outroRaw <= 0.01) return const SizedBox.shrink();
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 110,
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, _) {
+                      final double outroRaw = ((_controller.value - 0.78) / 0.22).clamp(0.0, 1.0);
+                      if (outroRaw <= 0.01) return const SizedBox.shrink();
 
-                    final double cardScale = Curves.easeOutBack.transform(outroRaw);
-                    final double cardOpacity = outroRaw.clamp(0.0, 1.0);
+                      final double cardScale = Curves.easeOutBack.transform(outroRaw);
+                      final double cardOpacity = outroRaw.clamp(0.0, 1.0);
 
-                    return Positioned(
-                      left: 20,
-                      right: 20,
-                      bottom: 110,
-                      child: Opacity(
+                      return Opacity(
                         opacity: cardOpacity,
                         child: Transform.scale(
                           scale: 0.85 + 0.15 * cardScale,
@@ -1108,9 +1108,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
 
                 // 4. BOTTOM HUD: THANH ĐIỀU KHIỂN VIDEO
