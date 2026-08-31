@@ -854,41 +854,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     return null;
   }
 
-  void _drawStoryTopHeader(Canvas canvas, Size size) {
-    final double cardW = size.width * 0.46;
-    final double cardH = size.height * 0.040;
-    final double cardX = (size.width - cardW) / 2;
-    final double cardY = size.height * 0.065; // Vùng an toàn dưới thanh profile Story
-
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(cardX, cardY, cardW, cardH),
-      Radius.circular(cardH / 2),
-    );
-
-    // Nền kính mờ
-    final bgPaint = Paint()..color = const Color(0xEE0F172A);
-    canvas.drawRRect(rrect, bgPaint);
-
-    // Viền phát sáng Neon
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = const Color(0xFF00E5FF);
-    canvas.drawRRect(rrect, borderPaint);
-
-    // Chữ thương hiệu Nocodevn Running
-    _drawCanvasText(
-      canvas: canvas,
-      text: 'NOCODEVN RUNNING',
-      center: Offset(size.width / 2, cardY + (cardH / 2)),
-      fontSize: size.width * 0.024,
-      fontWeight: FontWeight.w900,
-      color: const Color(0xFF00E5FF),
-      letterSpacing: 1.2,
-      maxWidth: cardW - 20,
-    );
-  }
-
   void _drawStoryStatsCard({
     required Canvas canvas,
     required Size size,
