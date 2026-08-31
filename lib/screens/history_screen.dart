@@ -6,6 +6,7 @@ import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/top_sync_toast.dart';
 import 'route_flyover_3d_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -28,74 +29,99 @@ class HistoryScreen extends StatelessWidget {
         title: const Text('LỊCH SỬ CHẠY BỘ'),
       ),
       body: SafeArea(
-        child: sessions.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: RefreshIndicator(
+          color: AppTheme.primaryNeon,
+          backgroundColor: const Color(0xFF0F172A),
+          strokeWidth: 2.5,
+          onRefresh: () async {
+            await Future.wait([
+              context.read<RunningProvider>().refreshAllData(),
+              context.read<AuthProvider>().checkUserStillExistsOnServer(),
+            ]);
+            if (context.mounted) {
+              TopSyncToast.show(
+                context,
+                message: '🔄 Đã cập nhật danh sách buổi chạy mới nhất!',
+                isSuccess: true,
+              );
+            }
+          },
+          child: sessions.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    Icon(Icons.directions_run_outlined, size: 64, color: AppTheme.textMuted),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Chưa có buổi chạy nào',
-                      style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.directions_run_outlined, size: 64, color: AppTheme.textMuted),
+                          SizedBox(height: 16),
+                          Text(
+                            'Chưa có buổi chạy nào',
+                            style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Vuốt xuống để tải lại hoặc bấm "Bắt đầu chạy"!',
+                            style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Bấm "Bắt đầu chạy" ở tab Chạy để ghi lại lượt đầu tiên!',
-                      style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                  ],
+                )
+              : CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // Thẻ tổng quan đầu trang
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.surface,
+                                AppTheme.surfaceLight,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: AppTheme.divider),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatItem('TỔNG KM', '${totalKm.toStringAsFixed(1)} km', AppTheme.primaryNeon),
+                              Container(width: 1, height: 40, color: AppTheme.divider),
+                              _buildStatItem('BUỔI CHẠY', '${sessions.length}', AppTheme.secondaryNeon),
+                              Container(width: 1, height: 40, color: AppTheme.divider),
+                              _buildStatItem('THỜI GIAN', '${hours}h ${minutes}p', AppTheme.accentOrange),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Danh sách các buổi chạy
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final session = sessions[index];
+                            return _buildSessionCard(context, session);
+                          },
+                          childCount: sessions.length,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              )
-            : CustomScrollView(
-                slivers: [
-                  // Thẻ tổng quan đầu trang
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppTheme.surface,
-                              AppTheme.surfaceLight,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppTheme.divider),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildStatItem('TỔNG KM', '${totalKm.toStringAsFixed(1)} km', AppTheme.primaryNeon),
-                            Container(width: 1, height: 40, color: AppTheme.divider),
-                            _buildStatItem('BUỔI CHẠY', '${sessions.length}', AppTheme.secondaryNeon),
-                            Container(width: 1, height: 40, color: AppTheme.divider),
-                            _buildStatItem('THỜI GIAN', '${hours}h ${minutes}p', AppTheme.accentOrange),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Danh sách các buổi chạy
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final session = sessions[index];
-                          return _buildSessionCard(context, session);
-                        },
-                        childCount: sessions.length,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+        ),
       ),
     );
   }
@@ -344,7 +370,7 @@ class HistoryScreen extends StatelessWidget {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
                     label: const Text(
-                      'XEM MÔ PHỎNG 3D FLYOVER',
+                      'VIDEO QUÁ TRÌNH',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,

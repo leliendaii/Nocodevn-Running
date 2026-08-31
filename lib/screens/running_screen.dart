@@ -424,10 +424,32 @@ class _RunningScreenState extends State<RunningScreen>
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-          child: Column(
-            children: [
+        child: RefreshIndicator(
+          color: AppTheme.primaryNeon,
+          backgroundColor: const Color(0xFF0F172A),
+          strokeWidth: 2.5,
+          onRefresh: () async {
+            await Future.wait([
+              context.read<RunningProvider>().refreshAllData(),
+              context.read<AuthProvider>().checkUserStillExistsOnServer(),
+            ]);
+            if (context.mounted) {
+              TopSyncToast.show(
+                context,
+                message: '🔄 Đã cập nhật dữ liệu mới nhất!',
+                isSuccess: true,
+              );
+            }
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                  child: Column(
+                    children: [
               // HEADER GỘP: THÔNG TIN USER + TRẠNG THÁI + NÚT VOICE COACH + NÚT ĐĂNG XUẤT
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -559,9 +581,7 @@ class _RunningScreenState extends State<RunningScreen>
                         });
                         TopSyncToast.show(
                           context,
-                          message: VoiceCoachService.isEnabled
-                              ? '🎙️ Đã bật Huấn luyện viên giọng nói tiếng Việt!'
-                              : '🔇 Đã tắt Voice Coach.',
+                          message: VoiceCoachService.isEnabled ? 'Bật tiếng' : 'Tắt tiếng',
                           isSuccess: VoiceCoachService.isEnabled,
                         );
                       },
@@ -1091,6 +1111,10 @@ class _RunningScreenState extends State<RunningScreen>
           ),
         ),
       ),
-    );
-  }
+    ],
+  ),
+),
+),
+);
+}
 }

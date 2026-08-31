@@ -92,7 +92,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       const RunningScreen(),
       const HistoryScreen(),
       _buildPersonalStatsTab(user?.id ?? ''),
-      _buildProfileTab(context, auth, user),
+      _buildProfileTab(auth, user),
     ];
 
     return Scaffold(
@@ -200,184 +200,224 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(title: const Text('THỐNG KÊ CỦA TÔI')),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Bộ lọc thời gian: Ngày / Tuần / Tháng / Năm
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.divider),
+        child: RefreshIndicator(
+          color: AppTheme.primaryNeon,
+          backgroundColor: const Color(0xFF0F172A),
+          strokeWidth: 2.5,
+          onRefresh: () async {
+            await Future.wait([
+              context.read<RunningProvider>().refreshAllData(),
+              context.read<AuthProvider>().checkUserStillExistsOnServer(),
+            ]);
+            if (mounted) {
+              TopSyncToast.show(
+                context,
+                message: '🔄 Đã cập nhật thống kê mới nhất!',
+                isSuccess: true,
+              );
+            }
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Bộ lọc thời gian: Ngày / Tuần / Tháng / Năm
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.divider),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildFilterBtn('Ngày', TimeFilter.day),
+                      _buildFilterBtn('Tuần', TimeFilter.week),
+                      _buildFilterBtn('Tháng', TimeFilter.month),
+                      _buildFilterBtn('Năm', TimeFilter.year),
+                    ],
+                  ),
                 ),
-                child: Row(
+                const SizedBox(height: 20),
+
+                // Thẻ tổng quan 3 chỉ số chính
+                Row(
                   children: [
-                    _buildFilterBtn('Ngày', TimeFilter.day),
-                    _buildFilterBtn('Tuần', TimeFilter.week),
-                    _buildFilterBtn('Tháng', TimeFilter.month),
-                    _buildFilterBtn('Năm', TimeFilter.year),
+                    Expanded(
+                      child: _buildMetricCard(
+                        'TỔNG QUÃNG ĐƯỜNG',
+                        '${totalKm.toStringAsFixed(1)} KM',
+                        Icons.straighten,
+                        AppTheme.primaryNeon,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildMetricCard(
+                        'THỜI GIAN CHẠY',
+                        '${hours}h ${minutes}p',
+                        Icons.timer_outlined,
+                        AppTheme.secondaryNeon,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Thẻ tổng quan 3 chỉ số chính
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      'TỔNG QUÃNG ĐƯỜNG',
-                      '${totalKm.toStringAsFixed(1)} KM',
-                      Icons.straighten,
-                      AppTheme.primaryNeon,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      'THỜI GIAN CHẠY',
-                      '${hours}h ${minutes}p',
-                      Icons.timer_outlined,
-                      AppTheme.secondaryNeon,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      'TỔNG CALO TIÊU THỤ',
-                      '$totalCal kcal',
-                      Icons.local_fire_department_outlined,
-                      AppTheme.accentOrange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      'TỔNG SỐ BUỔI CHẠY',
-                      '${userRuns.length} buổi',
-                      Icons.directions_run_rounded,
-                      AppTheme.success,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Biểu đồ cột phân nhóm
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppTheme.divider),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'BIỂU ĐỒ QUÃNG ĐƯỜNG (KM)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        Icon(
-                          Icons.bar_chart_rounded,
-                          color: AppTheme.primaryNeon,
-                        ),
-                      ],
+                    Expanded(
+                      child: _buildMetricCard(
+                        'TỔNG CALO TIÊU THỤ',
+                        '$totalCal kcal',
+                        Icons.local_fire_department_outlined,
+                        AppTheme.accentOrange,
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 200,
-                      child: chartData.isEmpty || totalKm == 0
-                          ? const Center(
-                              child: Text(
-                                'Chưa có dữ liệu cho khoảng thời gian này',
-                                style: TextStyle(color: AppTheme.textMuted),
-                              ),
-                            )
-                          : BarChart(
-                              BarChartData(
-                                alignment: BarChartAlignment.spaceAround,
-                                maxY:
-                                    (chartData
-                                                .map((e) => e.distanceKm)
-                                                .reduce(
-                                                  (a, b) => a > b ? a : b,
-                                                ) *
-                                            1.3)
-                                        .clamp(5.0, 100.0),
-                                barTouchData: BarTouchData(
-                                  touchTooltipData: BarTouchTooltipData(
-                                    getTooltipItem:
-                                        (group, groupIndex, rod, rodIndex) {
-                                          return BarTooltipItem(
-                                            '${chartData[groupIndex].label}\n${rod.toY.toStringAsFixed(2)} km',
-                                            const TextStyle(
-                                              color: Colors.white,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildMetricCard(
+                        'TỔNG SỐ BUỔI CHẠY',
+                        '${userRuns.length} buổi',
+                        Icons.directions_run_rounded,
+                        AppTheme.success,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Biểu đồ cột phân nhóm
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppTheme.divider),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'BIỂU ĐỒ QUÃNG ĐƯỜNG (KM)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Icon(
+                            Icons.bar_chart_rounded,
+                            color: AppTheme.primaryNeon,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 200,
+                        child: chartData.isEmpty || totalKm == 0
+                            ? const Center(
+                                child: Text(
+                                  'Chưa có dữ liệu cho khoảng thời gian này',
+                                  style: TextStyle(color: AppTheme.textMuted),
+                                ),
+                              )
+                            : BarChart(
+                                BarChartData(
+                                  alignment: BarChartAlignment.spaceAround,
+                                  maxY:
+                                      (chartData
+                                                  .map((e) => e.distanceKm)
+                                                  .reduce(
+                                                    (a, b) => a > b ? a : b,
+                                                  ) *
+                                              1.3)
+                                          .clamp(5.0, 100.0),
+                                  barTouchData: BarTouchData(
+                                    touchTooltipData: BarTouchTooltipData(
+                                      getTooltipItem:
+                                          (group, groupIndex, rod, rodIndex) {
+                                            return BarTooltipItem(
+                                              '${chartData[groupIndex].label}\n${rod.toY.toStringAsFixed(2)} km',
+                                              const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            );
+                                          },
+                                    ),
+                                  ),
+                                  titlesData: FlTitlesData(
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 34,
+                                        getTitlesWidget: (val, meta) {
+                                          if (val == meta.max || val == 0) return const SizedBox.shrink();
+                                          return Text(
+                                            '${val.toInt()}k',
+                                            style: const TextStyle(
+                                              color: AppTheme.textMuted,
+                                              fontSize: 10,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           );
                                         },
-                                  ),
-                                ),
-                                titlesData: FlTitlesData(
-                                  leftTitles: const AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false),
-                                  ),
-                                  rightTitles: const AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false),
-                                  ),
-                                  topTitles: const AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false),
-                                  ),
-                                  bottomTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      getTitlesWidget: (val, meta) {
-                                        final index = val.toInt();
-                                        if (index >= 0 &&
-                                            index < chartData.length) {
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 8.0,
-                                            ),
-                                            child: Text(
-                                              chartData[index].label,
-                                              style: const TextStyle(
-                                                color: AppTheme.textMuted,
-                                                fontSize: 11,
+                                      ),
+                                    ),
+                                    rightTitles: const AxisTitles(
+                                      sideTitles: SideTitles(showTitles: false),
+                                    ),
+                                    topTitles: const AxisTitles(
+                                      sideTitles: SideTitles(showTitles: false),
+                                    ),
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        getTitlesWidget: (val, meta) {
+                                          final index = val.toInt();
+                                          if (index >= 0 &&
+                                              index < chartData.length) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 8.0,
                                               ),
-                                            ),
-                                          );
-                                        }
-                                        return const SizedBox.shrink();
-                                      },
+                                              child: Text(
+                                                chartData[index].label,
+                                                style: const TextStyle(
+                                                  color: AppTheme.textMuted,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          return const SizedBox.shrink();
+                                        },
+                                      ),
                                     ),
                                   ),
-                                ),
-                                gridData: const FlGridData(show: false),
-                                borderData: FlBorderData(show: false),
-                                barGroups: chartData.asMap().entries.map((
-                                  entry,
-                                ) {
-                                  return BarChartGroupData(
-                                    x: entry.key,
-                                    barRods: [
-                                      BarChartRodData(
-                                        toY: entry.value.distanceKm,
+                                  gridData: FlGridData(
+                                    show: true,
+                                    drawVerticalLine: false,
+                                    getDrawingHorizontalLine: (val) => FlLine(
+                                      color: AppTheme.divider.withValues(alpha: 0.6),
+                                      strokeWidth: 0.8,
+                                      dashArray: [4, 4],
+                                    ),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  barGroups: chartData.asMap().entries.map((
+                                    entry,
+                                  ) {
+                                    return BarChartGroupData(
+                                      x: entry.key,
+                                      barRods: [
+                                        BarChartRodData(
+                                          toY: entry.value.distanceKm,
                                         gradient: const LinearGradient(
                                           colors: [
                                             AppTheme.primaryNeon,
@@ -405,8 +445,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFilterBtn(String label, TimeFilter filter) {
     final isSelected = _personalFilter == filter;
@@ -475,7 +516,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   // TAB 4: MÀN HÌNH HỒ SƠ CÁ NHÂN & CÀI ĐẶT
   Widget _buildProfileTab(
-    BuildContext context,
     AuthProvider auth,
     AppUser? user,
   ) {
@@ -485,11 +525,29 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-          child: Column(
-            children: [
-              // 1. THẺ HỒ SƠ NGƯỜI DÙNG KÈM NÚT ĐĂNG XUẤT
+        child: RefreshIndicator(
+          color: AppTheme.primaryNeon,
+          backgroundColor: const Color(0xFF0F172A),
+          strokeWidth: 2.5,
+          onRefresh: () async {
+            await Future.wait([
+              context.read<RunningProvider>().refreshAllData(),
+              context.read<AuthProvider>().checkUserStillExistsOnServer(),
+            ]);
+            if (mounted) {
+              TopSyncToast.show(
+                context,
+                message: '🔄 Đã cập nhật thông tin hồ sơ mới nhất!',
+                isSuccess: true,
+              );
+            }
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+            child: Column(
+              children: [
+                // 1. THẺ HỒ SƠ NGƯỜI DÙNG KÈM NÚT ĐĂNG XUẤT
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
@@ -786,7 +844,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   // Định dạng số nguyên có dấu phẩy phân cách hàng nghìn (ví dụ: 12,500)
