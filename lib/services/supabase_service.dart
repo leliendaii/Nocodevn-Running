@@ -504,77 +504,143 @@ class SupabaseService {
     }
   }
 
-  /// Thêm buổi chạy mới lên Supabase Cloud
+  /// Thêm buổi chạy mới lên Supabase Cloud (Dual-layer: SDK + Direct REST fallback)
   static Future<bool> insertRunSession(RunSession session) async {
+    if (!isConfigured) return false;
     final supa = client;
-    if (supa == null) return false;
 
-    try {
-      final payload = <String, dynamic>{
-        'id': session.id,
-        'user_id': session.userId,
-        'user_name': session.userName,
-        'start_time': session.startTime.toIso8601String(),
-        'end_time': session.endTime.toIso8601String(),
-        'duration_seconds': session.durationSeconds,
-        'distance_km': session.distanceKm,
-        'calories': session.calories,
-        'notes': session.notes,
-      };
-      if (session.routePoints.isNotEmpty) {
-        payload['route_points'] = session.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList();
+    final payload = <String, dynamic>{
+      'id': session.id,
+      'user_id': session.userId,
+      'user_name': session.userName,
+      'start_time': session.startTime.toUtc().toIso8601String(),
+      'end_time': session.endTime.toUtc().toIso8601String(),
+      'duration_seconds': session.durationSeconds,
+      'distance_km': session.distanceKm,
+      'calories': session.calories,
+      'notes': session.notes,
+      'route_points': session.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
+    };
+
+    if (supa != null) {
+      try {
+        await supa.from('run_sessions').insert(payload).timeout(const Duration(seconds: 4));
+        return true;
+      } catch (e) {
+        debugPrint('Insert run_session SDK error: $e, thử REST trực tiếp...');
       }
-
-      await supa.from('run_sessions').insert(payload).timeout(const Duration(seconds: 4));
-      return true;
-    } catch (e) {
-      debugPrint('Lỗi thêm buổi chạy Supabase: $e');
-      return false;
     }
+
+    // Direct REST Fallback
+    try {
+      final url = Uri.parse('$supabaseUrl/rest/v1/run_sessions');
+      final resp = await http.post(
+        url,
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': 'Bearer $supabaseAnonKey',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 5));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        debugPrint('✅ Đã lưu buổi chạy lên Supabase Cloud qua Direct REST!');
+        return true;
+      } else {
+        debugPrint('Lỗi Direct REST insert (${resp.statusCode}): ${resp.body}');
+      }
+    } catch (e) {
+      debugPrint('Lỗi thêm buổi chạy REST direct: $e');
+    }
+    return false;
   }
 
-  /// Admin cập nhật số KM và thời gian chạy lên Cloud
+  /// Admin cập nhật số KM và thời gian chạy lên Cloud (Dual-layer: SDK + Direct REST fallback)
   static Future<bool> updateRunSession(
     String id, {
     required double newDistanceKm,
     required int newDurationSeconds,
     String? newNotes,
   }) async {
+    if (!isConfigured) return false;
     final supa = client;
-    if (supa == null) return false;
 
-    try {
-      final Map<String, dynamic> updateData = {
-        'distance_km': newDistanceKm,
-        'duration_seconds': newDurationSeconds,
-        'calories': CalorieCalculator.calculate(
-          distanceKm: newDistanceKm,
-          durationSeconds: newDurationSeconds,
-        ),
-      };
-      if (newNotes != null) {
-        updateData['notes'] = newNotes;
-      }
-
-      await supa.from('run_sessions').update(updateData).eq('id', id).timeout(const Duration(seconds: 4));
-      return true;
-    } catch (e) {
-      debugPrint('Lỗi cập nhật buổi chạy Supabase: $e');
-      return false;
+    final Map<String, dynamic> updateData = {
+      'distance_km': newDistanceKm,
+      'duration_seconds': newDurationSeconds,
+      'calories': CalorieCalculator.calculate(
+        distanceKm: newDistanceKm,
+        durationSeconds: newDurationSeconds,
+      ),
+    };
+    if (newNotes != null) {
+      updateData['notes'] = newNotes;
     }
+
+    if (supa != null) {
+      try {
+        await supa.from('run_sessions').update(updateData).eq('id', id).timeout(const Duration(seconds: 4));
+        return true;
+      } catch (e) {
+        debugPrint('Update run_session SDK error: $e, thử REST trực tiếp...');
+      }
+    }
+
+    // Direct REST Fallback
+    try {
+      final url = Uri.parse('$supabaseUrl/rest/v1/run_sessions?id=eq.$id');
+      final resp = await http.patch(
+        url,
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': 'Bearer $supabaseAnonKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(updateData),
+      ).timeout(const Duration(seconds: 5));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Lỗi cập nhật buổi chạy REST direct: $e');
+    }
+    return false;
   }
 
-  /// Xóa buổi chạy khỏi Cloud
+  /// Xóa buổi chạy khỏi Cloud (Dual-layer: SDK + Direct REST fallback)
   static Future<bool> deleteRunSession(String id) async {
+    if (!isConfigured) return false;
     final supa = client;
-    if (supa == null) return false;
 
-    try {
-      await supa.from('run_sessions').delete().eq('id', id).timeout(const Duration(seconds: 4));
-      return true;
-    } catch (e) {
-      debugPrint('Lỗi xóa buổi chạy Supabase: $e');
-      return false;
+    if (supa != null) {
+      try {
+        await supa.from('run_sessions').delete().eq('id', id).timeout(const Duration(seconds: 4));
+        return true;
+      } catch (e) {
+        debugPrint('Delete run_session SDK error: $e, thử REST trực tiếp...');
+      }
     }
+
+    // Direct REST Fallback
+    try {
+      final url = Uri.parse('$supabaseUrl/rest/v1/run_sessions?id=eq.$id');
+      final resp = await http.delete(
+        url,
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': 'Bearer $supabaseAnonKey',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Lỗi xóa buổi chạy REST direct: $e');
+    }
+    return false;
   }
 }

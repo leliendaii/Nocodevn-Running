@@ -338,23 +338,28 @@ class AuthProvider with ChangeNotifier {
           final displayName = u.userMetadata?['name'] ?? cleanIdentifier.split('@').first;
           final username = u.userMetadata?['username'] ?? (cleanIdentifier.contains('@') ? '' : cleanIdentifier);
 
-          // Tạo session người dùng tức thì (0ms) để vào ngay app
+          final profile = await SupabaseService.fetchProfile(u.id, u.email, username);
+          final roleFromDb = (profile != null && profile['role'] == 'admin')
+              ? UserRole.admin
+              : ((u.userMetadata?['role'] == 'admin') ? UserRole.admin : UserRole.user);
+          final displayNameFromDb = profile?['name'] as String? ?? displayName;
+          final usernameFromDb = profile?['username'] as String? ?? username;
+          final avatarFromDb = profile?['avatar_url'] as String? ?? (u.userMetadata?['avatar_url'] ?? '');
+
+          // Tạo session người dùng chuẩn từ DB
           final appUser = AppUser(
             id: u.id,
-            name: displayName,
-            username: username,
+            name: displayNameFromDb,
+            username: usernameFromDb,
             email: u.email ?? cleanIdentifier,
-            role: (u.userMetadata?['role'] == 'admin') ? UserRole.admin : UserRole.user,
-            avatarUrl: u.userMetadata?['avatar_url'] ?? '',
+            role: roleFromDb,
+            avatarUrl: avatarFromDb,
           );
 
           _currentUser = appUser;
           LocalStorageService.saveUserSession(user: appUser, rememberMe: remember, password: password);
           _startAutoSyncRealtime();
           notifyListeners();
-
-          // Tự động kiểm tra quyền Admin từ profiles ngầm
-          refreshProfileFromServer();
 
           return null;
         }

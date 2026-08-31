@@ -208,6 +208,7 @@ class RunningProvider with ChangeNotifier {
     }
   }
 
+
   // Getters cho buổi chạy hiện tại
   TrackingState get state => _state;
   bool get isRunning => _state == TrackingState.running;
