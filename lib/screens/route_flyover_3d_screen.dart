@@ -820,35 +820,55 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
           body: SafeArea(
             child: Stack(
               children: [
-                // 1. ENGINE FLYCAM SIÊU MƯỢT (Trượt liên tục 2.000 điểm đều nhau, Zero Jitter)
+                // 1. ENGINE 2 LỚP ĐỘC LẬP (BẢN ĐỒ TĨNH 0% GPU + VỆT CHẠY VECTOR ĐỘNG SIÊU TỐC 60-120 FPS)
                 Positioned.fill(
                   child: _cachedRoutePixels.isEmpty
                       ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
-                      : AnimatedBuilder(
-                          animation: _controller,
-                          builder: (context, _) {
-                            return CustomPaint(
-                              painter: Real3DFlyoverPainter(
-                                pixels: _cachedRoutePixels,
-                                fullPath: _fullVectorPath,
-                                sampledPositions: _sampledPositions,
-                                sampledHeadings: _sampledHeadings,
-                                startPinPixel: _startPinPixel,
-                                finishPinPixel: _finishPinPixel,
-                                pathMetric: _pathMetric,
-                                totalLength: _totalPathLength,
-                                milestones: _milestones,
-                                progress: _controller.value,
-                                tileCache: _tileCache,
-                                zoom: _zoomLevel,
-                                routeCenterX: _routeCenterX,
-                                routeCenterY: _routeCenterY,
-                                spanW: _spanW,
-                                spanH: _spanH,
-                                onTileRequested: _loadMapTile,
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // TẦNG 1: BẢN ĐỒ GOOGLE MAPS TĨNH + MỐC KM + HUY HIỆU START/FINISH (Không bao giờ repaint khi chạy)
+                            RepaintBoundary(
+                              child: CustomPaint(
+                                isComplex: true,
+                                willChange: false,
+                                painter: StaticMapBackgroundPainter(
+                                  pixels: _cachedRoutePixels,
+                                  fullPath: _fullVectorPath,
+                                  startPinPixel: _startPinPixel,
+                                  finishPinPixel: _finishPinPixel,
+                                  milestones: _milestones,
+                                  tileCache: _tileCache,
+                                  zoom: _zoomLevel,
+                                  routeCenterX: _routeCenterX,
+                                  routeCenterY: _routeCenterY,
+                                  spanW: _spanW,
+                                  spanH: _spanH,
+                                  onTileRequested: _loadMapTile,
+                                ),
                               ),
-                            );
-                          },
+                            ),
+
+                            // TẦNG 2: VỆT CHẠY VECTOR ĐỎ THỂ THAO + CHẤM CHẠY PHÁT SÁNG (Chỉ vẽ 1 line vector nhẹ 0.1ms)
+                            AnimatedBuilder(
+                              animation: _controller,
+                              builder: (context, _) {
+                                return CustomPaint(
+                                  painter: DynamicTrailOverlayPainter(
+                                    sampledPositions: _sampledPositions,
+                                    sampledHeadings: _sampledHeadings,
+                                    pathMetric: _pathMetric,
+                                    totalLength: _totalPathLength,
+                                    progress: _controller.value,
+                                    routeCenterX: _routeCenterX,
+                                    routeCenterY: _routeCenterY,
+                                    spanW: _spanW,
+                                    spanH: _spanH,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                 ),
 
@@ -1095,18 +1115,13 @@ class MilestoneData {
   const MilestoneData({required this.km, required this.point, required this.pixel});
 }
 
-// PAINTER VẼ ĐỘNG FLYCAM SIÊU MƯỢT (BẢN ĐỒ CHUẨN HƯỚNG BẮC, CHỮ THẲNG ĐỨNG, NÉT VẼ VECTOR SẮC NÉT)
-class Real3DFlyoverPainter extends CustomPainter {
+// TẦNG 1: PAINTER BẢN ĐỒ TĨNH (CỐ ĐỊNH, KHÔNG BAO GIỜ REPAINT KHI ANIMATION CHẠY)
+class StaticMapBackgroundPainter extends CustomPainter {
   final List<Offset> pixels;
   final Path fullPath;
-  final List<Offset> sampledPositions;
-  final List<double> sampledHeadings;
   final Offset startPinPixel;
   final Offset finishPinPixel;
-  final ui.PathMetric pathMetric;
-  final double totalLength;
   final List<MilestoneData> milestones;
-  final double progress;
   final Map<String, ui.Image> tileCache;
   final int zoom;
   final double routeCenterX;
@@ -1117,7 +1132,6 @@ class Real3DFlyoverPainter extends CustomPainter {
 
   static const double tileSize = 256.0;
 
-  // Cached Paint objects để không cấp phát bộ nhớ mỗi khung hình (Zero Garbage Collection / 60 FPS)
   static final Paint _tilePaint = Paint()
     ..isAntiAlias = true
     ..filterQuality = FilterQuality.medium;
@@ -1131,6 +1145,157 @@ class Real3DFlyoverPainter extends CustomPainter {
     ..style = PaintingStyle.stroke
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round;
+
+  StaticMapBackgroundPainter({
+    required this.pixels,
+    required this.fullPath,
+    required this.startPinPixel,
+    required this.finishPinPixel,
+    required this.milestones,
+    required this.tileCache,
+    required this.zoom,
+    required this.routeCenterX,
+    required this.routeCenterY,
+    required this.spanW,
+    required this.spanH,
+    required this.onTileRequested,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (pixels.isEmpty) return;
+
+    final double targetScaleX = (size.width * 0.76) / (spanW > 10 ? spanW : 80);
+    final double targetScaleY = (size.height * 0.54) / (spanH > 10 ? spanH : 80);
+    final double camScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
+
+    final double screenCenterX = size.width / 2;
+    final double screenCenterY = size.height * 0.52;
+
+    canvas.save();
+    canvas.translate(screenCenterX, screenCenterY);
+    canvas.scale(camScale, camScale);
+    canvas.translate(-routeCenterX, -routeCenterY);
+
+    // 1. Vẽ các ô Map Tiles
+    final int centerTileX = (routeCenterX / tileSize).floor();
+    final int centerTileY = (routeCenterY / tileSize).floor();
+    final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
+    final int tileRadiusY = (3.4 / camScale).ceil().clamp(3, 7);
+
+    for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
+      for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
+        final tx = centerTileX + dx;
+        final ty = centerTileY + dy;
+        final key = '$zoom/$tx/$ty';
+
+        final tileRect = Rect.fromLTWH(tx * tileSize - 0.75, ty * tileSize - 0.75, tileSize + 1.5, tileSize + 1.5);
+
+        if (tileCache.containsKey(key)) {
+          final img = tileCache[key]!;
+          canvas.drawImageRect(
+            img,
+            Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+            tileRect,
+            _tilePaint,
+          );
+        } else {
+          canvas.drawRect(tileRect, _emptyTilePaint);
+          onTileRequested(zoom, tx, ty);
+        }
+      }
+    }
+
+    // 2. Vẽ đường dẫn dự kiến mờ
+    canvas.drawPath(fullPath, _fullPathPaint);
+
+    // 3. Vẽ các cột mốc Km
+    for (final m in milestones) {
+      final pinPixel = m.pixel;
+
+      canvas.save();
+      canvas.translate(pinPixel.dx, pinPixel.dy);
+
+      canvas.drawCircle(const Offset(0, 0), 4, Paint()..color = Colors.black38);
+      canvas.drawLine(const Offset(0, 0), const Offset(0, -18), Paint()..color = Colors.black54..strokeWidth = 2);
+      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = Colors.white);
+      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = AppTheme.primaryNeon..style = PaintingStyle.stroke..strokeWidth = 2);
+
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '${m.km}',
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(-tp.width / 2, -18 - tp.height / 2));
+
+      canvas.restore();
+    }
+
+    // 4. Vẽ cột mốc Start & Finish
+    final bool isLoop = (startPinPixel - finishPinPixel).distance < 40.0;
+
+    // Start
+    final Offset startBadgeOffset = isLoop ? const Offset(-24, 0) : Offset.zero;
+    canvas.save();
+    canvas.translate(startPinPixel.dx + startBadgeOffset.dx, startPinPixel.dy + startBadgeOffset.dy);
+    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
+      Paint()..color = const Color(0xFF10B981),
+    );
+    final startText = TextPainter(
+      text: const TextSpan(
+        text: '🟢 BẮT ĐẦU',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
+    canvas.restore();
+
+    // Finish
+    final Offset finishBadgeOffset = isLoop ? const Offset(24, 0) : Offset.zero;
+    canvas.save();
+    canvas.translate(finishPinPixel.dx + finishBadgeOffset.dx, finishPinPixel.dy + finishBadgeOffset.dy);
+    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
+      Paint()..color = const Color(0xFFEF4444),
+    );
+    final finishText = TextPainter(
+      text: const TextSpan(
+        text: '🏁 KẾT THÚC',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+    finishText.paint(canvas, Offset(-finishText.width / 2, -46 + (24 - finishText.height) / 2));
+    canvas.restore();
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant StaticMapBackgroundPainter oldDelegate) {
+    return oldDelegate.tileCache.length != tileCache.length;
+  }
+}
+
+// TẦNG 2: PAINTER VỆT CHẠY ĐỘNG (CHỈ VẼ DUY NHẤT 1 ĐƯỜNG VECTOR & BEACON CHẤM CHẠY - CHI PHÍ RENDER < 0.1ms)
+class DynamicTrailOverlayPainter extends CustomPainter {
+  final List<Offset> sampledPositions;
+  final List<double> sampledHeadings;
+  final ui.PathMetric pathMetric;
+  final double totalLength;
+  final double progress;
+  final double routeCenterX;
+  final double routeCenterY;
+  final double spanW;
+  final double spanH;
 
   static final Paint _shadowPaint = Paint()
     ..isAntiAlias = true
@@ -1156,31 +1321,22 @@ class Real3DFlyoverPainter extends CustomPainter {
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round;
 
-  Real3DFlyoverPainter({
-    required this.pixels,
-    required this.fullPath,
+  DynamicTrailOverlayPainter({
     required this.sampledPositions,
     required this.sampledHeadings,
-    required this.startPinPixel,
-    required this.finishPinPixel,
     required this.pathMetric,
     required this.totalLength,
-    required this.milestones,
     required this.progress,
-    required this.tileCache,
-    required this.zoom,
     required this.routeCenterX,
     required this.routeCenterY,
     required this.spanW,
     required this.spanH,
-    required this.onTileRequested,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (pixels.isEmpty || sampledPositions.isEmpty) return;
+    if (sampledPositions.isEmpty) return;
 
-    // 1. TIẾN ĐỘ CHẠY & NỘI SUY BẰNG BẢNG SAMPLING ĐỀU 2.000 ĐIỂM (Zero Jitter - Lướt êm 60-120 FPS)
     final double runProgress = (progress / 0.78).clamp(0.0, 1.0);
     final double currentDist = totalLength * runProgress;
 
@@ -1192,169 +1348,42 @@ class Real3DFlyoverPainter extends CustomPainter {
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
-    // 2. TÍNH TOÁN ZOOM CÂN ĐỐI CHÍNH GIỮA (100% CỐ ĐỊNH TÂM - TRIỆT TIÊU 100% LẮC QUA TRÁI PHẢI VÀ GIẬT ZOOM)
-    // Giữ toàn bộ cung đường, điểm Bắt đầu và Kết thúc luôn hiển thị rõ ràng, cân đối ngay giữa màn hình
     final double targetScaleX = (size.width * 0.76) / (spanW > 10 ? spanW : 80);
     final double targetScaleY = (size.height * 0.54) / (spanH > 10 ? spanH : 80);
     final double camScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
 
-    final double camX = routeCenterX;
-    final double camY = routeCenterY;
-    final double outroT = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
-
-    // 3. TÍNH TOÁN MA TRẬN CAMERA CHUẨN GOOGLE MAPS (Cố định tâm khung nhìn 100% không rung lắc)
     final double screenCenterX = size.width / 2;
     final double screenCenterY = size.height * 0.52;
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
     canvas.scale(camScale, camScale);
-    canvas.translate(-camX, -camY);
+    canvas.translate(-routeCenterX, -routeCenterY);
 
-    // 4. VẼ CÁC MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ MÀN HÌNH (Gối mép 0.75px - Triệt tiêu 100% đường kẻ bàn cờ)
-    final int centerTileX = (camX / tileSize).floor();
-    final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
-    final int tileRadiusY = (3.4 / camScale).ceil().clamp(3, 7);
-
-    for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
-      for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
-        final tx = centerTileX + dx;
-        final ty = centerTileY + dy;
-        final key = '$zoom/$tx/$ty';
-
-        // Gối mép 0.75px giữa các ô để triệt tiêu hoàn toàn đường kẻ phân tách
-        final tileRect = Rect.fromLTWH(tx * tileSize - 0.75, ty * tileSize - 0.75, tileSize + 1.5, tileSize + 1.5);
-
-        if (tileCache.containsKey(key)) {
-          final img = tileCache[key]!;
-          canvas.drawImageRect(
-            img,
-            Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
-            tileRect,
-            _tilePaint,
-          );
-        } else {
-          canvas.drawRect(tileRect, _emptyTilePaint);
-          onTileRequested(zoom, tx, ty);
-        }
-      }
-    }
-
-    // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN TRƯỚC (Nét mảnh mờ thanh lịch, sắc nét)
-    canvas.drawPath(fullPath, _fullPathPaint);
-
-    // 6. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Vector Thể Thao Liền Mạch Chuẩn Strava)
+    // 1. Vẽ Vệt Chạy Đỏ Thể Thao
     if (currentDist > 1.0) {
       final Path activePath = pathMetric.extractPath(0.0, currentDist);
-
-      // Lớp 1: Bóng đổ mặt đường tạo chiều sâu
       canvas.drawPath(activePath, _shadowPaint);
-
-      // Lớp 2: Vệt chạy đỏ Neon liền mạch chuẩn thể thao
       canvas.drawPath(activePath, _activePathPaint);
-
-      // Lớp 3: Lõi sáng thể thao tinh tế
       canvas.drawPath(activePath, _coreHighlightPaint);
     }
 
-    // 8. VẼ CỘT MỐC KM CẮM NỔI 3D TRÊN TUYẾN ĐƯỜNG
-    for (final m in milestones) {
-      final pinPixel = m.pixel;
-
-      canvas.save();
-      canvas.translate(pinPixel.dx, pinPixel.dy);
-
-      canvas.drawCircle(const Offset(0, 0), 4, Paint()..color = Colors.black38);
-      canvas.drawLine(const Offset(0, 0), const Offset(0, -18), Paint()..color = Colors.black54..strokeWidth = 2);
-      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = Colors.white);
-      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = AppTheme.primaryNeon..style = PaintingStyle.stroke..strokeWidth = 2);
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '${m.km}',
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(-tp.width / 2, -18 - tp.height / 2));
-
-      canvas.restore();
-    }
-
-    // 9. VẼ CỘT MỐC BẮT ĐẦU VÀ KẾT THÚC (LUÔN LUÔN HIỂN THỊ TỪ ĐẦU VIDEO ĐẾN CUỐI VIDEO)
-    final bool isLoop = (startPinPixel - finishPinPixel).distance < 40.0;
-
-    // 🟢 Điểm Bắt Đầu (Luôn luôn hiển thị)
-    final Offset startBadgeOffset = isLoop ? const Offset(-24, 0) : Offset.zero;
-    canvas.save();
-    canvas.translate(startPinPixel.dx + startBadgeOffset.dx, startPinPixel.dy + startBadgeOffset.dy);
-
-    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
-    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
-      Paint()..color = const Color(0xFF10B981),
-    );
-    final startText = TextPainter(
-      text: const TextSpan(
-        text: '🟢 BẮT ĐẦU',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
-      ),
-      textDirection: ui.TextDirection.ltr,
-    )..layout();
-    startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
-    canvas.restore();
-
-    // 🏁 Điểm Kết Thúc (Luôn luôn hiển thị)
-    final Offset finishBadgeOffset = isLoop ? const Offset(24, 0) : Offset.zero;
-    canvas.save();
-    canvas.translate(finishPinPixel.dx + finishBadgeOffset.dx, finishPinPixel.dy + finishBadgeOffset.dy);
-
-    if (outroT > 0.05) {
-      canvas.drawCircle(
-        const Offset(0, -28),
-        26,
-        Paint()
-          ..color = AppTheme.secondaryNeon.withValues(alpha: 0.35 * outroT)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3,
-      );
-    }
-
-    canvas.drawCircle(const Offset(0, 0), 6, Paint()..color = Colors.black45);
-    canvas.drawLine(const Offset(0, 0), const Offset(0, -22), Paint()..color = Colors.black87..strokeWidth = 2.5);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(-40, -46, 80, 24), const Radius.circular(12)),
-      Paint()..color = const Color(0xFFEF4444),
-    );
-    final finishText = TextPainter(
-      text: const TextSpan(
-        text: '🏁 KẾT THÚC',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
-      ),
-      textDirection: ui.TextDirection.ltr,
-    )..layout();
-    finishText.paint(canvas, Offset(-finishText.width / 2, -46 + (24 - finishText.height) / 2));
-    canvas.restore();
-
-    // 10. VẼ CON TRỎ ĐỊNH VỊ GPS THỂ THAO NIKE/APPLE ATHLETIC BEACON (Sóng Neon + Đĩa Tròn Phát Quang)
+    // 2. Vẽ Chấm Chạy Định Vị GPS Phát Sáng
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
-    // Sóng Radar tỏa tròn nhịp nhàng
     final double pulse = (progress * 18.0) % 1.0;
     canvas.drawCircle(
       Offset.zero,
       12 + pulse * 24,
       Paint()
         ..isAntiAlias = true
-        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.40 * (1.0 - pulse) * (1.0 - outroT))
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.40 * (1.0 - pulse))
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2,
     );
 
-    // Đèn pha dẫn đường chiếu về phía trước (Xoay 100% theo hướng chạy)
+    // Đèn pha dẫn đường
     canvas.save();
     canvas.rotate(runnerHeading);
 
@@ -1370,13 +1399,13 @@ class Real3DFlyoverPainter extends CustomPainter {
         const Offset(0, 0),
         const Offset(48, 0),
         [
-          const Color(0xFF00E5FF).withValues(alpha: 0.50 * (1.0 - outroT)),
+          const Color(0xFF00E5FF).withValues(alpha: 0.50),
           const Color(0xFF00E5FF).withValues(alpha: 0.0),
         ],
       );
     canvas.drawPath(beamPath, beamPaint);
 
-    // Vành đai kính phát sáng (Halo Ring)
+    // Vành đai kính phát sáng
     canvas.drawCircle(Offset.zero, 13, Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.6));
     canvas.drawCircle(
       Offset.zero,
@@ -1387,7 +1416,7 @@ class Real3DFlyoverPainter extends CustomPainter {
         ..color = const Color(0xFF00E5FF),
     );
 
-    // Mũi tên định hướng thể thao tinh tế
+    // Mũi tên định hướng
     final navArrow = Path()
       ..moveTo(9, 0)
       ..lineTo(-5, -6)
@@ -1399,14 +1428,13 @@ class Real3DFlyoverPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, 2.5, Paint()..color = const Color(0xFF00E5FF));
 
     canvas.restore();
-
     canvas.restore();
 
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant Real3DFlyoverPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.tileCache.length != tileCache.length;
+  bool shouldRepaint(covariant DynamicTrailOverlayPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
