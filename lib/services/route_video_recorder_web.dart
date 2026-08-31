@@ -102,21 +102,47 @@ class RealtimeVideoSession {
         }
       }
 
-      // 2. Kích hoạt tải file trực tiếp về máy
       final url = html.Url.createObjectUrlFromBlob(blob);
+
+      // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để người dùng bấm "Lưu video" vào Album Ảnh
+      if (isIOS) {
+        try {
+          final file = html.File([blob], finalName, {'type': fileMime});
+          final dynamic nav = html.window.navigator;
+          if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
+            await nav.share({
+              'files': [file],
+              'title': 'Video 3D Flyover',
+            });
+            return const VideoSaveResult(
+              isSuccess: true,
+              message: '🎉 Đã mở bảng chia sẻ iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
+            );
+          }
+        } catch (shareErr) {
+          debugPrint('iOS Share error: $shareErr');
+        }
+
+        // Trên iOS: Tự động mở video trực tiếp trong tab mới để xem và bấm Lưu vào Ảnh
+        try {
+          html.window.open(url, '_blank');
+        } catch (_) {
+          html.window.location.href = url;
+        }
+
+        return const VideoSaveResult(
+          isSuccess: true,
+          message: '🎉 Đã mở video! Nhấn vào biểu tượng Chia sẻ [↑] ➔ chọn "Lưu video" để lưu vào Album Ảnh nhé!',
+        );
+      }
+
+      // 2. Kích hoạt tải file trực tiếp về máy (Android & PC)
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download', finalName)
         ..style.display = 'none';
       html.document.body?.children.add(anchor);
       anchor.click();
       html.document.body?.children.remove(anchor);
-
-      if (isIOS) {
-        return const VideoSaveResult(
-          isSuccess: true,
-          message: '📥 Đã tải video vào ứng dụng "Tệp" (Files)! Mở Tệp ➔ Bấm vào video ➔ Bấm nút Chia sẻ [↑] ➔ Chọn "Lưu video" để vào Album Ảnh nhé!',
-        );
-      }
 
       return const VideoSaveResult(
         isSuccess: true,

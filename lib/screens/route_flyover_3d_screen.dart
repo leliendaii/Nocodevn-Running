@@ -55,7 +55,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  static const int _baseDurationMs = 13500; // Tốc độ cơ bản êm ái chuẩn phong cách Strava Flyover
+  int _baseDurationMs = 13500; // Tốc độ cơ bản tính theo quãng đường
 
   @override
   void initState() {
@@ -74,6 +74,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveDurationSec = 13 * 60; // 13 phút (780 giây)
       _effectivePace = '5:12';
       _effectiveCalories = 165;
+    }
+
+    // Tự động điều chỉnh thời lượng video theo quãng đường:
+    // Ngắn -> quay chậm rãi thưởng ngoạn; Dài -> lướt nhanh gọn
+    if (_effectiveDistanceKm < 1.0) {
+      _baseDurationMs = 10000;
+    } else if (_effectiveDistanceKm < 5.0) {
+      _baseDurationMs = 13000;
+    } else if (_effectiveDistanceKm < 10.0) {
+      _baseDurationMs = 16000;
+    } else if (_effectiveDistanceKm < 21.0) {
+      _baseDurationMs = 19000;
+    } else {
+      _baseDurationMs = 22000;
     }
 
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
@@ -1089,118 +1103,116 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
                 const SizedBox(height: 12), // KHOẢNG CÁCH RÕ RÀNG GIỮA 2 KHỐI
 
-                // B. THANH ĐIỀU KHIỂN PLAYBACK (SLIDER ĐỎ + 1X + NÚT TRÒN ĐỎ + 100%)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 18,
-                        offset: const Offset(0, 5),
+                // B. THANH ĐIỀU KHIỂN PLAYBACK (SLIDER ĐỎ + 1X + NÚT TRÒN ĐỎ + 100%) - TỰ ĐỘNG CẬP NHẬT THEO TỪNG FRAME
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    final double progressVal = _controller.value.clamp(0.0, 1.0);
+                    final int percent = (progressVal * 100).round();
+                    final isCompleted = progressVal >= 0.98 || _controller.status == AnimationStatus.completed;
+
+                    IconData playIcon = Icons.pause_rounded;
+                    if (!_isPlaying) {
+                      playIcon = isCompleted ? Icons.replay_rounded : Icons.play_arrow_rounded;
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            blurRadius: 18,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Slider đỏ với nút tròn trắng
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 4.0,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.5),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                          activeTrackColor: const Color(0xFFFF3366),
-                          inactiveTrackColor: const Color(0xFF1E293B),
-                          thumbColor: Colors.white,
-                        ),
-                        child: Slider(
-                          value: _controller.value.clamp(0.0, 1.0),
-                          onChanged: (val) {
-                            _controller.stop();
-                            _controller.value = val;
-                            setState(() => _isPlaying = false);
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Dropdown speed
-                          InkWell(
-                            onTap: _openSpeedSelectorModal,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFF334155)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.secondaryNeon, size: 18),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    _formatSpeed(_playbackSpeed),
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          // Slider đỏ với nút tròn trắng di chuyển mượt mà 100%
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              trackHeight: 4.0,
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.5),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                              activeTrackColor: const Color(0xFFFF3366),
+                              inactiveTrackColor: const Color(0xFF1E293B),
+                              thumbColor: Colors.white,
+                            ),
+                            child: Slider(
+                              value: progressVal,
+                              onChanged: (val) {
+                                _controller.stop();
+                                _controller.value = val;
+                                setState(() => _isPlaying = false);
+                              },
                             ),
                           ),
-
-                          // Nút Play / Replay tròn đỏ phát sáng
-                          InkWell(
-                            onTap: _togglePlayPause,
-                            borderRadius: BorderRadius.circular(30),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFFF2A55),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFFF2A55).withValues(alpha: 0.5),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 3),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Dropdown speed
+                              InkWell(
+                                onTap: _openSpeedSelectorModal,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E293B),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF334155)),
                                   ),
-                                ],
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.secondaryNeon, size: 18),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        _formatSpeed(_playbackSpeed),
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              child: AnimatedBuilder(
-                                animation: _controller,
-                                builder: (context, _) {
-                                  final isCompleted = _controller.value >= 0.98 || _controller.status == AnimationStatus.completed;
-                                  IconData icon = Icons.pause_rounded;
-                                  if (!_isPlaying) {
-                                    icon = isCompleted ? Icons.replay_rounded : Icons.play_arrow_rounded;
-                                  }
-                                  return Icon(
-                                    icon,
+
+                              // Nút Play / Replay tròn đỏ phát sáng
+                              InkWell(
+                                onTap: _togglePlayPause,
+                                borderRadius: BorderRadius.circular(30),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFFFF2A55),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFFF2A55).withValues(alpha: 0.5),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    playIcon,
                                     color: Colors.white,
                                     size: 26,
-                                  );
-                                },
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
 
-                          // Phần trăm tiến độ 100%
-                          AnimatedBuilder(
-                            animation: _controller,
-                            builder: (context, _) {
-                              final int percent = (_controller.value * 100).round();
-                              return Container(
+                              // Phần trăm tiến độ 100%
+                              Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 child: Text(
                                   '$percent%',
@@ -1210,13 +1222,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                     color: Colors.white,
                                   ),
                                 ),
-                              );
-                            },
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -1345,10 +1357,10 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
     // 2. CAMERA STRAVA 3D FLYOVER - MƯỢT MÀ 100% TUYỆT ĐỐI KHÔNG RUNG LẮC:
-    final double targetScaleX = (size.width * 0.48) / (spanW > 40 ? spanW : 160);
-    final double targetScaleY = (size.height * 0.35) / (spanH > 40 ? spanH : 160);
-    final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.15, 1.10);
-    final double chaseScale = (overviewScale * 2.1).clamp(0.35, 2.3);
+    final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
+    final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
+    final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
+    final double chaseScale = (overviewScale * 1.8).clamp(0.40, 2.5);
 
     final double outroRaw = ((progress - 0.82) / 0.18).clamp(0.0, 1.0);
     final double outroT = Curves.easeOutCubic.transform(outroRaw);
@@ -1363,7 +1375,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camY = ui.lerpDouble(smoothedCam.dy, routeCenterY, outroT)!;
       camScale = ui.lerpDouble(chaseScale, overviewScale, outroT)!;
     } else {
-      // 🗺️ CHẾ ĐỘ TOÀN CẢNH: Cố định 100% tâm tuyến đường, 0% rung lắc
+      // 🗺️ CHẾ ĐỘ TOÀN CẢNH: Zoom to rõ ràng, cố định 100% tâm tuyến đường và KHÔNG BỊ ZOOM Ở CUỐI VIDEO
       camX = routeCenterX;
       camY = routeCenterY;
       camScale = overviewScale;
