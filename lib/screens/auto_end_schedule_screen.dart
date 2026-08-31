@@ -5,17 +5,8 @@ import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 
-class AutoEndScheduleScreen extends StatefulWidget {
+class AutoEndScheduleScreen extends StatelessWidget {
   const AutoEndScheduleScreen({super.key});
-
-  @override
-  State<AutoEndScheduleScreen> createState() => _AutoEndScheduleScreenState();
-}
-
-class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
-  bool _reminderEnabled = true;
-  int _reminderHour = 5;
-  int _reminderMinute = 30;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +33,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
         builder: (context, running, _) {
           final startStr = '${running.autoStartHour.toString().padLeft(2, '0')}:${running.autoStartMinute.toString().padLeft(2, '0')}';
           final endStr = '${running.autoEndHour.toString().padLeft(2, '0')}:${running.autoEndMinute.toString().padLeft(2, '0')}';
-          final reminderStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
+          final reminderStr = '${running.reminderHour.toString().padLeft(2, '0')}:${running.reminderMinute.toString().padLeft(2, '0')}';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
@@ -50,14 +41,14 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ==========================================
-                // PHẦN 1: TỰ ĐỘNG KẾT THÚC & LƯU PHIÊN CHẠY
+                // PHẦN 1: TỰ ĐỘNG KẾT THÚC PHIÊN CHẠY
                 // ==========================================
                 Row(
                   children: const [
                     Icon(Icons.timer_off_outlined, color: AppTheme.primaryNeon, size: 18),
                     SizedBox(width: 8),
                     Text(
-                      'TỰ ĐỘNG KẾT THÚC & LƯU PHIÊN',
+                      'TỰ ĐỘNG KẾT THÚC PHIÊN CHẠY',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
@@ -93,19 +84,9 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                                 child: const Icon(Icons.flash_on_rounded, color: AppTheme.primaryNeon, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Tự động chốt phiên chạy',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Chống quên tắt khi chạy xong',
-                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                  ),
-                                ],
+                              const Text(
+                                'Tự động kết thúc phiên chạy',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
                               ),
                             ],
                           ),
@@ -123,7 +104,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                               );
                               TopSyncToast.show(
                                 context,
-                                message: val ? 'Đã bật tự động chốt phiên chạy!' : 'Đã tắt tự động chốt!',
+                                message: val ? 'Đã bật tự động kết thúc' : 'Đã tắt tự động kết thúc',
                               );
                             },
                           ),
@@ -166,7 +147,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                           },
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceLight.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(14),
@@ -176,18 +157,10 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                               children: [
                                 const Icon(Icons.wb_sunny_outlined, color: AppTheme.textSecondary, size: 18),
                                 const SizedBox(width: 10),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Khung giờ bắt đầu chạy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      SizedBox(height: 1),
-                                      Text('Giờ thường xỏ giày ra đường', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-                                    ],
-                                  ),
-                                ),
+                                const Text('Giờ bắt đầu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
+                                const Spacer(),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: AppTheme.surface,
                                     borderRadius: BorderRadius.circular(8),
@@ -234,13 +207,13 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                                 endMinute: picked.minute,
                               );
                               if (context.mounted) {
-                                TopSyncToast.show(context, message: 'Đã đổi giờ chốt thành ${picked.format(context)}');
+                                TopSyncToast.show(context, message: 'Đã đổi giờ kết thúc thành ${picked.format(context)}');
                               }
                             }
                           },
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceLight.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(14),
@@ -250,18 +223,10 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                               children: [
                                 const Icon(Icons.flag_circle_outlined, color: AppTheme.primaryNeon, size: 18),
                                 const SizedBox(width: 10),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Giờ tự động chốt kết quả', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      SizedBox(height: 1),
-                                      Text('Ngắt GPS & lưu lên Cloud', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-                                    ],
-                                  ),
-                                ),
+                                const Text('Giờ kết thúc', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
+                                const Spacer(),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
@@ -282,41 +247,17 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
-
-                // Thẻ giải thích chi tiết
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppTheme.divider),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: AppTheme.secondaryNeon, size: 18),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '💡 Khi bạn chạy trong khung giờ trên mà quên bấm dừng, hễ đồng hồ bước qua giờ chốt, hệ thống sẽ tự động hoàn tất và lưu bài chạy thẳng lên Cloud.',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 24),
 
                 // ==========================================
-                // PHẦN 2: NHẮC NHỞ LUYỆN TẬP HÀNG NGÀY
+                // PHẦN 2: NHẮC NHỞ
                 // ==========================================
                 Row(
                   children: const [
                     Icon(Icons.notifications_active_outlined, color: AppTheme.primaryNeon, size: 18),
                     SizedBox(width: 8),
                     Text(
-                      'NHẮC NHỞ LUYỆN TẬP',
+                      'NHẮC NHỞ',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
@@ -351,45 +292,40 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                                 child: const Icon(Icons.alarm_on_rounded, color: AppTheme.primaryNeon, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Thông báo nhắc chạy bộ',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Duy trì kỷ luật mỗi ngày',
-                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                  ),
-                                ],
+                              const Text(
+                                'Nhắc nhở',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
                               ),
                             ],
                           ),
                           Switch(
-                            value: _reminderEnabled,
+                            value: running.reminderEnabled,
                             activeThumbColor: AppTheme.primaryNeon,
                             onChanged: (val) {
-                              setState(() => _reminderEnabled = val);
+                              running.updateReminderSchedule(
+                                userId: userId,
+                                enabled: val,
+                                hour: running.reminderHour,
+                                minute: running.reminderMinute,
+                              );
                               TopSyncToast.show(
                                 context,
                                 message: val
-                                    ? 'Đã bật nhắc nhở luyện tập lúc $reminderStr!'
-                                    : 'Đã tắt nhắc nhở!',
+                                    ? 'Đã bật nhắc nhở lúc $reminderStr'
+                                    : 'Đã tắt nhắc nhở',
                               );
                             },
                           ),
                         ],
                       ),
-                      if (_reminderEnabled) ...[
+                      if (running.reminderEnabled) ...[
                         const Divider(color: AppTheme.divider, height: 24),
                         // Giờ nhắc nhở
                         InkWell(
                           onTap: () async {
                             final picked = await showTimePicker(
                               context: context,
-                              initialTime: TimeOfDay(hour: _reminderHour, minute: _reminderMinute),
+                              initialTime: TimeOfDay(hour: running.reminderHour, minute: running.reminderMinute),
                               builder: (context, child) {
                                 return Theme(
                                   data: ThemeData.dark().copyWith(
@@ -403,10 +339,12 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                               },
                             );
                             if (picked != null) {
-                              setState(() {
-                                _reminderHour = picked.hour;
-                                _reminderMinute = picked.minute;
-                              });
+                              running.updateReminderSchedule(
+                                userId: userId,
+                                enabled: true,
+                                hour: picked.hour,
+                                minute: picked.minute,
+                              );
                               if (context.mounted) {
                                 TopSyncToast.show(context, message: 'Đã đổi giờ nhắc nhở thành ${picked.format(context)}');
                               }
@@ -414,7 +352,7 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                           },
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceLight.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(14),
@@ -424,10 +362,10 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
                               children: [
                                 const Icon(Icons.alarm_rounded, color: AppTheme.textSecondary, size: 18),
                                 const SizedBox(width: 10),
-                                const Text('Giờ nhắc nhở mỗi sáng:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                                const Text('Giờ nhắc nhở', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
                                 const Spacer(),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
@@ -457,5 +395,3 @@ class _AutoEndScheduleScreenState extends State<AutoEndScheduleScreen> {
     );
   }
 }
-
-

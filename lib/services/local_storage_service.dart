@@ -507,5 +507,52 @@ class LocalStorageService {
       debugPrint('Lỗi xóa checkpoint active run: $e');
     }
   }
+
+  // ==========================================
+  // CẤU HÌNH NHẮC NHỞ
+  // ==========================================
+  static const String _keyReminderPrefix = 'daily_reminder_';
+
+  /// Lưu cài đặt Nhắc nhở
+  static Future<void> saveReminderConfig({
+    required String userId,
+    required bool enabled,
+    required int hour,
+    required int minute,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = {
+        'enabled': enabled,
+        'hour': hour,
+        'minute': minute,
+      };
+      await prefs.setString('$_keyReminderPrefix$userId', jsonEncode(data));
+    } catch (e) {
+      debugPrint('Lỗi lưu reminder config: $e');
+    }
+  }
+
+  /// Đọc cài đặt Nhắc nhở
+  static Future<Map<String, dynamic>> loadReminderConfig(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('$_keyReminderPrefix$userId');
+      if (str == null || str.isEmpty) {
+        return {
+          'enabled': true,
+          'hour': 5,
+          'minute': 30,
+        };
+      }
+      return jsonDecode(str) as Map<String, dynamic>;
+    } catch (e) {
+      return {
+        'enabled': true,
+        'hour': 5,
+        'minute': 30,
+      };
+    }
+  }
 }
 

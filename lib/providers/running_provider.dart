@@ -52,6 +52,12 @@ class RunningProvider with ChangeNotifier {
   int _autoEndMinute = 30;
   bool _wasAutoFinished = false;
 
+  // Cấu hình Nhắc nhở
+  bool _reminderEnabled = true;
+  int _reminderHour = 5;
+  int _reminderMinute = 30;
+  DateTime? _lastReminderTriggerDate;
+
   // Haptic & Milestone callback cho mỗi 1 KM hoàn thành (giống Nike Run Club / Strava)
   int _lastMilestoneKm = 0;
   void Function(int kmCount, String pace, int durationSeconds)? onKilometerMilestone;
@@ -79,6 +85,9 @@ class RunningProvider with ChangeNotifier {
         }
       }
       notifyListeners();
+      if (_activeUserId != null) {
+        checkDailyReminder(_activeUserId!);
+      }
     }
   }
 
@@ -110,11 +119,14 @@ class RunningProvider with ChangeNotifier {
       }
 
       notifyListeners();
+      if (_activeUserId != null) {
+        checkDailyReminder(_activeUserId!);
+      }
 
       // Đồng bộ offline chạy ngầm trong nền không gây đơ kéo vuốt
       _syncPendingOfflineRuns();
     } catch (e) {
-      debugPrint('Lỗi refreshAllData: $e');
+      debugPrint('Lỗi refreshData: $e');
     }
   }
 
@@ -150,7 +162,8 @@ class RunningProvider with ChangeNotifier {
   }
 
   /// Kiểm tra User có phải Admin hay không
-  bool isUserAdmin(String userId) {
+  bool isUserAdmin(String? userId) {
+    if (userId == null) return false;
     final p = _userProfiles[userId];
     if (p != null && p['role'] != null) {
       return (p['role'] as String).toLowerCase() == 'admin';
@@ -169,7 +182,14 @@ class RunningProvider with ChangeNotifier {
     _autoStartMinute = schedule['startMinute'] ?? 0;
     _autoEndHour = schedule['endHour'] ?? 7;
     _autoEndMinute = schedule['endMinute'] ?? 30;
+
+    final reminder = await LocalStorageService.loadReminderConfig(userId);
+    _reminderEnabled = reminder['enabled'] ?? true;
+    _reminderHour = reminder['hour'] ?? 5;
+    _reminderMinute = reminder['minute'] ?? 30;
+
     notifyListeners();
+    checkDailyReminder(userId);
   }
 
   /// Cập nhật khung giờ chạy và giờ tự động chốt cho riêng User đang đăng nhập
@@ -196,6 +216,68 @@ class RunningProvider with ChangeNotifier {
       endMinute: endMinute,
     );
     notifyListeners();
+  }
+
+  /// Cập nhật cấu hình Nhắc nhở
+  Future<void> updateReminderSchedule({
+    required String userId,
+    required bool enabled,
+    required int hour,
+    required int minute,
+  }) async {
+    _activeUserId = userId;
+    _reminderEnabled = enabled;
+    _reminderHour = hour;
+    _reminderMinute = minute;
+    await LocalStorageService.saveReminderConfig(
+      userId: userId,
+      enabled: enabled,
+      hour: hour,
+      minute: minute,
+    );
+    notifyListeners();
+    if (enabled) {
+      checkDailyReminder(userId);
+    }
+  }
+
+  /// Kiểm tra và kích hoạt thông báo nhắc nhở thông minh
+  Future<void> checkDailyReminder(String userId) async {
+    if (!_reminderEnabled) return;
+    final now = DateTime.now();
+
+    // Nếu hôm nay đã gửi nhắc nhở rồi thì không lặp lại
+    if (_lastReminderTriggerDate != null &&
+        _lastReminderTriggerDate!.year == now.year &&
+        _lastReminderTriggerDate!.month == now.month &&
+        _lastReminderTriggerDate!.day == now.day) {
+      return;
+    }
+
+    // Kiểm tra xem người dùng hôm nay đã có buổi chạy nào chưa
+    final userRuns = _sessions.where((s) => s.userId == userId).toList();
+    final bool hasRunToday = userRuns.any((s) =>
+        s.startTime.year == now.year &&
+        s.startTime.month == now.month &&
+        s.startTime.day == now.day);
+
+    if (hasRunToday) {
+      // Đã hoàn thành bài chạy hôm nay -> Không cần nhắc
+      return;
+    }
+
+    // Nếu thời gian hiện tại đã đến hoặc đã vượt quá giờ nhắc nhở trong ngày
+    final currentMinutes = now.hour * 60 + now.minute;
+    final reminderMinutes = _reminderHour * 60 + _reminderMinute;
+
+    if (currentMinutes >= reminderMinutes) {
+      _lastReminderTriggerDate = now;
+      final timeStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
+      await LiveWorkoutNotificationService.showMorningReminderNotification(
+        title: 'Nhắc nhở',
+        body: 'Sáng nay bạn chưa hoàn thành buổi chạy lúc $timeStr. Hãy dành ít phút chạy bộ nhé!',
+      );
+    }
   }
 
   /// Tải dữ liệu kết hợp Offline Cache & Supabase Cloud
@@ -253,6 +335,17 @@ class RunningProvider with ChangeNotifier {
   List<RunPoint> get currentRoute => List.unmodifiable(_currentRoute);
   List<RunSession> get allSessions => List.unmodifiable(_sessions);
 
+  // Getters cài đặt Tự động kết thúc & Nhắc nhở
+  bool get autoEndEnabled => _autoEndEnabled;
+  int get autoStartHour => _autoStartHour;
+  int get autoStartMinute => _autoStartMinute;
+  int get autoEndHour => _autoEndHour;
+  int get autoEndMinute => _autoEndMinute;
+
+  bool get reminderEnabled => _reminderEnabled;
+  int get reminderHour => _reminderHour;
+  int get reminderMinute => _reminderMinute;
+
   /// Vận tốc trung bình cả buổi (km/h)
   double get currentSpeedKmh {
     if (_distanceKm <= 0.005 || _durationSeconds <= 0) return 0.0;
@@ -294,12 +387,6 @@ class RunningProvider with ChangeNotifier {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  // Getters cho cấu hình khung giờ tự động kết thúc (Chống quên)
-  bool get autoEndEnabled => _autoEndEnabled;
-  int get autoStartHour => _autoStartHour;
-  int get autoStartMinute => _autoStartMinute;
-  int get autoEndHour => _autoEndHour;
-  int get autoEndMinute => _autoEndMinute;
   bool get wasAutoFinished => _wasAutoFinished;
 
   void clearAutoFinishedFlag() {
@@ -406,6 +493,37 @@ class RunningProvider with ChangeNotifier {
             calories: _calories,
             isPaused: false,
           );
+        }
+
+        // Tự động kết thúc phiên chạy khi chạm hoặc vượt qua giờ kết thúc đã cài
+        if (_autoEndEnabled) {
+          final now = DateTime.now();
+          final currentMin = now.hour * 60 + now.minute;
+          final endMin = _autoEndHour * 60 + _autoEndMinute;
+          final startMin = _autoStartHour * 60 + _autoStartMinute;
+
+          final bool isOverTime = (endMin > startMin)
+              ? (currentMin >= endMin)
+              : (currentMin >= endMin && currentMin < startMin);
+
+          if (isOverTime && _distanceKm > 0.02) {
+            _wasAutoFinished = true;
+            final double finishedDistance = _distanceKm;
+            final int sec = _durationSeconds;
+            final min = sec ~/ 60;
+            final s = sec % 60;
+            final durationStr = '${min.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+
+            stopAndSaveTracking(
+              userId: _activeUserId ?? 'user',
+              userName: 'Runner',
+            );
+
+            LiveWorkoutNotificationService.showAutoEndNotification(
+              distanceKm: finishedDistance,
+              durationStr: durationStr,
+            );
+          }
         }
       }
     });

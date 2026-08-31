@@ -129,4 +129,86 @@ class LiveWorkoutNotificationService {
       debugPrint('Lỗi hủy thông báo: $e');
     }
   }
+
+  /// Bắn thông báo nhắc nhở ra màn hình khóa & trung tâm thông báo
+  static Future<void> showMorningReminderNotification({
+    required String title,
+    required String body,
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+
+      const androidDetails = AndroidNotificationDetails(
+        'running_daily_reminder_channel',
+        'Nhắc nhở luyện tập hàng ngày',
+        channelDescription: 'Thông báo nhắc nhở chạy bộ buổi sáng và duy trì mục tiêu',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        showWhen: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.show(
+        999,
+        title,
+        body,
+        details,
+      );
+    } catch (e) {
+      debugPrint('Lỗi hiển thị thông báo nhắc nhở: $e');
+    }
+  }
+
+  /// Thông báo khi hệ thống tự động kết thúc phiên chạy đúng giờ đã cài
+  static Future<void> showAutoEndNotification({
+    required double distanceKm,
+    required String durationStr,
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+
+      const androidDetails = AndroidNotificationDetails(
+        'running_auto_end_channel',
+        'Tự động kết thúc phiên chạy',
+        channelDescription: 'Thông báo khi phiên chạy tự động chốt và lưu kết quả',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        showWhen: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.show(
+        889,
+        'Tự động kết thúc phiên chạy',
+        'Đã hoàn thành ${distanceKm.toStringAsFixed(2)} km trong $durationStr. Thành tích đã được lưu.',
+        details,
+      );
+    } catch (e) {
+      debugPrint('Lỗi hiển thị thông báo tự động kết thúc: $e');
+    }
+  }
 }
