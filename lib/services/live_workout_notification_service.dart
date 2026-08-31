@@ -75,10 +75,10 @@ class LiveWorkoutNotificationService {
       final String kmStr = distanceKm.toStringAsFixed(2);
 
       final String title = isPaused
-          ? '⏸️ TẠM DỪNG: $kmStr km'
-          : '🏃 ĐANG CHẠY: $kmStr km';
+          ? 'TẠM DỪNG: $kmStr km'
+          : 'ĐANG CHẠY: $kmStr km';
 
-      final String body = '⏱️ $timeStr  •  ⚡ $pace /km  •  🔥 $calories kcal';
+      final String body = '$timeStr  •  $pace /km  •  $calories kcal';
 
       final androidDetails = AndroidNotificationDetails(
         _channelId,
@@ -91,9 +91,9 @@ class LiveWorkoutNotificationService {
         onlyAlertOnce: true, // Không rung chuông mỗi giây
         showWhen: true,
         styleInformation: BigTextStyleInformation(
-          '⏱️ Thời gian: $timeStr\n⚡ Pace trung bình: $pace /km\n🔥 Năng lượng tiêu hao: $calories kcal',
+          'Thời gian: $timeStr\nPace: $pace /km\nCalo: $calories kcal',
           contentTitle: title,
-          summaryText: isPaused ? 'Tạm dừng buổi chạy' : 'Đang theo dõi trực tiếp',
+          summaryText: isPaused ? 'Tạm dừng buổi chạy' : 'Đang theo dõi',
         ),
       );
 

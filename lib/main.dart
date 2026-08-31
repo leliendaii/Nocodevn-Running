@@ -42,7 +42,7 @@ class RunningTrackerApp extends StatelessWidget {
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {
           return MaterialApp(
-            title: 'Nocode Running',
+            title: 'Nocodevn Running',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
             locale: DevicePreview.locale(context),

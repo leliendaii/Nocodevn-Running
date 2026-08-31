@@ -90,13 +90,13 @@ class RealtimeVideoSession {
 
         return const VideoSaveResult(
           isSuccess: true,
-          message: '🎉 Đã lưu video thành công vào Album Ảnh (Camera Roll)!',
+          message: 'Đã lưu video thành công vào Album Ảnh',
         );
       }
     } catch (e) {
       debugPrint('Lỗi downloadVideoDirect: $e');
     }
-    return const VideoSaveResult(isSuccess: true, message: '🎉 Đã sẵn sàng video!');
+    return const VideoSaveResult(isSuccess: true, message: 'Đã sẵn sàng video');
   }
 
   /// TẢI VỀ TRÊN NATIVE IOS (IPHONE APP) & ANDROID: Lưu thẳng vào Album Ảnh (Camera Roll)
@@ -122,7 +122,7 @@ class RealtimeVideoSession {
             await Gal.putVideo(path).timeout(const Duration(seconds: 5));
             return const VideoSaveResult(
               isSuccess: true,
-              message: '🎉 Đã lưu video thành công vào Album Ảnh (Camera Roll)!',
+              message: 'Đã lưu video thành công vào Album Ảnh',
             );
           }
         } catch (galError) {
@@ -140,7 +140,7 @@ class RealtimeVideoSession {
 
           return const VideoSaveResult(
             isSuccess: true,
-            message: '🎉 Đã mở bảng chia sẻ của iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
+            message: 'Đã mở bảng chia sẻ. Chọn "Lưu video" để lưu vào Thư viện Ảnh.',
           );
         } catch (shareErr) {
           debugPrint('Share fallback error: $shareErr');
@@ -149,7 +149,7 @@ class RealtimeVideoSession {
 
       return const VideoSaveResult(
         isSuccess: true,
-        message: '🎉 Video đã sẵn sàng!',
+        message: 'Video đã sẵn sàng',
       );
     } catch (e) {
       debugPrint('Lỗi lưu video native: $e');

@@ -77,7 +77,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         TopSyncToast.show(
           context,
           message:
-              '🛡️ Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km) do máy bị đóng đột ngột!',
+              'Đã tự động lưu buổi chạy trước (${recovered.formattedDistance} km)',
         );
       }
     }
@@ -228,7 +228,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             if (mounted) {
               TopSyncToast.show(
                 context,
-                message: '🔄 Đã cập nhật thống kê mới nhất!',
+                message: 'Đã cập nhật thống kê mới nhất',
                 isSuccess: true,
               );
             }
@@ -553,7 +553,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             if (mounted) {
               TopSyncToast.show(
                 context,
-                message: '🔄 Đã cập nhật thông tin hồ sơ mới nhất!',
+                message: 'Đã cập nhật thông tin hồ sơ mới nhất',
                 isSuccess: true,
               );
             }

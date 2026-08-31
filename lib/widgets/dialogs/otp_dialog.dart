@@ -155,7 +155,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
       Navigator.of(context).pop();
       TopSyncToast.show(
         context,
-        message: '🎉 Xác thực Email thành công! Đã kích hoạt tài khoản.',
+        message: 'Xác thực Email thành công. Đã kích hoạt tài khoản.',
         isSuccess: true,
       );
     }

@@ -98,7 +98,7 @@ class RealtimeVideoSession {
 
         return const VideoSaveResult(
           isSuccess: true,
-          message: '🎉 Đã mở bảng chia sẻ iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
+          message: 'Đã mở bảng chia sẻ. Chọn "Lưu video" để lưu vào Thư viện Ảnh.',
         );
       }
 
@@ -112,7 +112,7 @@ class RealtimeVideoSession {
         }
         return const VideoSaveResult(
           isSuccess: true,
-          message: '🎉 Đã mở video! Nhấn vào biểu tượng Chia sẻ [↑] ➔ chọn "Lưu video" để lưu vào Album Ảnh nhé!',
+          message: 'Đã mở video. Nhấn Chia sẻ để lưu vào Album Ảnh.',
         );
       }
 
@@ -125,7 +125,7 @@ class RealtimeVideoSession {
 
       return const VideoSaveResult(
         isSuccess: true,
-        message: '🎉 Đã tải video thành công về thiết bị!',
+        message: 'Đã tải video thành công về thiết bị',
       );
     } catch (e) {
       return VideoSaveResult(isSuccess: false, message: 'Lỗi tải video: $e');

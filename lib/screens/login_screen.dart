@@ -115,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
         TopSyncToast.show(
           context,
           message:
-              '⚠️ Quá 5 lần gửi! Vui lòng thử lại sau $remainingMinutes phút.',
+              'Quá số lần gửi cho phép. Thử lại sau $remainingMinutes phút.',
           isSuccess: false,
         );
         return;
@@ -129,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _lockUntil = DateTime.now().add(const Duration(hours: 1));
       TopSyncToast.show(
         context,
-        message: '⛔ Đã gửi quá 5 lần! Tạm khóa gửi OTP trong 1 tiếng.',
+        message: 'Đã gửi quá 5 lần. Tạm khóa gửi OTP trong 1 giờ.',
         isSuccess: false,
       );
       return;
@@ -157,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (auth.isAuthenticated) {
       TopSyncToast.show(
         context,
-        message: '🎉 Đăng ký thành công! Đang vào ứng dụng...',
+        message: 'Đăng ký thành công. Đang vào ứng dụng...',
         isSuccess: true,
       );
       return;

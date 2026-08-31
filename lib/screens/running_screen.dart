@@ -46,7 +46,7 @@ class _RunningScreenState extends State<RunningScreen>
           if (mounted) {
             TopSyncToast.show(
               context,
-              message: '🎯 Bạn vừa chạy được $kmCount km trong vòng ${VoiceCoachService.formatDurationSpeech(durationSeconds)}! (Pace: $pace)',
+              message: 'Đã hoàn thành $kmCount km (${VoiceCoachService.formatDurationSpeech(durationSeconds)}, Pace $pace)',
               isSuccess: true,
             );
           }
@@ -159,7 +159,7 @@ class _RunningScreenState extends State<RunningScreen>
                             Navigator.of(ctx).pop();
                             TopSyncToast.show(
                               context,
-                              message: 'Đã hủy buổi chạy ngắn!',
+                              message: 'Đã hủy buổi chạy',
                               isSuccess: false,
                             );
                           },
@@ -372,7 +372,7 @@ class _RunningScreenState extends State<RunningScreen>
                           Navigator.of(ctx).pop();
                           TopSyncToast.show(
                             context,
-                            message: '🎉 Chúc mừng! Đã lưu buổi chạy thành công!',
+                            message: 'Đã lưu buổi chạy thành công',
                             isSuccess: true,
                           );
                         },
@@ -438,7 +438,7 @@ class _RunningScreenState extends State<RunningScreen>
             if (context.mounted) {
               TopSyncToast.show(
                 context,
-                message: '🔄 Đã cập nhật dữ liệu mới nhất!',
+                message: 'Đã cập nhật dữ liệu mới nhất',
                 isSuccess: true,
               );
             }

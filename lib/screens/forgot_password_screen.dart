@@ -195,7 +195,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       Navigator.of(context).pop();
       TopSyncToast.show(
         context,
-        message: '🎉 Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới.',
+        message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.',
         isSuccess: true,
       );
     } else {
