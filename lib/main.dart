@@ -10,6 +10,7 @@ import 'screens/main_shell.dart';
 import 'theme/app_theme.dart';
 import 'services/supabase_service.dart';
 import 'services/local_storage_service.dart';
+import 'services/live_workout_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,7 @@ void main() async {
   } catch (_) {}
   await LocalStorageService.init();
   await SupabaseService.initialize();
+  await LiveWorkoutNotificationService.initialize();
   runApp(
     DevicePreview(
       enabled: !kReleaseMode, // Bật khung điện thoại ảo khi chạy debug trên Chrome / Windows

@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/calorie_calculator.dart';
 import '../services/gps_compression_service.dart';
+import '../services/live_workout_notification_service.dart';
 
 enum TrackingState { idle, running, paused, finished }
 
@@ -376,8 +377,15 @@ class RunningProvider with ChangeNotifier {
     _lastPositionTime = null;
     _lastMilestoneKm = 0;
 
-    // Lưu ngay checkpoint điểm xuất phát
+    // Lưu ngay checkpoint điểm xuất phát & Khởi tạo thông báo chạy ngầm trực tiếp
     saveActiveCheckpointNow();
+    LiveWorkoutNotificationService.updateWorkoutNotification(
+      distanceKm: 0.0,
+      durationSeconds: 0,
+      pace: '0:00',
+      calories: 0,
+      isPaused: false,
+    );
 
     // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
@@ -385,6 +393,17 @@ class RunningProvider with ChangeNotifier {
       if (_state == TrackingState.running) {
         _updateDurationFromWallClock();
         notifyListeners();
+
+        // Cập nhật thông số trực tiếp ra Trung tâm thông báo & Màn hình khóa mỗi 2 giây
+        if (_durationSeconds % 2 == 0) {
+          LiveWorkoutNotificationService.updateWorkoutNotification(
+            distanceKm: _distanceKm,
+            durationSeconds: _durationSeconds,
+            pace: currentPace,
+            calories: _calories,
+            isPaused: false,
+          );
+        }
       }
     });
 
@@ -532,6 +551,13 @@ class RunningProvider with ChangeNotifier {
     _pauseStartTime = DateTime.now();
     _positionStream?.pause();
     saveActiveCheckpointNow();
+    LiveWorkoutNotificationService.updateWorkoutNotification(
+      distanceKm: _distanceKm,
+      durationSeconds: _durationSeconds,
+      pace: currentPace,
+      calories: _calories,
+      isPaused: true,
+    );
     notifyListeners();
   }
 
@@ -545,6 +571,13 @@ class RunningProvider with ChangeNotifier {
     _positionStream?.resume();
     _updateDurationFromWallClock();
     saveActiveCheckpointNow();
+    LiveWorkoutNotificationService.updateWorkoutNotification(
+      distanceKm: _distanceKm,
+      durationSeconds: _durationSeconds,
+      pace: currentPace,
+      calories: _calories,
+      isPaused: false,
+    );
     notifyListeners();
   }
 
@@ -585,6 +618,9 @@ class RunningProvider with ChangeNotifier {
     _lastPosition = null;
     _lastPositionTime = null;
     _instantSpeedKmh = 0.0;
+
+    // Hủy thông báo chạy ngầm khi đã hoàn thành buổi chạy
+    LiveWorkoutNotificationService.cancelWorkoutNotification();
 
     final compressedRoute = GpsCompressionService.compress(_currentRoute);
 
@@ -651,6 +687,7 @@ class RunningProvider with ChangeNotifier {
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
     _lastMilestoneKm = 0;
+    LiveWorkoutNotificationService.cancelWorkoutNotification();
     LocalStorageService.clearActiveTrackingCheckpoint();
     notifyListeners();
   }
