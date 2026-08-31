@@ -998,194 +998,197 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
             ),
           ),
 
-          // 4. THẺ TỔNG KẾT THÀNH TÍCH (HOÀN THÀNH XUẤT SẮC)
+          // 4. BOTTOM GROUP: THẺ TỔNG KẾT & THANH ĐIỀU KHIỂN XẾP CÁCH NHAU RÕ RÀNG (KHÔNG DÍNH NHAU)
           Positioned(
             left: 16,
             right: 16,
-            bottom: 128,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.94),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.5),
-                  width: 1.2,
+            bottom: 20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // A. THẺ TỔNG KẾT THÀNH TÍCH (HOÀN THÀNH XUẤT SẮC)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD700), size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'HOÀN THÀNH XUẤT SẮC',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF10B981),
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildSummaryStatItem('QUÃNG ĐƯỜNG', '${_effectiveDistanceKm.toStringAsFixed(2)} km', AppTheme.primaryNeon),
+                          _buildSummaryStatItem('PACE TB', '$_effectivePace /km', AppTheme.secondaryNeon),
+                          _buildSummaryStatItem('THỜI GIAN', _formatDuration(_effectiveDurationSec), Colors.white),
+                          _buildSummaryStatItem('CALO', '$_effectiveCalories kcal', AppTheme.accentOrange),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD700), size: 18),
-                      SizedBox(width: 6),
-                      Text(
-                        'HOÀN THÀNH XUẤT SẮC',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF10B981),
-                          letterSpacing: 1.0,
-                        ),
+
+                const SizedBox(height: 12), // KHOẢNG CÁCH RÕ RÀNG GIỮA 2 KHỐI
+
+                // B. THANH ĐIỀU KHIỂN PLAYBACK (SLIDER ĐỎ + 1X + NÚT TRÒN ĐỎ + 100%)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 18,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildSummaryStatItem('QUÃNG ĐƯỜNG', '${_effectiveDistanceKm.toStringAsFixed(2)} km', AppTheme.primaryNeon),
-                      _buildSummaryStatItem('PACE TB', '$_effectivePace /km', AppTheme.secondaryNeon),
-                      _buildSummaryStatItem('THỜI GIAN', _formatDuration(_effectiveDurationSec), Colors.white),
-                      _buildSummaryStatItem('CALO', '$_effectiveCalories kcal', AppTheme.accentOrange),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 5. THANH ĐIỀU KHIỂN PLAYBACK DƯỚI CÙNG (SLIDER ĐỎ + 1X + NÚT TRÒN ĐỎ + 100%)
-          Positioned(
-            bottom: 24,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 18,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Slider đỏ với nút tròn trắng
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4.0,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.5),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                      activeTrackColor: const Color(0xFFFF3366),
-                      inactiveTrackColor: const Color(0xFF1E293B),
-                      thumbColor: Colors.white,
-                    ),
-                    child: Slider(
-                      value: _controller.value.clamp(0.0, 1.0),
-                      onChanged: (val) {
-                        _controller.stop();
-                        _controller.value = val;
-                        setState(() => _isPlaying = false);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Dropdown speed
-                      InkWell(
-                        onTap: _openSpeedSelectorModal,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
+                      // Slider đỏ với nút tròn trắng
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4.0,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.5),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                          activeTrackColor: const Color(0xFFFF3366),
+                          inactiveTrackColor: const Color(0xFF1E293B),
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          value: _controller.value.clamp(0.0, 1.0),
+                          onChanged: (val) {
+                            _controller.stop();
+                            _controller.value = val;
+                            setState(() => _isPlaying = false);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Dropdown speed
+                          InkWell(
+                            onTap: _openSpeedSelectorModal,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF334155)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.secondaryNeon, size: 18),
-                              const SizedBox(width: 2),
-                              Text(
-                                _formatSpeed(_playbackSpeed),
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF334155)),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.secondaryNeon, size: 18),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    _formatSpeed(_playbackSpeed),
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
 
-                      // Nút Play / Replay tròn đỏ phát sáng
-                      InkWell(
-                        onTap: _togglePlayPause,
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFFF2A55),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFFF2A55).withValues(alpha: 0.5),
-                                blurRadius: 16,
-                                offset: const Offset(0, 3),
+                          // Nút Play / Replay tròn đỏ phát sáng
+                          InkWell(
+                            onTap: _togglePlayPause,
+                            borderRadius: BorderRadius.circular(30),
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFFF2A55),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF2A55).withValues(alpha: 0.5),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                            ],
+                              child: AnimatedBuilder(
+                                animation: _controller,
+                                builder: (context, _) {
+                                  final isCompleted = _controller.value >= 0.98 || _controller.status == AnimationStatus.completed;
+                                  IconData icon = Icons.pause_rounded;
+                                  if (!_isPlaying) {
+                                    icon = isCompleted ? Icons.replay_rounded : Icons.play_arrow_rounded;
+                                  }
+                                  return Icon(
+                                    icon,
+                                    color: Colors.white,
+                                    size: 26,
+                                  );
+                                },
+                              ),
+                            ),
                           ),
-                          child: AnimatedBuilder(
+
+                          // Phần trăm tiến độ 100%
+                          AnimatedBuilder(
                             animation: _controller,
                             builder: (context, _) {
-                              final isCompleted = _controller.value >= 0.98 || _controller.status == AnimationStatus.completed;
-                              IconData icon = Icons.pause_rounded;
-                              if (!_isPlaying) {
-                                icon = isCompleted ? Icons.replay_rounded : Icons.play_arrow_rounded;
-                              }
-                              return Icon(
-                                icon,
-                                color: Colors.white,
-                                size: 26,
+                              final int percent = (_controller.value * 100).round();
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Text(
+                                  '$percent%',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               );
                             },
                           ),
-                        ),
-                      ),
-
-                      // Phần trăm tiến độ 100%
-                      AnimatedBuilder(
-                        animation: _controller,
-                        builder: (context, _) {
-                          final int percent = (_controller.value * 100).round();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            child: Text(
-                              '$percent%',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                          );
-                        },
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
