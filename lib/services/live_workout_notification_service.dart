@@ -25,7 +25,7 @@ class LiveWorkoutNotificationService {
         iOS: iosSettings,
       );
 
-      await _notifications.initialize(settings: initSettings);
+      await _notifications.initialize(initSettings);
 
       // Tạo Channel trên Android với cờ chạy ngầm mượt mà không rung chuông liên tục
       final androidImplementation = _notifications.resolvePlatformSpecificImplementation<
@@ -111,10 +111,10 @@ class LiveWorkoutNotificationService {
       );
 
       await _notifications.show(
-        id: _notificationId,
-        title: title,
-        body: body,
-        notificationDetails: details,
+        _notificationId,
+        title,
+        body,
+        details,
       );
     } catch (e) {
       // Bỏ qua lỗi cập nhật thông báo ngầm
@@ -124,7 +124,7 @@ class LiveWorkoutNotificationService {
   /// Xóa thông báo khi kết thúc buổi chạy
   static Future<void> cancelWorkoutNotification() async {
     try {
-      await _notifications.cancel(id: _notificationId);
+      await _notifications.cancel(_notificationId);
     } catch (e) {
       debugPrint('Lỗi hủy thông báo: $e');
     }

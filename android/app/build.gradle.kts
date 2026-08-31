@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.running.app.running_tracker"
-    compileSdk = 36
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
