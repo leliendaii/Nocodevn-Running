@@ -25,7 +25,7 @@ class RealtimeVideoSession {
     required this.completer,
   });
 
-  /// Đẩy khung hình raw GPU (RGBA) trực tiếp vào Canvas trong 1ms
+  /// Đẩy khung hình raw GPU (RGBA) trực tiếp vào Canvas
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
     try {
       final imgData = ctx.createImageData(frameWidth, frameHeight);
@@ -61,7 +61,7 @@ class RealtimeVideoSession {
     return false;
   }
 
-  /// TẢI VỀ: Tự động lưu vào Album Ảnh (trên iPhone) hoặc Tải file MP4 về máy
+  /// TẢI VỀ: Tự động lưu vào Album Ảnh (trên iPhone) hoặc Tải file về máy
   Future<VideoSaveResult> downloadVideo(String filename) async {
     final blob = finalBlob;
     if (blob == null || blob.size == 0) {
@@ -76,10 +76,16 @@ class RealtimeVideoSession {
       final isIOS = userAgent.contains('iphone') || userAgent.contains('ipad') || userAgent.contains('ipod');
       final fileMime = blob.type.isNotEmpty ? blob.type : 'video/mp4';
 
+      // Xác định đúng đuôi file tương thích
+      String finalName = filename;
+      if (fileMime.contains('webm') && finalName.endsWith('.mp4')) {
+        finalName = finalName.replaceAll('.mp4', '.webm');
+      }
+
       // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để bấm "Lưu video" vào Album Ảnh
       if (isIOS) {
         try {
-          final file = html.File([blob], filename, {'type': fileMime});
+          final file = html.File([blob], finalName, {'type': fileMime});
           final dynamic nav = html.window.navigator;
           if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
             await nav.share({
@@ -99,7 +105,7 @@ class RealtimeVideoSession {
       // 2. Kích hoạt tải file trực tiếp về máy
       final url = html.Url.createObjectUrlFromBlob(blob);
       final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', filename)
+        ..setAttribute('download', finalName)
         ..style.display = 'none';
       html.document.body?.children.add(anchor);
       anchor.click();
@@ -122,11 +128,14 @@ RealtimeVideoSession startRealtimeVideoSession({
 }) {
   final canvas = html.CanvasElement(width: width, height: height);
 
-  // Canvas gắn vào DOM để WebKit kích hoạt captureStream
+  // Canvas gắn vào DOM với kích thước hiển thị nhỏ để WebKit không ngắt tiến trình vẽ
   canvas.style.position = 'fixed';
-  canvas.style.left = '-9999px';
-  canvas.style.top = '-9999px';
-  canvas.style.opacity = '0.01';
+  canvas.style.right = '0px';
+  canvas.style.bottom = '0px';
+  canvas.style.width = '2px';
+  canvas.style.height = '2px';
+  canvas.style.opacity = '0.9';
+  canvas.style.zIndex = '-999';
   canvas.style.pointerEvents = 'none';
   html.document.body?.children.add(canvas);
 
@@ -142,9 +151,11 @@ RealtimeVideoSession startRealtimeVideoSession({
   }
 
   final supportedTypes = [
-    'video/mp4',
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
     'video/mp4;codecs=avc1',
     'video/mp4;codecs=h264',
+    'video/mp4',
+    'video/webm;codecs=h264',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm',
