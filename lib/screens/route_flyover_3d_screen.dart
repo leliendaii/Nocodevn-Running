@@ -151,7 +151,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _spanW = (maxX - minX).abs();
     _spanH = (maxY - minY).abs();
 
-    _milestones = _generateMilestonePins(_effectiveDistanceKm, _pathMetric, _totalPathLength, _smoothRoute);
+    // 6. Cột mốc tạm dừng (Chỉ hiển thị khi người dùng thực tế có bấm Tạm Dừng trong lúc chạy)
+    _milestones = _generatePausePins(widget.session.pausePoints, _zoomLevel);
 
     // 7. Tiền tải trước toàn bộ Map Tiles vào RAM & Disk Cache (Load < 0.1s tức thì)
     _precacheRouteMapTiles();
@@ -380,18 +381,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     return basePoints;
   }
 
-  List<MilestoneData> _generateMilestonePins(double totalKm, ui.PathMetric pathMetric, double totalLength, List<GeoPoint> route) {
+  List<MilestoneData> _generatePausePins(List<RunPoint> pausePoints, int zoom) {
     final List<MilestoneData> pins = [];
-    final int totalPins = totalKm.floor();
-    if (totalPins <= 0 || totalLength <= 1.0) return pins;
-
-    for (int i = 1; i <= totalPins; i++) {
-      final double frac = (i / totalKm).clamp(0.0, 1.0);
-      final double targetOffset = totalLength * frac;
-      final tangent = pathMetric.getTangentForOffset(targetOffset);
-      final pixel = tangent?.position ?? _cachedRoutePixels.first;
-      final routeIdx = ((route.length - 1) * frac).toInt().clamp(0, route.length - 1);
-      pins.add(MilestoneData(km: i, point: route[routeIdx], pixel: pixel));
+    for (int i = 0; i < pausePoints.length; i++) {
+      final pt = pausePoints[i];
+      final pixel = _latLngToPixel(pt.x, pt.y, zoom);
+      pins.add(MilestoneData(km: i + 1, point: GeoPoint(pt.x, pt.y), pixel: pixel));
     }
     return pins;
   }
@@ -1570,7 +1565,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       canvas.drawPath(activePath, coreHighlightPaint);
     }
 
-    // 8. VẼ CÁC CỘT MỐC KM 3D
+    // 8. VẼ CÁC CỘT MỐC TẠM DỪNG (CHỈ KHI NGƯỜI DÙNG CÓ BẤM TẠM DỪNG TRONG LÚC CHẠY)
     for (final m in milestones) {
       final pinPixel = m.pixel;
 
@@ -1579,17 +1574,22 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
       canvas.drawCircle(const Offset(0, 0), 4, Paint()..color = Colors.black26);
       canvas.drawLine(const Offset(0, 0), const Offset(0, -18), Paint()..color = Colors.black54..strokeWidth = 2);
-      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = Colors.white);
-      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = const Color(0xFFFC5200)..style = PaintingStyle.stroke..strokeWidth = 2);
+      canvas.drawCircle(const Offset(0, -18), 12, Paint()..color = const Color(0xFF0F172A));
+      canvas.drawCircle(
+        const Offset(0, -18),
+        12,
+        Paint()
+          ..color = const Color(0xFFF59E0B) // Màu vàng hổ phách thể thao cho điểm Tạm Dừng
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
 
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '${m.km}',
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(-tp.width / 2, -18 - tp.height / 2));
+      // Icon Pause (2 vạch dọc vàng hổ phách)
+      final pauseBarPaint = Paint()
+        ..color = const Color(0xFFF59E0B)
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-4.5, -23, 3.2, 10), const Radius.circular(1.5)), pauseBarPaint);
+      canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(1.3, -23, 3.2, 10), const Radius.circular(1.5)), pauseBarPaint);
 
       canvas.restore();
     }

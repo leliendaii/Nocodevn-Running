@@ -539,23 +539,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               );
             },
           ),
-          // Nút Làm Mới Dữ Liệu từ Supabase Cloud
-          IconButton(
-            tooltip: 'Làm mới dữ liệu Cloud',
-            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary, size: 20),
-            onPressed: () async {
-              await running.refreshAllData();
-              if (context.mounted) {
-                TopSyncToast.show(context, message: 'Đã đồng bộ dữ liệu mới nhất từ Cloud!');
-              }
-            },
-          ),
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          child: Column(
+        child: RefreshIndicator(
+          color: AppTheme.primaryNeon,
+          backgroundColor: const Color(0xFF0F172A),
+          strokeWidth: 2.5,
+          onRefresh: () async {
+            await running.refreshAllData();
+            if (context.mounted) {
+              TopSyncToast.show(context, message: 'Đã đồng bộ dữ liệu mới nhất từ Cloud!');
+            }
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. THANH CHỌN ĐỐI TƯỢNG GỌN GÀNG & CÓ TÌM KIẾM
@@ -1053,8 +1053,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFilterTab(String label, TimeFilter filter) {
     final isSelected = _selectedFilter == filter;

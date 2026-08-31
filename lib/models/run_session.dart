@@ -16,6 +16,7 @@ class RunSession {
   int calories;
   String notes;
   final List<RunPoint> routePoints;
+  final List<RunPoint> pausePoints;
 
   RunSession({
     required this.id,
@@ -28,6 +29,7 @@ class RunSession {
     required this.calories,
     this.notes = '',
     this.routePoints = const [],
+    this.pausePoints = const [],
   });
 
   /// Tính tốc độ trung bình theo phút/km (Pace: mm:ss)
@@ -67,6 +69,7 @@ class RunSession {
     int? calories,
     String? notes,
     List<RunPoint>? routePoints,
+    List<RunPoint>? pausePoints,
   }) {
     return RunSession(
       id: id ?? this.id,
@@ -79,6 +82,7 @@ class RunSession {
       calories: calories ?? this.calories,
       notes: notes ?? this.notes,
       routePoints: routePoints ?? this.routePoints,
+      pausePoints: pausePoints ?? this.pausePoints,
     );
   }
 }

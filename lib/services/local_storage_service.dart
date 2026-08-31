@@ -312,6 +312,7 @@ class LocalStorageService {
         'calories': s.calories,
         'notes': s.notes,
         'route_points': s.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
+        'pause_points': s.pausePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
       }).toList();
 
       await prefs.setString(_keyCachedSessions, jsonEncode(list));
@@ -344,6 +345,15 @@ class LocalStorageService {
           }
         }
 
+        final List<RunPoint> pausePoints = [];
+        if (item['pause_points'] is List) {
+          for (final pt in item['pause_points']) {
+            if (pt is Map && pt['x'] != null && pt['y'] != null) {
+              pausePoints.add(RunPoint((pt['x'] as num).toDouble(), (pt['y'] as num).toDouble()));
+            }
+          }
+        }
+
         sessions.add(
           RunSession(
             id: id,
@@ -356,6 +366,7 @@ class LocalStorageService {
             calories: (item['calories'] as num?)?.toInt() ?? 0,
             notes: item['notes'] ?? '',
             routePoints: routePoints,
+            pausePoints: pausePoints,
           ),
         );
       }

@@ -36,9 +36,12 @@ class RunningProvider with ChangeNotifier {
   int _totalPausedSeconds = 0;
   Timer? _timer;
   final List<RunPoint> _currentRoute = [];
+  final List<RunPoint> _pausePoints = []; // Danh sách các tọa độ điểm thực tế user bấm Tạm Dừng
   Position? _lastPosition;
   DateTime? _lastPositionTime;
   StreamSubscription<Position>? _positionStream;
+
+  List<RunPoint> get pausePoints => List.unmodifiable(_pausePoints);
 
   // Cấu hình Khung giờ chạy & Tự động kết thúc (Chống quên) - Theo từng User
   String? _activeUserId;
@@ -544,11 +547,18 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Tạm dừng chạy
+  // Tạm dừng chạy (Chỉ ghi nhận cột mốc dừng khi user chủ động bấm Tạm dừng)
   void pauseTracking() {
     _state = TrackingState.paused;
     _instantSpeedKmh = 0.0;
     _pauseStartTime = DateTime.now();
+
+    if (_lastPosition != null) {
+      _pausePoints.add(RunPoint(_lastPosition!.latitude, _lastPosition!.longitude));
+    } else if (_currentRoute.isNotEmpty) {
+      _pausePoints.add(_currentRoute.last);
+    }
+
     _positionStream?.pause();
     saveActiveCheckpointNow();
     LiveWorkoutNotificationService.updateWorkoutNotification(
@@ -635,6 +645,7 @@ class RunningProvider with ChangeNotifier {
       calories: _calories,
       notes: effectiveNotes,
       routePoints: compressedRoute,
+      pausePoints: List.from(_pausePoints),
     );
 
     _sessions.insert(0, newSession);
@@ -646,6 +657,7 @@ class RunningProvider with ChangeNotifier {
     _calories = 0;
     _instantSpeedKmh = 0.0;
     _currentRoute.clear();
+    _pausePoints.clear();
     _runStartTime = null;
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
@@ -683,6 +695,7 @@ class RunningProvider with ChangeNotifier {
     _calories = 0;
     _instantSpeedKmh = 0.0;
     _currentRoute.clear();
+    _pausePoints.clear();
     _runStartTime = null;
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
