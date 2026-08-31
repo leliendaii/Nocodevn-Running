@@ -1243,7 +1243,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  // Modal Thông tin Ứng dụng & Hỗ trợ - Ngắn gọn, tinh tế, chuẩn thể thao
+  // Modal Thông tin Ứng dụng & Hỗ trợ - Đơn giản, ngắn gọn, dễ hiểu
   void _showAppAboutDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1280,8 +1280,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 Row(
                   children: [
                     Container(
-                      width: 42,
-                      height: 42,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
@@ -1299,7 +1299,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         Text(
                           'RUNNING TRACKER',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: 0.8,
@@ -1316,22 +1316,26 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 14),
 
-                // Mô tả ngắn gọn (2 dòng cốt lõi)
+                // Mô tả đơn giản
                 const Text(
-                  'Ứng dụng theo dõi chạy bộ chuyên nghiệp, đo chính xác GPS, tốc độ Pace, calo và tái hiện video 3D hành trình của bạn.',
+                  'Ứng dụng đơn giản giúp bạn ghi lại quá trình chạy bộ mỗi ngày, xem lại lộ trình trên bản đồ và tải video kỷ niệm về máy.',
                   style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
                 ),
                 const SizedBox(height: 14),
 
-                // 3 Tính năng cốt lõi (gọn gàng)
-                _buildQuickFeatureRow(Icons.gps_fixed_rounded, AppTheme.primaryNeon, 'GPS Thể Thao: Đo quãng đường, pace & calo chuẩn xác theo thời gian thực.'),
+                // Các chức năng có trong app
+                _buildQuickFeatureRow(Icons.gps_fixed_rounded, AppTheme.primaryNeon, 'Đo GPS khi chạy: Tự đo quãng đường (km), thời gian, tốc độ (pace) và calo.'),
                 const SizedBox(height: 8),
-                _buildQuickFeatureRow(Icons.shield_rounded, const Color(0xFF10B981), 'Chống Mất Dữ Liệu: Tự động lưu và khôi phục khi sập nguồn hoặc tắt app.'),
+                _buildQuickFeatureRow(Icons.videocam_rounded, AppTheme.secondaryNeon, 'Xem & Tải video 3D: Xem lại đường chạy mô phỏng và tải video về điện thoại.'),
                 const SizedBox(height: 8),
-                _buildQuickFeatureRow(Icons.videocam_rounded, AppTheme.secondaryNeon, 'Mô Phỏng 3D: Tái hiện hành trình và lưu video trực tiếp vào Album Ảnh.'),
+                _buildQuickFeatureRow(Icons.history_rounded, const Color(0xFFF59E0B), 'Lịch sử chạy bộ: Lưu lại đầy đủ các lần chạy kèm bản đồ chi tiết.'),
+                const SizedBox(height: 8),
+                _buildQuickFeatureRow(Icons.shield_rounded, const Color(0xFF10B981), 'Tự động lưu: Đang chạy mà lỡ tắt app hay hết pin thì mở lại vẫn còn nguyên.'),
+                const SizedBox(height: 8),
+                _buildQuickFeatureRow(Icons.volume_up_rounded, const Color(0xFF38BDF8), 'Giọng nói nhắc nhở: Tự đọc số km và tốc độ khi chạy.'),
                 const SizedBox(height: 14),
 
-                // Hỗ trợ & Bản quyền
+                // Tác giả
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1339,12 +1343,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     color: const Color(0xFF1E293B).withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text('Tác giả: Liên Đài', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                      Text('Bảo mật dữ liệu 100%', style: TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
-                    ],
+                  child: const Center(
+                    child: Text('Phát triển bởi: Liên Đài • 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
                 const SizedBox(height: 16),
