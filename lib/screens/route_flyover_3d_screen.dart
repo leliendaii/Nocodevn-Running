@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../services/route_video_recorder.dart';
@@ -24,7 +23,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   bool _isPlaying = true;
   bool _isDisposed = false;
   bool _isFlycamMode = true; // Mặc định: TRUE = Theo Dõi (Bám mượt theo người chạy)
-  bool _isExportingVideo = false; // Bật khi đang quay video để xuất HUD thông số Story Facebook
 
   late final double _effectiveDistanceKm;
   late final int _effectiveDurationSec;
@@ -560,23 +558,19 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
               Future.microtask(() async {
                 try {
-                  if (mounted && !_isDisposed) {
-                    setState(() => _isExportingVideo = true);
-                  }
                   _controller.reset();
 
                   // Tính toán số frames chuẩn xác 100% đồng bộ với tốc độ đang chọn (x1, x2, x3):
                   final double effectiveDurationSec = (_baseDurationMs / 1000.0) / _playbackSpeed;
                   final int totalSteps = (effectiveDurationSec * 25.0).round().clamp(60, 450);
 
-                  final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-                  if (boundary == null) throw Exception('Không tìm thấy khung hình 3D.');
+                  // KÍCH THƯỚC CHUẨN 100% FACEBOOK STORY / INSTAGRAM / TIKTOK: 1080 x 1920 (TỶ LỆ 9:16)
+                  const double exportWidth = 1080.0;
+                  const double exportHeight = 1920.0;
 
-                  // Độ nét chuẩn Retina HD 1080p
-                  final firstImg = await boundary.toImage(pixelRatio: 2.0);
                   final session = RouteVideoRecorder.startSession(
-                    width: firstImg.width,
-                    height: firstImg.height,
+                    width: exportWidth.toInt(),
+                    height: exportHeight.toInt(),
                     fps: 25.0,
                   );
                   activeSession = session;
@@ -588,24 +582,24 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
                     setDialogState(() {
                       progress = (step / (totalSteps + 125)) * 0.95;
-                      status = 'Đang quay video ${_isFlycamMode ? "Theo dõi" : "Toàn cảnh"} ${(_playbackSpeed).toStringAsFixed(1)}x (${(progress * 100).toInt()}%)...';
+                      status = 'Đang quay video 1080p Story ${_isFlycamMode ? "Theo dõi" : "Toàn cảnh"} ${(_playbackSpeed).toStringAsFixed(1)}x (${(progress * 100).toInt()}%)...';
                     });
 
-                    await Future.delayed(const Duration(milliseconds: 20));
+                    // Render khung hình 3D + Thẻ thông số trực tiếp vào Canvas 1080x1920 siêu nét
+                    final img = await _renderStoryFrameImage(
+                      t: t,
+                      width: exportWidth,
+                      height: exportHeight,
+                    );
+                    final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+                    if (raw != null) {
+                      final frameBytes = raw.buffer.asUint8List();
+                      session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
 
-                    final b = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-                    if (b != null) {
-                      final img = await b.toImage(pixelRatio: 2.0);
-                      final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-                      if (raw != null) {
-                        final frameBytes = raw.buffer.asUint8List();
-                        session.pushRawFrame(frameBytes, img.width, img.height);
-
-                        // Ở frame cuối (t = 1.0), giữ nguyên toàn cảnh 5 giây để thấy trọn vẹn thông số & cung đường
-                        if (step == totalSteps) {
-                          for (int hold = 0; hold < 125; hold++) {
-                            session.pushRawFrame(frameBytes, img.width, img.height);
-                          }
+                      // Ở frame cuối (t = 1.0), giữ nguyên toàn cảnh 5 giây (125 frames) để thấy trọn vẹn thông số & cung đường
+                      if (step == totalSteps) {
+                        for (int hold = 0; hold < 125; hold++) {
+                          session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
                         }
                       }
                     }
@@ -613,7 +607,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
                   setDialogState(() {
                     progress = 0.98;
-                    status = 'Đang hoàn tất video HD...';
+                    status = 'Đang hoàn tất video Full HD 1080x1920...';
                   });
 
                   await session.finishRecording();
@@ -624,10 +618,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     isDone = true;
                   });
 
-                  if (mounted && !_isDisposed) {
-                    setState(() => _isExportingVideo = false);
-                  }
-
                   _controller.duration = Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round());
                   _controller.value = previousValue;
                   if (previousPlaying && mounted && !_isDisposed) {
@@ -635,9 +625,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     setState(() => _isPlaying = true);
                   }
                 } catch (e) {
-                  if (mounted && !_isDisposed) {
-                    setState(() => _isExportingVideo = false);
-                  }
                   setDialogState(() {
                     status = 'Lỗi quay video: $e';
                     isDone = true;
@@ -787,96 +774,289 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       },
     );
   }
+  Future<ui.Image> _renderStoryFrameImage({
+    required double t,
+    required double width,
+    required double height,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
 
-  /// Thẻ thông số thể thao cao cấp nhúng trực tiếp vào Video khi xuất (Chuẩn Story Facebook / TikTok / Instagram - Chữ & Số To Rõ)
-  Widget _buildStoryVideoStatsOverlay({
+    final painter = Real3DStravaFlyoverPainter(
+      pixels: _cachedRoutePixels,
+      fullPath: _fullVectorPath,
+      sampledPositions: _sampledPositions,
+      smoothedCamPositions: _smoothedCamPositions,
+      sampledHeadings: _sampledHeadings,
+      startPinPixel: _startPinPixel,
+      finishPinPixel: _finishPinPixel,
+      pathMetric: _pathMetric,
+      totalLength: _totalPathLength,
+      milestones: _milestones,
+      progress: t,
+      tileCache: MapTileCacheService.memoryCache,
+      zoom: _zoomLevel,
+      routeCenterX: _routeCenterX,
+      routeCenterY: _routeCenterY,
+      spanW: _spanW,
+      spanH: _spanH,
+      isFlycamMode: _isFlycamMode,
+      tileVersion: _tileVersion,
+      onTileRequested: (z, x, y) {},
+    );
+
+    // 1. Vẽ bản đồ 3D và lộ trình đường chạy trên khung hình 1080x1920
+    painter.paint(canvas, Size(width, height));
+
+    // 2. Tính toán các chỉ số thành tích thời gian thực
+    double curProgress = 0.0;
+    if (t < 0.15) {
+      curProgress = 0.0;
+    } else if (t < 0.75) {
+      curProgress = ((t - 0.15) / 0.60).clamp(0.0, 1.0);
+    } else {
+      curProgress = 1.0;
+    }
+
+    final double curDistance = _effectiveDistanceKm * curProgress;
+    final int curDurationSec = (_effectiveDurationSec * curProgress).round();
+    final int min = curDurationSec ~/ 60;
+    final int sec = curDurationSec % 60;
+    final String curTimeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+    final int curCalories = (_effectiveCalories * curProgress).round();
+    final bool isFinished = curProgress >= 0.99;
+
+    // 3. Vẽ huy hiệu Watermark VIP góc trên
+    _drawStoryTopHeader(canvas, Size(width, height));
+
+    // 4. Vẽ Thẻ thống số nổi bật ở vùng an toàn đáy Story
+    _drawStoryStatsCard(
+      canvas: canvas,
+      size: Size(width, height),
+      distanceKm: curDistance,
+      timeStr: curTimeStr,
+      calories: curCalories,
+      pace: _effectivePace,
+      isFinished: isFinished,
+    );
+
+    final picture = recorder.endRecording();
+    return await picture.toImage(width.toInt(), height.toInt());
+  }
+
+  void _drawStoryTopHeader(Canvas canvas, Size size) {
+    const double cardW = 460.0;
+    const double cardH = 74.0;
+    final double cardX = (size.width - cardW) / 2;
+    const double cardY = 120.0; // Vùng an toàn dưới thanh profile Story
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(cardX, cardY, cardW, cardH),
+      const Radius.circular(37),
+    );
+
+    // Nền kính mờ
+    final bgPaint = Paint()..color = const Color(0xEE0F172A);
+    canvas.drawRRect(rrect, bgPaint);
+
+    // Viền phát sáng Neon
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..color = const Color(0xFF00E5FF);
+    canvas.drawRRect(rrect, borderPaint);
+
+    // Chữ thương hiệu Nocodevn Running
+    _drawCanvasText(
+      canvas: canvas,
+      text: 'NOCODEVN RUNNING',
+      center: Offset(size.width / 2, cardY + (cardH / 2)),
+      fontSize: 22,
+      fontWeight: FontWeight.w900,
+      color: const Color(0xFF00E5FF),
+      letterSpacing: 1.5,
+      maxWidth: 420,
+    );
+  }
+
+  void _drawStoryStatsCard({
+    required Canvas canvas,
+    required Size size,
     required double distanceKm,
     required String timeStr,
     required int calories,
     required String pace,
     required bool isFinished,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isFinished ? const Color(0xFF10B981) : const Color(0xFF334155),
-          width: 1.8,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isFinished ? const Color(0xFF10B981).withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.55),
-            blurRadius: 22,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isFinished ? Icons.emoji_events_rounded : Icons.directions_run_rounded,
-                color: isFinished ? const Color(0xFFFFD700) : AppTheme.primaryNeon,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isFinished ? 'HOÀN THÀNH LỘ TRÌNH CHẠY BỘ' : 'ĐANG THEO DÕI LỘ TRÌNH CHẠY BỘ',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w900,
-                  color: isFinished ? const Color(0xFF10B981) : AppTheme.primaryNeon,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildBigStoryStatItem('QUÃNG ĐƯỜNG', '${distanceKm.toStringAsFixed(2)} km', const Color(0xFF00E5FF)),
-              _buildBigStoryStatItem('PACE TB', '$pace /km', const Color(0xFF10B981)),
-              _buildBigStoryStatItem('THỜI GIAN', timeStr, Colors.white),
-              _buildBigStoryStatItem('CALO', '$calories kcal', const Color(0xFFFF7043)),
-            ],
-          ),
-        ],
-      ),
+    const double cardW = 980.0;
+    const double cardH = 260.0;
+    final double cardX = (size.width - cardW) / 2;
+    final double cardY = size.height - cardH - 180.0; // Vùng an toàn trên thanh comment Story
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(cardX, cardY, cardW, cardH),
+      const Radius.circular(40),
+    );
+
+    // Nền thẻ kính mờ cao cấp
+    final bgPaint = Paint()..color = const Color(0xEE0F172A);
+    canvas.drawRRect(rrect, bgPaint);
+
+    // Viền thẻ
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = isFinished ? const Color(0xFF10B981) : const Color(0xFF334155);
+    canvas.drawRRect(rrect, borderPaint);
+
+    // Tiêu đề trạng thái
+    final String title = isFinished ? 'HOÀN THÀNH LỘ TRÌNH CHẠY BỘ' : 'ĐANG THEO DÕI LỘ TRÌNH CHẠY BỘ';
+    final Color titleColor = isFinished ? const Color(0xFF10B981) : const Color(0xFF00E5FF);
+
+    _drawCanvasText(
+      canvas: canvas,
+      text: title,
+      center: Offset(size.width / 2, cardY + 45),
+      fontSize: 25,
+      fontWeight: FontWeight.w900,
+      color: titleColor,
+      letterSpacing: 1.0,
+      maxWidth: 900,
+    );
+
+    // Đường gạch ngang tinh tế
+    final divPaint = Paint()
+      ..color = const Color(0x22FFFFFF)
+      ..strokeWidth = 1.5;
+    canvas.drawLine(
+      Offset(cardX + 40, cardY + 80),
+      Offset(cardX + cardW - 40, cardY + 80),
+      divPaint,
+    );
+
+    // 4 Cột thông số
+    final colW = cardW / 4;
+    final double yVal = cardY + 140;
+    final double yLbl = cardY + 200;
+
+    // Cột 1: Quãng đường
+    _drawCanvasText(
+      canvas: canvas,
+      text: '${distanceKm.toStringAsFixed(2)} km',
+      center: Offset(cardX + colW * 0.5, yVal),
+      fontSize: 36,
+      fontWeight: FontWeight.w900,
+      color: const Color(0xFF00E5FF),
+      maxWidth: colW,
+    );
+    _drawCanvasText(
+      canvas: canvas,
+      text: 'QUÃNG ĐƯỜNG',
+      center: Offset(cardX + colW * 0.5, yLbl),
+      fontSize: 19,
+      fontWeight: FontWeight.w800,
+      color: const Color(0xFF94A3B8),
+      letterSpacing: 0.5,
+      maxWidth: colW,
+    );
+
+    // Cột 2: Pace TB
+    _drawCanvasText(
+      canvas: canvas,
+      text: '$pace /km',
+      center: Offset(cardX + colW * 1.5, yVal),
+      fontSize: 36,
+      fontWeight: FontWeight.w900,
+      color: const Color(0xFF10B981),
+      maxWidth: colW,
+    );
+    _drawCanvasText(
+      canvas: canvas,
+      text: 'PACE TB',
+      center: Offset(cardX + colW * 1.5, yLbl),
+      fontSize: 19,
+      fontWeight: FontWeight.w800,
+      color: const Color(0xFF94A3B8),
+      letterSpacing: 0.5,
+      maxWidth: colW,
+    );
+
+    // Cột 3: Thời gian
+    _drawCanvasText(
+      canvas: canvas,
+      text: timeStr,
+      center: Offset(cardX + colW * 2.5, yVal),
+      fontSize: 36,
+      fontWeight: FontWeight.w900,
+      color: Colors.white,
+      maxWidth: colW,
+    );
+    _drawCanvasText(
+      canvas: canvas,
+      text: 'THỜI GIAN',
+      center: Offset(cardX + colW * 2.5, yLbl),
+      fontSize: 19,
+      fontWeight: FontWeight.w800,
+      color: const Color(0xFF94A3B8),
+      letterSpacing: 0.5,
+      maxWidth: colW,
+    );
+
+    // Cột 4: Calo
+    _drawCanvasText(
+      canvas: canvas,
+      text: '$calories kcal',
+      center: Offset(cardX + colW * 3.5, yVal),
+      fontSize: 36,
+      fontWeight: FontWeight.w900,
+      color: const Color(0xFFFF7043),
+      maxWidth: colW,
+    );
+    _drawCanvasText(
+      canvas: canvas,
+      text: 'CALO',
+      center: Offset(cardX + colW * 3.5, yLbl),
+      fontSize: 19,
+      fontWeight: FontWeight.w800,
+      color: const Color(0xFF94A3B8),
+      letterSpacing: 0.5,
+      maxWidth: colW,
     );
   }
 
-  Widget _buildBigStoryStatItem(String label, String value, Color color) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15.5,
-            fontWeight: FontWeight.w900,
-            color: color,
-            letterSpacing: 0.2,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.textMuted,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
+  void _drawCanvasText({
+    required Canvas canvas,
+    required String text,
+    required Offset center,
+    required double fontSize,
+    required FontWeight fontWeight,
+    required Color color,
+    double letterSpacing = 0.0,
+    double maxWidth = 300.0,
+  }) {
+    final builder = ui.ParagraphBuilder(
+      ui.ParagraphStyle(
+        textAlign: TextAlign.center,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+      ),
+    );
+    builder.pushStyle(ui.TextStyle(
+      color: color,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      letterSpacing: letterSpacing,
+    ));
+    builder.addText(text);
+    final paragraph = builder.build();
+    paragraph.layout(ui.ParagraphConstraints(width: maxWidth));
+    canvas.drawParagraph(
+      paragraph,
+      Offset(center.dx - (maxWidth / 2), center.dy - (paragraph.height / 2)),
     );
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -892,22 +1072,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 animation: _controller,
                 builder: (context, _) {
                   final double t = _controller.value.clamp(0.0, 1.0);
-                  double curProgress = 0.0;
-                  if (t < 0.15) {
-                    curProgress = 0.0;
-                  } else if (t < 0.75) {
-                    curProgress = ((t - 0.15) / 0.60).clamp(0.0, 1.0);
-                  } else {
-                    curProgress = 1.0;
-                  }
-
-                  final double curDistance = _effectiveDistanceKm * curProgress;
-                  final int curDurationSec = (_effectiveDurationSec * curProgress).round();
-                  final int min = curDurationSec ~/ 60;
-                  final int sec = curDurationSec % 60;
-                  final String curTimeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-                  final int curCalories = (_effectiveCalories * curProgress).round();
-                  final bool isFinished = curProgress >= 0.99;
 
                   return Stack(
                     children: [
@@ -945,21 +1109,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           size: Size.infinite,
                         ),
                       ),
-
-                      // Thẻ thông số thời gian thực to rõ trên video khi xuất để đăng Story Facebook
-                      if (_isExportingVideo)
-                        Positioned(
-                          left: 16,
-                          right: 16,
-                          bottom: 32,
-                          child: _buildStoryVideoStatsOverlay(
-                            distanceKm: curDistance,
-                            timeStr: curTimeStr,
-                            calories: curCalories,
-                            pace: _effectivePace,
-                            isFinished: isFinished,
-                          ),
-                        ),
                     ],
                   );
                 },
