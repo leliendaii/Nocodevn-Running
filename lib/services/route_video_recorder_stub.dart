@@ -130,26 +130,28 @@ class RealtimeVideoSession {
 
         // 1. Thử lưu trực tiếp vào Thư viện Ảnh bằng thư viện Gal (có timeout 4 giây chống treo)
         try {
-          final hasAccess = await Gal.hasAccess(toAlbum: true).timeout(
+          bool hasAccess = await Gal.hasAccess(toAlbum: false).timeout(
             const Duration(seconds: 2),
             onTimeout: () => false,
           );
           if (!hasAccess) {
-            await Gal.requestAccess(toAlbum: true).timeout(
-              const Duration(seconds: 4),
+            hasAccess = await Gal.requestAccess(toAlbum: false).timeout(
+              const Duration(seconds: 5),
               onTimeout: () => false,
             );
           }
 
-          // Lưu ảnh động vào Album Ảnh iPhone (tự động hiển thị và chạy trong Thư viện Ảnh)
-          await Gal.putImage(path, album: 'Running 3D').timeout(
-            const Duration(seconds: 4),
-          );
+          if (hasAccess) {
+            // Lưu ảnh động vào Album Ảnh iPhone (tự động hiển thị và chạy trong Thư viện Ảnh)
+            await Gal.putImage(path).timeout(
+              const Duration(seconds: 5),
+            );
 
-          return const VideoSaveResult(
-            isSuccess: true,
-            message: '🎉 Đã lưu video thành công vào Album Ảnh (Camera Roll)!',
-          );
+            return const VideoSaveResult(
+              isSuccess: true,
+              message: '🎉 Đã lưu video thành công vào Album Ảnh (Camera Roll)!',
+            );
+          }
         } catch (galError) {
           debugPrint('Lưu Gal thất bại/timeout, mở bảng chia sẻ gốc iPhone: $galError');
         }

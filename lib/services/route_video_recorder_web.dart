@@ -82,7 +82,7 @@ class RealtimeVideoSession {
         finalName = finalName.replaceAll('.mp4', '.webm');
       }
 
-      // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để bấm "Lưu video" vào Album Ảnh
+      // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để người dùng bấm "Lưu video" vào Album Ảnh
       if (isIOS) {
         try {
           final file = html.File([blob], finalName, {'type': fileMime});
@@ -94,7 +94,7 @@ class RealtimeVideoSession {
             });
             return const VideoSaveResult(
               isSuccess: true,
-              message: '🎉 Đã mở bảng chia sẻ của iPhone! Hãy chọn "Lưu video" để lưu vào Album Ảnh.',
+              message: '🎉 Đã mở bảng chia sẻ iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
             );
           }
         } catch (shareErr) {
@@ -111,9 +111,16 @@ class RealtimeVideoSession {
       anchor.click();
       html.document.body?.children.remove(anchor);
 
+      if (isIOS) {
+        return const VideoSaveResult(
+          isSuccess: true,
+          message: '📥 Đã tải video vào ứng dụng "Tệp" (Files)! Mở Tệp ➔ Bấm vào video ➔ Bấm nút Chia sẻ [↑] ➔ Chọn "Lưu video" để vào Album Ảnh nhé!',
+        );
+      }
+
       return const VideoSaveResult(
         isSuccess: true,
-        message: '🎉 Đã tải video thành công!',
+        message: '🎉 Đã tải video thành công về thiết bị!',
       );
     } catch (e) {
       return VideoSaveResult(isSuccess: false, message: 'Lỗi tải video: $e');

@@ -762,6 +762,28 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 },
                         ),
                       ),
+                      Container(
+                        margin: const EdgeInsets.only(top: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155), width: 0.8),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: AppTheme.secondaryNeon, size: 15),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '💡 Trên iPhone: Video sẽ được lưu vào ứng dụng "Tệp" (Files) ➔ Thư mục "Tải về" (Downloads). Bạn chỉ cần mở Tệp ➔ Bấm nút Chia sẻ [↑] ➔ Chọn "Lưu video" là video sẽ nằm ngay trong Album Ảnh!',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.35),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
