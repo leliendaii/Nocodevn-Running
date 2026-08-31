@@ -220,7 +220,8 @@ class _RunningScreenState extends State<RunningScreen>
     String userId,
     String userName,
   ) {
-    final notesController = TextEditingController(text: 'Buổi chạy ngoài trời');
+    final defaultNote = running.generateDefaultRunNote(userId);
+    final notesController = TextEditingController(text: defaultNote);
 
     showDialog(
       context: context,
@@ -363,7 +364,7 @@ class _RunningScreenState extends State<RunningScreen>
                             userId: userId,
                             userName: userName,
                             notes: notesController.text.trim().isEmpty
-                                ? 'Buổi chạy ngoài trời'
+                                ? defaultNote
                                 : notesController.text.trim(),
                           );
                           Navigator.of(ctx).pop();

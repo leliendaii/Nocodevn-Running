@@ -520,12 +520,35 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tạo tên ghi chú mặc định theo chuẩn: "Buổi chạy [DD/MM/YYYY]" hoặc "Buổi chạy [DD/MM/YYYY] #2"
+  String generateDefaultRunNote(String userId, [DateTime? runDate]) {
+    final date = runDate ?? DateTime.now();
+    final dateStr = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+    final userRuns = getUserSessions(userId);
+    final runsToday = userRuns.where((s) {
+      return s.startTime.year == date.year &&
+             s.startTime.month == date.month &&
+             s.startTime.day == date.day;
+    }).toList();
+
+    final int countToday = runsToday.length;
+    if (countToday == 0) {
+      return 'Buổi chạy [$dateStr]';
+    } else {
+      return 'Buổi chạy [$dateStr] #${countToday + 1}';
+    }
+  }
+
   // Kết thúc và lưu buổi chạy (Offline-First an toàn tuyệt đối)
   RunSession? stopAndSaveTracking({
     required String userId,
     required String userName,
-    String notes = 'Buổi chạy ngoài trời',
+    String? notes,
   }) {
+    final String effectiveNotes = (notes != null && notes.trim().isNotEmpty)
+        ? notes.trim()
+        : generateDefaultRunNote(userId, _runStartTime);
     _updateDurationFromWallClock();
     _timer?.cancel();
     _timer = null;
@@ -546,7 +569,7 @@ class RunningProvider with ChangeNotifier {
       durationSeconds: _durationSeconds,
       distanceKm: _distanceKm,
       calories: _calories,
-      notes: notes,
+      notes: effectiveNotes,
       routePoints: compressedRoute,
     );
 
