@@ -820,55 +820,64 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
           body: SafeArea(
             child: Stack(
               children: [
-                // 1. ENGINE 2 LỚP ĐỘC LẬP (BẢN ĐỒ TĨNH 0% GPU + VỆT CHẠY VECTOR ĐỘNG SIÊU TỐC 60-120 FPS)
+                // 1. ENGINE 2 LỚP ĐỘC LẬP + HARDWARE GPU ZOOM OUT TẠI ĐOẠN VỀ ĐÍCH (Mượt 120 FPS không giật lag)
                 Positioned.fill(
                   child: _cachedRoutePixels.isEmpty
                       ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryNeon))
-                      : Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            // TẦNG 1: BẢN ĐỒ GOOGLE MAPS TĨNH + MỐC KM + HUY HIỆU START/FINISH (Không bao giờ repaint khi chạy)
-                            RepaintBoundary(
-                              child: CustomPaint(
-                                isComplex: true,
-                                willChange: false,
-                                painter: StaticMapBackgroundPainter(
-                                  pixels: _cachedRoutePixels,
-                                  fullPath: _fullVectorPath,
-                                  startPinPixel: _startPinPixel,
-                                  finishPinPixel: _finishPinPixel,
-                                  milestones: _milestones,
-                                  tileCache: _tileCache,
-                                  zoom: _zoomLevel,
-                                  routeCenterX: _routeCenterX,
-                                  routeCenterY: _routeCenterY,
-                                  spanW: _spanW,
-                                  spanH: _spanH,
-                                  onTileRequested: _loadMapTile,
-                                ),
-                              ),
-                            ),
+                      : AnimatedBuilder(
+                          animation: _controller,
+                          builder: (context, _) {
+                            // Hiệu ứng Zoom Out lùi xa êm ái khi về đích (Từ 78% đến 100%)
+                            final double outroRaw = ((_controller.value - 0.78) / 0.22).clamp(0.0, 1.0);
+                            final double outroT = Curves.easeInOutCubic.transform(outroRaw);
+                            final double dynamicZoomScale = ui.lerpDouble(1.18, 0.95, outroT)!;
 
-                            // TẦNG 2: VỆT CHẠY VECTOR ĐỎ THỂ THAO + CHẤM CHẠY PHÁT SÁNG (Chỉ vẽ 1 line vector nhẹ 0.1ms)
-                            AnimatedBuilder(
-                              animation: _controller,
-                              builder: (context, _) {
-                                return CustomPaint(
-                                  painter: DynamicTrailOverlayPainter(
-                                    sampledPositions: _sampledPositions,
-                                    sampledHeadings: _sampledHeadings,
-                                    pathMetric: _pathMetric,
-                                    totalLength: _totalPathLength,
-                                    progress: _controller.value,
-                                    routeCenterX: _routeCenterX,
-                                    routeCenterY: _routeCenterY,
-                                    spanW: _spanW,
-                                    spanH: _spanH,
+                            return Transform.scale(
+                              scale: dynamicZoomScale,
+                              alignment: const Alignment(0, 0.04), // Căn chỉnh chuẩn tâm tuyến đường
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // TẦNG 1: BẢN ĐỒ GOOGLE MAPS TĨNH + MỐC KM + HUY HIỆU START/FINISH (Không bao giờ repaint khi chạy)
+                                  RepaintBoundary(
+                                    child: CustomPaint(
+                                      isComplex: true,
+                                      willChange: false,
+                                      painter: StaticMapBackgroundPainter(
+                                        pixels: _cachedRoutePixels,
+                                        fullPath: _fullVectorPath,
+                                        startPinPixel: _startPinPixel,
+                                        finishPinPixel: _finishPinPixel,
+                                        milestones: _milestones,
+                                        tileCache: _tileCache,
+                                        zoom: _zoomLevel,
+                                        routeCenterX: _routeCenterX,
+                                        routeCenterY: _routeCenterY,
+                                        spanW: _spanW,
+                                        spanH: _spanH,
+                                        onTileRequested: _loadMapTile,
+                                      ),
+                                    ),
                                   ),
-                                );
-                              },
-                            ),
-                          ],
+
+                                  // TẦNG 2: VỆT CHẠY VECTOR ĐỎ THỂ THAO + CHẤM CHẠY PHÁT SÁNG (Chỉ vẽ 1 line vector nhẹ 0.1ms)
+                                  CustomPaint(
+                                    painter: DynamicTrailOverlayPainter(
+                                      sampledPositions: _sampledPositions,
+                                      sampledHeadings: _sampledHeadings,
+                                      pathMetric: _pathMetric,
+                                      totalLength: _totalPathLength,
+                                      progress: _controller.value,
+                                      routeCenterX: _routeCenterX,
+                                      routeCenterY: _routeCenterY,
+                                      spanW: _spanW,
+                                      spanH: _spanH,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                 ),
 
@@ -1180,8 +1189,8 @@ class StaticMapBackgroundPainter extends CustomPainter {
     // 1. Vẽ các ô Map Tiles
     final int centerTileX = (routeCenterX / tileSize).floor();
     final int centerTileY = (routeCenterY / tileSize).floor();
-    final int tileRadiusX = (2.4 / camScale).ceil().clamp(2, 6);
-    final int tileRadiusY = (3.4 / camScale).ceil().clamp(3, 7);
+    final int tileRadiusX = (3.0 / camScale).ceil().clamp(3, 7);
+    final int tileRadiusY = (4.0 / camScale).ceil().clamp(4, 8);
 
     for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
       for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
