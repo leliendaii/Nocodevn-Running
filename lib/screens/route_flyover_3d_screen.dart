@@ -553,7 +553,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         bool isStarted = false;
         bool isDownloading = false;
         RealtimeVideoSession? activeSession;
-        final filename = 'flyover_3d_${widget.session.id}_${_formatSpeed(_playbackSpeed)}.mp4';
+        final modeStr = _isFlycamMode ? 'flycam' : 'toancanh';
+        final filename = 'flyover_3d_${modeStr}_${widget.session.id}.mp4';
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -576,16 +577,16 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   );
                   activeSession = session;
 
-                  // 80 khung hình mượt mà liên tục (Chuẩn video 30 FPS, camera di chuyển siêu êm)
-                  const int totalSteps = 80;
+                  // 70 khung hình liên tục (Chuẩn video 30 FPS mượt mà)
+                  const int totalSteps = 70;
                   for (int step = 0; step <= totalSteps; step++) {
                     if (_isDisposed || !mounted) break;
                     final double t = step / totalSteps;
                     _controller.value = t;
 
                     setDialogState(() {
-                      progress = (step / totalSteps) * 0.90;
-                      status = '🎥 Đang quay video HD siêu mượt (${(progress * 100).toInt()}%)...';
+                      progress = (step / (totalSteps + 2)) * 0.95;
+                      status = '🎥 Đang quay video ${_isFlycamMode ? "Flycam" : "Toàn cảnh"} (${(progress * 100).toInt()}%)...';
                     });
 
                     await Future.delayed(const Duration(milliseconds: 35));
@@ -601,15 +602,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   }
 
                   setDialogState(() {
-                    progress = 0.96;
-                    status = '💎 Đang đóng gói video HD chất lượng cao...';
+                    progress = 0.98;
+                    status = '💎 Đang hoàn tất video HD...';
                   });
 
                   await session.finishRecording();
 
                   setDialogState(() {
                     progress = 1.0;
-                    status = '🎉 Video đã sẵn sàng tải về!';
+                    status = '🎉 Video đã sẵn sàng lưu!';
                     isDone = true;
                   });
 
@@ -737,7 +738,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 )
                               : const Icon(Icons.download_rounded, size: 19),
                           label: Text(
-                            isDownloading ? 'ĐANG LƯU VÀO MÁY...' : 'LƯU VÀO ALBUM ẢNH (IPHONE)',
+                            isDownloading ? 'ĐANG LƯU VÀO MÁY...' : 'LƯU VÀO ALBUM ẢNH',
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w900,
@@ -761,28 +762,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                     isSuccess: res.isSuccess,
                                   );
                                 },
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.only(top: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withValues(alpha: 0.75),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF334155), width: 0.8),
-                        ),
-                        child: const Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.info_outline_rounded, color: AppTheme.secondaryNeon, size: 15),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '💡 Trên iPhone: Video sẽ được lưu vào ứng dụng "Tệp" (Files) ➔ Thư mục "Tải về" (Downloads). Bạn chỉ cần mở Tệp ➔ Bấm nút Chia sẻ [↑] ➔ Chọn "Lưu video" là video sẽ nằm ngay trong Album Ảnh!',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.35),
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -885,63 +864,72 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
                     ),
 
-                    // Pill Thống Kê Giữa (🟢 1.30 km | 3:46 /km | 04:54)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFF1E293B)),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF10B981),
-                            ),
+                    // Pill Thống Kê Giữa Nhảy Động Theo Tiến Độ Video
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, _) {
+                        final double curProgress = _controller.value.clamp(0.0, 1.0);
+                        final double curDistance = _effectiveDistanceKm * curProgress;
+                        final int curDurationSec = (_effectiveDurationSec * curProgress).round();
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: const Color(0xFF1E293B)),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_effectiveDistanceKm.toStringAsFixed(2)} km',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                              color: Colors.white,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF10B981),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${curDistance.toStringAsFixed(2)} km',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Container(width: 1, height: 14, color: const Color(0xFF334155)),
+                              ),
+                              Text(
+                                '$_effectivePace /km',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  color: AppTheme.secondaryNeon,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Container(width: 1, height: 14, color: const Color(0xFF334155)),
+                              ),
+                              Text(
+                                _formatDuration(curDurationSec),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Container(width: 1, height: 14, color: const Color(0xFF334155)),
-                          ),
-                          Text(
-                            '$_effectivePace /km',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                              color: AppTheme.secondaryNeon,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Container(width: 1, height: 14, color: const Color(0xFF334155)),
-                          ),
-                          Text(
-                            _formatDuration(_effectiveDurationSec),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
 
                     // Nút Tròn Tải Video
@@ -1029,55 +1017,74 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // A. THẺ TỔNG KẾT THÀNH TÍCH (HOÀN THÀNH XUẤT SẮC)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.94),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD700), size: 18),
-                          SizedBox(width: 6),
-                          Text(
-                            'HOÀN THÀNH XUẤT SẮC',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF10B981),
-                              letterSpacing: 1.0,
-                            ),
+                // A. THẺ TỔNG KẾT THÀNH TÍCH NHẢY ĐỘNG THEO TIẾN ĐỘ CHẠY
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    final double curProgress = _controller.value.clamp(0.0, 1.0);
+                    final double curDistance = _effectiveDistanceKm * curProgress;
+                    final int curDurationSec = (_effectiveDurationSec * curProgress).round();
+                    final int curCalories = (_effectiveCalories * curProgress).round();
+                    final bool isCompleted = curProgress >= 0.98;
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isCompleted
+                              ? const Color(0xFF10B981).withValues(alpha: 0.6)
+                              : const Color(0xFF334155),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isCompleted
+                                ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                                : Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildSummaryStatItem('QUÃNG ĐƯỜNG', '${_effectiveDistanceKm.toStringAsFixed(2)} km', AppTheme.primaryNeon),
-                          _buildSummaryStatItem('PACE TB', '$_effectivePace /km', AppTheme.secondaryNeon),
-                          _buildSummaryStatItem('THỜI GIAN', _formatDuration(_effectiveDurationSec), Colors.white),
-                          _buildSummaryStatItem('CALO', '$_effectiveCalories kcal', AppTheme.accentOrange),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isCompleted ? Icons.emoji_events_rounded : Icons.directions_run_rounded,
+                                color: isCompleted ? const Color(0xFFFFD700) : AppTheme.primaryNeon,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isCompleted ? 'HOÀN THÀNH XUẤT SẮC' : 'ĐANG CHẠY LỘ TRÌNH',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: isCompleted ? const Color(0xFF10B981) : AppTheme.primaryNeon,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildSummaryStatItem('QUÃNG ĐƯỜNG', '${curDistance.toStringAsFixed(2)} km', AppTheme.primaryNeon),
+                              _buildSummaryStatItem('PACE TB', '$_effectivePace /km', AppTheme.secondaryNeon),
+                              _buildSummaryStatItem('THỜI GIAN', _formatDuration(curDurationSec), Colors.white),
+                              _buildSummaryStatItem('CALO', '$curCalories kcal', AppTheme.accentOrange),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 12), // KHOẢNG CÁCH RÕ RÀNG GIỮA 2 KHỐI
