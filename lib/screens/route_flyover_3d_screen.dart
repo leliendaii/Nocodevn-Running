@@ -52,10 +52,17 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   int _tileVersion = 0;
   final GlobalKey _previewKey = GlobalKey();
 
+  double _userScaleMultiplier = 1.0;
+  Offset _userPanOffset = Offset.zero;
+  double _baseScaleMultiplier = 1.0;
+  Offset _basePanOffset = Offset.zero;
+  Offset _lastFocalPoint = Offset.zero;
+  String _selectedMapType = 'roadmap'; // 'roadmap' | 'terrain' | 'satellite'
+
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  int _baseDurationMs = 14000; // Thời lượng chuẩn 14s (2s zoom điểm đầu -> 8.5s chạy -> 2s dừng điểm cuối không zoom -> 1.5s zoom toàn cảnh)
+  int _baseDurationMs = 16000;
 
   @override
   void initState() {
@@ -403,10 +410,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       if (ty > maxTy) maxTy = ty;
     }
 
-    minTx -= 6;
-    maxTx += 6;
-    minTy -= 6;
-    maxTy += 7;
+    minTx -= 7;
+    maxTx += 7;
+    minTy -= 7;
+    maxTy += 8;
 
     MapTileCacheService.preloadBoundingBox(
       zoom: _zoomLevel,
@@ -414,11 +421,151 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       maxX: maxTx,
       minY: minTy,
       maxY: maxTy,
+      mapType: _selectedMapType,
       onTileLoaded: () {
         if (!_isDisposed && mounted) {
           setState(() => _tileVersion++);
         }
       },
+    );
+  }
+
+  void _resetView() {
+    setState(() {
+      _userScaleMultiplier = 1.0;
+      _userPanOffset = Offset.zero;
+    });
+  }
+
+  void _changeMapType(String type) {
+    if (_selectedMapType == type) return;
+    setState(() {
+      _selectedMapType = type;
+      _tileVersion++;
+    });
+    _precacheRouteMapTiles();
+  }
+
+  void _showMapTypeSelectorSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: AppTheme.divider, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'CHỌN KIỂU BẢN ĐỒ GOOGLE MAPS',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.8),
+                ),
+                const SizedBox(height: 16),
+                _buildMapTypeOption(
+                  ctx: ctx,
+                  id: 'roadmap',
+                  title: 'Đường Phố Chuẩn (Roadmap)',
+                  subtitle: 'Bản đồ vector rõ ràng tên đường và ngã rẽ',
+                  icon: Icons.map_rounded,
+                  color: AppTheme.primaryNeon,
+                ),
+                const SizedBox(height: 8),
+                _buildMapTypeOption(
+                  ctx: ctx,
+                  id: 'terrain',
+                  title: 'Địa Hình Đồi Núi (Terrain 3D)',
+                  subtitle: 'Hiển thị bóng đổ địa hình độ dốc tự nhiên',
+                  icon: Icons.terrain_rounded,
+                  color: const Color(0xFF10B981),
+                ),
+                const SizedBox(height: 8),
+                _buildMapTypeOption(
+                  ctx: ctx,
+                  id: 'satellite',
+                  title: 'Vệ Tinh Không Gian (Satellite)',
+                  subtitle: 'Ảnh chụp vệ tinh thực tế kèm tên đường',
+                  icon: Icons.satellite_alt_rounded,
+                  color: const Color(0xFF00E5FF),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMapTypeOption({
+    required BuildContext ctx,
+    required String id,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    final bool isSelected = _selectedMapType == id;
+    return InkWell(
+      onTap: () {
+        Navigator.of(ctx).pop();
+        _changeMapType(id);
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : const Color(0xFF1E293B).withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFF334155),
+            width: isSelected ? 1.8 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? color : Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected) Icon(Icons.check_circle_rounded, color: color, size: 20),
+          ],
+        ),
+      ),
     );
   }
 
@@ -806,6 +953,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       spanH: _spanH,
       isFlycamMode: _isFlycamMode,
       tileVersion: _tileVersion,
+      userScaleMultiplier: _userScaleMultiplier,
+      userPanOffset: _userPanOffset,
+      mapType: _selectedMapType,
       onTileRequested: (z, x, y) {},
     );
 
@@ -1048,50 +1198,68 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 builder: (context, _) {
                   final double t = _controller.value.clamp(0.0, 1.0);
 
-                  return Stack(
-                    children: [
-                      // Bản đồ 3D và lộ trình đường chạy
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: Real3DStravaFlyoverPainter(
-                            pixels: _cachedRoutePixels,
-                            fullPath: _fullVectorPath,
-                            sampledPositions: _sampledPositions,
-                            smoothedCamPositions: _smoothedCamPositions,
-                            sampledHeadings: _sampledHeadings,
-                            startPinPixel: _startPinPixel,
-                            finishPinPixel: _finishPinPixel,
-                            pathMetric: _pathMetric,
-                            totalLength: _totalPathLength,
-                            milestones: _milestones,
-                            progress: t,
-                            tileCache: MapTileCacheService.memoryCache,
-                            zoom: _zoomLevel,
-                            routeCenterX: _routeCenterX,
-                            routeCenterY: _routeCenterY,
-                            spanW: _spanW,
-                            spanH: _spanH,
-                            isFlycamMode: _isFlycamMode,
-                            tileVersion: _tileVersion,
-                            onTileRequested: (z, x, y) {
-                              MapTileCacheService.getTile(z, x, y).then((img) {
-                                if (img != null && !_isDisposed && mounted) {
-                                  setState(() => _tileVersion++);
-                                }
-                              });
-                            },
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onScaleStart: (details) {
+                      _baseScaleMultiplier = _userScaleMultiplier;
+                      _basePanOffset = _userPanOffset;
+                      _lastFocalPoint = details.localFocalPoint;
+                    },
+                    onScaleUpdate: (details) {
+                      setState(() {
+                        _userScaleMultiplier = (_baseScaleMultiplier * details.scale).clamp(0.35, 3.5);
+                        final delta = details.localFocalPoint - _lastFocalPoint;
+                        _userPanOffset = _basePanOffset + delta;
+                      });
+                    },
+                    child: Stack(
+                      children: [
+                        // Bản đồ 3D và lộ trình đường chạy
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: Real3DStravaFlyoverPainter(
+                              pixels: _cachedRoutePixels,
+                              fullPath: _fullVectorPath,
+                              sampledPositions: _sampledPositions,
+                              smoothedCamPositions: _smoothedCamPositions,
+                              sampledHeadings: _sampledHeadings,
+                              startPinPixel: _startPinPixel,
+                              finishPinPixel: _finishPinPixel,
+                              pathMetric: _pathMetric,
+                              totalLength: _totalPathLength,
+                              milestones: _milestones,
+                              progress: t,
+                              tileCache: MapTileCacheService.memoryCache,
+                              zoom: _zoomLevel,
+                              routeCenterX: _routeCenterX,
+                              routeCenterY: _routeCenterY,
+                              spanW: _spanW,
+                              spanH: _spanH,
+                              isFlycamMode: _isFlycamMode,
+                              tileVersion: _tileVersion,
+                              userScaleMultiplier: _userScaleMultiplier,
+                              userPanOffset: _userPanOffset,
+                              mapType: _selectedMapType,
+                              onTileRequested: (z, x, y) {
+                                MapTileCacheService.getTile(z, x, y, mapType: _selectedMapType).then((img) {
+                                  if (img != null && !_isDisposed && mounted) {
+                                    setState(() => _tileVersion++);
+                                  }
+                                });
+                              },
+                            ),
+                            size: Size.infinite,
                           ),
-                          size: Size.infinite,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
             ),
           ),
 
-          // 2. VIP TOP HUD: NÚT BACK TRÒN + NÚT CHUYỂN CHẾ ĐỘ TOÀN CẢNH/FLYCAM Ở GIỮA CÂN ĐỐI + NÚT TẢI VIDEO TRÒN
+          // 2. VIP TOP HUD: NÚT BACK + NÚT CHUYỂN TOÀN CẢNH/FLYCAM + NÚT LỚP MAP + NÚT TẢI VIDEO
           Positioned(
             top: 0,
             left: 0,
@@ -1168,31 +1336,117 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
                     ),
 
-                    // Nút Tròn Tải Video
-                    InkWell(
-                      onTap: _handleDownloadVideo,
-                      borderRadius: BorderRadius.circular(24),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-                          border: Border.all(color: const Color(0xFF1E293B)),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10),
-                          ],
+                    // Nhóm Nút Bên Phải: Nút Lớp Bản Đồ + Nút Tải Video
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Nút Chuyển Lớp Bản Đồ (Đường phố / Địa hình / Vệ tinh)
+                        InkWell(
+                          onTap: _showMapTypeSelectorSheet,
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                              border: Border.all(
+                                color: _selectedMapType != 'roadmap'
+                                    ? const Color(0xFF00E5FF)
+                                    : const Color(0xFF1E293B),
+                                width: _selectedMapType != 'roadmap' ? 1.5 : 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _selectedMapType != 'roadmap'
+                                      ? const Color(0xFF00E5FF).withValues(alpha: 0.3)
+                                      : Colors.black.withValues(alpha: 0.4),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Icon(
+                                _selectedMapType == 'terrain'
+                                    ? Icons.terrain_rounded
+                                    : _selectedMapType == 'satellite'
+                                        ? Icons.satellite_alt_rounded
+                                        : Icons.layers_rounded,
+                                color: _selectedMapType != 'roadmap'
+                                    ? const Color(0xFF00E5FF)
+                                    : AppTheme.primaryNeon,
+                                size: 20,
+                              ),
+                            ),
+                          ),
                         ),
-                        child: const Center(
-                          child: Icon(Icons.download_rounded, color: AppTheme.secondaryNeon, size: 20),
+                        const SizedBox(width: 8),
+
+                        // Nút Tròn Tải Video
+                        InkWell(
+                          onTap: _handleDownloadVideo,
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                              border: Border.all(color: const Color(0xFF1E293B)),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.download_rounded, color: AppTheme.secondaryNeon, size: 20),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
           ),
+
+          // 3. NÚT ĐẶT LẠI GÓC NHÌN (CHỈ HIỆN KHI BẠN ĐÃ DÙNG TAY ZOOM HOẶC KÉO MAP)
+          if (_userScaleMultiplier != 1.0 || _userPanOffset != Offset.zero)
+            Positioned(
+              top: 74,
+              right: 16,
+              child: SafeArea(
+                child: InkWell(
+                  onTap: _resetView,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.primaryNeon, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryNeon.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.center_focus_strong_rounded, size: 14, color: AppTheme.primaryNeon),
+                        SizedBox(width: 6),
+                        Text(
+                          'ĐẶT LẠI GÓC',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppTheme.primaryNeon),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // 4. BOTTOM GROUP: THẺ TỔNG KẾT & THANH ĐIỀU KHIỂN XẾP CÁCH NHAU RÕ RÀNG (KHÔNG DÍNH NHAU)
           Positioned(
@@ -1488,6 +1742,9 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
   final double spanH;
   final bool isFlycamMode;
   final int tileVersion;
+  final double userScaleMultiplier;
+  final Offset userPanOffset;
+  final String mapType;
   final Function(int z, int x, int y) onTileRequested;
 
   static const double tileSize = 256.0;
@@ -1518,6 +1775,9 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     required this.spanH,
     required this.isFlycamMode,
     required this.tileVersion,
+    this.userScaleMultiplier = 1.0,
+    this.userPanOffset = Offset.zero,
+    this.mapType = 'roadmap',
     required this.onTileRequested,
   });
 
@@ -1592,8 +1852,12 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     } else {
       // 5. Giai đoạn ĐỢI 5 GIÂY TOÀN CẢNH: Giữ nguyên toàn cảnh và các thông số hiển thị trọn vẹn
       flightProgress = 1.0;
-      camX = routeCenterX;
-      camY = routeCenterY;
+      final double overviewT = ((progress - 0.74) / 0.26).clamp(0.0, 1.0);
+      // Hiệu ứng Flycam Drone lơ lửng nhẹ nhàng làm mềm khung nhìn toàn cảnh
+      final double floatX = math.sin(overviewT * math.pi * 2) * (spanW * 0.02);
+      final double floatY = math.cos(overviewT * math.pi * 2) * (spanH * 0.015);
+      camX = routeCenterX + floatX;
+      camY = routeCenterY + floatY;
       camScale = overviewScale;
     }
 
@@ -1608,10 +1872,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
     final double outroT = ((progress - 0.85) / 0.15).clamp(0.0, 1.0);
 
-    // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM
-    final double strokeBase = (3.6 / camScale).clamp(2.4, 5.0);
-    final double strokeCore = (1.4 / camScale).clamp(0.9, 2.0);
-    final double strokeShadow = (6.0 / camScale).clamp(4.0, 8.5);
+    // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM (KÈM ZOOM TAY)
+    final double effectiveCamScale = camScale * userScaleMultiplier;
+    final double strokeBase = (3.6 / effectiveCamScale).clamp(2.4, 5.0);
+    final double strokeCore = (1.4 / effectiveCamScale).clamp(0.9, 2.0);
+    final double strokeShadow = (6.0 / effectiveCamScale).clamp(4.0, 8.5);
 
     final Paint fullPathPaint = Paint()
       ..isAntiAlias = true
@@ -1645,26 +1910,26 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // 4. MA TRẬN CAMERA CHUYÊN NGHIỆP
-    final double screenCenterX = size.width / 2;
-    final double screenCenterY = size.height * 0.52;
+    // 4. MA TRẬN CAMERA CHUYÊN NGHIỆP (KẾT HỢP TỈ LỆ ZOOM & CĂN CHỈNH TAY CỦA NGƯỜI DÙNG)
+    final double screenCenterX = size.width / 2 + userPanOffset.dx;
+    final double screenCenterY = size.height * 0.52 + userPanOffset.dy;
 
     canvas.save();
     canvas.translate(screenCenterX, screenCenterY);
-    canvas.scale(camScale, camScale);
+    canvas.scale(effectiveCamScale, effectiveCamScale);
     canvas.translate(-camX, -camY);
 
-    // 5. VẼ MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ KHUNG NHÌN
+    // 5. VẼ MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ KHUNG NHÌN (HỖ TRỢ ROADMAP, TERRAIN, SATELLITE)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (4.5 / camScale).ceil().clamp(5, 10);
-    final int tileRadiusY = (5.5 / camScale).ceil().clamp(6, 12);
+    final int tileRadiusX = (4.5 / effectiveCamScale).ceil().clamp(5, 14);
+    final int tileRadiusY = (5.5 / effectiveCamScale).ceil().clamp(6, 16);
 
     for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
       for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
         final tx = centerTileX + dx;
         final ty = centerTileY + dy;
-        final key = '$zoom/$tx/$ty';
+        final key = '$mapType/$zoom/$tx/$ty';
 
         final tileRect = Rect.fromLTWH(tx * tileSize - 0.75, ty * tileSize - 0.75, tileSize + 1.5, tileSize + 1.5);
 
@@ -1747,19 +2012,27 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     startText.paint(canvas, Offset(-startText.width / 2, -46 + (24 - startText.height) / 2));
     canvas.restore();
 
-    // Finish Pin
     final Offset finishBadgeOffset = isLoop ? const Offset(24, 0) : Offset.zero;
     canvas.save();
     canvas.translate(finishPinPixel.dx + finishBadgeOffset.dx, finishPinPixel.dy + finishBadgeOffset.dy);
 
-    if (outroT > 0.05) {
+    if (progress >= 0.58) {
+      final double rippleT = ((progress - 0.58) * 8) % 1.0;
       canvas.drawCircle(
-        const Offset(0, -28),
-        26 + outroT * 8,
+        const Offset(0, -22),
+        14 + rippleT * 28,
         Paint()
-          ..color = const Color(0xFF10B981).withValues(alpha: 0.35 * outroT)
+          ..color = const Color(0xFFEF4444).withValues(alpha: (1.0 - rippleT) * 0.6)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 3,
+          ..strokeWidth = 2.5,
+      );
+      canvas.drawCircle(
+        const Offset(0, -22),
+        7 + rippleT * 15,
+        Paint()
+          ..color = const Color(0xFFFC5200).withValues(alpha: (1.0 - rippleT) * 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
       );
     }
 

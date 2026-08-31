@@ -34,9 +34,25 @@ class MapTileCacheService {
     _isDiskDirInitialized = true;
   }
 
+  /// Chuyển đổi mã loại bản đồ sang tham số Google Maps Server
+  /// - roadmap -> lyrs=m (Đường phố)
+  /// - terrain -> lyrs=p (Địa hình đồi núi 3D)
+  /// - satellite -> lyrs=y (Ảnh vệ tinh hybrid có tên đường)
+  static String _getGoogleLayerCode(String mapType) {
+    switch (mapType) {
+      case 'terrain':
+        return 'p';
+      case 'satellite':
+        return 'y';
+      case 'roadmap':
+      default:
+        return 'm';
+    }
+  }
+
   /// Tải Map Tile với cơ chế 3 tầng: RAM ➔ Ổ đĩa Disk ➔ Mạng Network
-  static Future<ui.Image?> getTile(int z, int x, int y) async {
-    final key = '$z/$x/$y';
+  static Future<ui.Image?> getTile(int z, int x, int y, {String mapType = 'roadmap'}) async {
+    final key = '$mapType/$z/$x/$y';
 
     // 1. Kiểm tra RAM Cache (0ms)
     if (_memoryCache.containsKey(key)) {
@@ -51,7 +67,7 @@ class MapTileCacheService {
 
       // 2. Kiểm tra Disk Cache trên thiết bị (< 5ms)
       if (!kIsWeb && _diskCacheDir != null) {
-        final diskFile = File('${_diskCacheDir!.path}/tile_${z}_${x}_$y.png');
+        final diskFile = File('${_diskCacheDir!.path}/tile_${mapType}_${z}_${x}_$y.png');
         if (await diskFile.exists()) {
           final bytes = await diskFile.readAsBytes();
           final image = await _decodeImageFromBytes(bytes);
@@ -65,7 +81,8 @@ class MapTileCacheService {
 
       // 3. Tải qua mạng Google Maps Server với độ phân giải cao Retina HD (@2x)
       final int serverId = (x.abs() + y.abs()) % 4;
-      final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z&scale=2';
+      final String layerCode = _getGoogleLayerCode(mapType);
+      final url = 'https://mt$serverId.google.com/vt/lyrs=$layerCode&hl=vi&x=$x&y=$y&z=$z&scale=2';
 
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
@@ -73,7 +90,7 @@ class MapTileCacheService {
 
         // Lưu vào Disk Cache
         if (!kIsWeb && _diskCacheDir != null) {
-          final diskFile = File('${_diskCacheDir!.path}/tile_${z}_${x}_$y.png');
+          final diskFile = File('${_diskCacheDir!.path}/tile_${mapType}_${z}_${x}_$y.png');
           diskFile.writeAsBytes(bytes).catchError((_) => diskFile);
         }
 
@@ -113,15 +130,16 @@ class MapTileCacheService {
     required int maxX,
     required int minY,
     required int maxY,
+    String mapType = 'roadmap',
     VoidCallback? onTileLoaded,
   }) async {
     final List<Future<void>> tasks = [];
     for (int x = minX; x <= maxX; x++) {
       for (int y = minY; y <= maxY; y++) {
-        final key = '$zoom/$x/$y';
+        final key = '$mapType/$zoom/$x/$y';
         if (_memoryCache.containsKey(key)) continue;
 
-        tasks.add(getTile(zoom, x, y).then((img) {
+        tasks.add(getTile(zoom, x, y, mapType: mapType).then((img) {
           if (img != null) {
             onTileLoaded?.call();
           }
