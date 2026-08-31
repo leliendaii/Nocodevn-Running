@@ -413,16 +413,16 @@ class RunningProvider with ChangeNotifier {
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // Lọc bỏ tọa độ quá nhiễu (> 18m) để tránh cộng dồn sai số vệ tinh
-          if (position.accuracy > 18.0) {
+          // Lọc bỏ tọa độ quá nhiễu (> 30m) để tránh sai số quá lớn
+          if (position.accuracy > 30.0) {
             return;
           }
 
           final now = DateTime.now();
           _updateDurationFromWallClock();
 
-          // Lấy vận tốc tức thời từ chipset GPS phần cứng (m/s)
-          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 3.0)
+          // Lấy vận tốc tức thời từ phần cứng GPS (m/s)
+          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 5.0)
               ? position.speed
               : -1.0;
 
@@ -435,31 +435,29 @@ class RunningProvider with ChangeNotifier {
             );
 
             final double timeDeltaSec = _lastPositionTime != null
-                ? (now.difference(_lastPositionTime!).inMilliseconds / 1000.0).clamp(0.1, 30.0)
+                ? (now.difference(_lastPositionTime!).inMilliseconds / 1000.0).clamp(0.1, 60.0)
                 : 1.0;
 
             final double calcSpeedMps = distanceInMeters / timeDeltaSec;
-            final double effectiveSpeedMps = (hwSpeedMps >= 0.2) ? hwSpeedMps : calcSpeedMps;
-            final double speedKmh = (effectiveSpeedMps * 3.6).clamp(0.0, 35.0);
+            final double effectiveSpeedMps = (hwSpeedMps >= 0.0) ? hwSpeedMps : calcSpeedMps;
+            final double effectiveSpeedKmh = effectiveSpeedMps * 3.6;
 
-            // Cập nhật Vận tốc tức thời mượt mà (đi bộ 3-6 km/h, chạy 7-20 km/h)
-            if (speedKmh >= 0.8) {
-              _instantSpeedKmh = speedKmh;
-            } else if (distanceInMeters < 1.5 && timeDeltaSec > 2.0) {
+            // BỘ LỌC CHUẨN STRAVA / GARMIN:
+            // 1. Kiểm tra nhảy bất thường (tốc độ > 55 km/h)
+            final bool isAbnormalJump = (calcSpeedMps > 15.3); // > 55 km/h
+
+            // 2. Kiểm tra đứng yên / rung lắc vi mô (< 1.2m và tốc độ < 0.8 km/h)
+            final bool isStationaryDrift = (distanceInMeters < 1.2 && effectiveSpeedKmh < 0.8) || (distanceInMeters < 0.6);
+
+            // 3. Cập nhật vận tốc tức thời thời gian thực:
+            if (isStationaryDrift) {
               _instantSpeedKmh = 0.0;
+            } else if (!isAbnormalJump) {
+              _instantSpeedKmh = effectiveSpeedKmh.clamp(0.0, 45.0);
             }
 
-            // BỘ LỌC CHỐNG TRÔI GPS KHI ĐI BỘ / ĐỨNG YÊN (Chuẩn Strava & Garmin):
-            // 1. Loại bỏ nhảy ảo bất thường (tốc độ > 35 km/h hoặc khoảng cách nhảy vọt > 50m trong tích tắc)
-            final bool isAbnormalJump = calcSpeedMps > 10.0 || distanceInMeters > 50.0;
-
-            // 2. Chống cộng dồn trôi ảo khi đứng yên / di chuyển siêu nhỏ (< 2.0m khi tốc độ < 0.5 m/s)
-            final bool isStationaryDrift = (distanceInMeters < 2.2 && effectiveSpeedMps < 0.5) || (distanceInMeters < 1.4);
-
-            // 3. Điều kiện di chuyển thực tế hợp lệ (đi bộ thật hoặc chạy thật)
-            final bool isValidMovement = !isAbnormalJump && !isStationaryDrift && (distanceInMeters >= 2.2 || (effectiveSpeedMps >= 0.6 && distanceInMeters >= 1.6));
-
-            if (isValidMovement) {
+            // 4. Ghi nhận di chuyển hợp lệ:
+            if (!isAbnormalJump && !isStationaryDrift) {
               _distanceKm += distanceInMeters / 1000.0;
               _calories = CalorieCalculator.calculate(
                 distanceKm: _distanceKm,
@@ -469,14 +467,15 @@ class RunningProvider with ChangeNotifier {
               _lastPosition = position;
               _lastPositionTime = now;
 
-              // KIỂM TRA MỐC KM ĐẠT ĐƯỢC (1.0km, 2.0km, 3.0km...) ĐỂ KÍCH HOẠT RUNG & THÔNG BÁO
+              // Kiểm tra mốc KM (1.0km, 2.0km...) để rung thông báo
               final int currentKm = _distanceKm.floor();
               if (currentKm > _lastMilestoneKm && currentKm > 0) {
                 _lastMilestoneKm = currentKm;
                 onKilometerMilestone?.call(currentKm, currentPace);
               }
-            } else if (!isAbnormalJump && distanceInMeters >= 4.0) {
-              // Cập nhật mốc tọa độ định kỳ để tránh tích tụ sai số khoảng cách
+            } else {
+              // Dù là dừng lại hay nhảy GPS, luôn đồng bộ lại mốc vị trí mới nhất
+              // ĐẢM BẢO TUYỆT ĐỐI KHÔNG BAO GIỜ BỊ TREO TỌA ĐỘ HAY ĐỨNG ĐẾM KM!
               _lastPosition = position;
               _lastPositionTime = now;
             }

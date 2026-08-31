@@ -39,8 +39,8 @@ class CalorieCalculator {
     final double durationHours = durationSeconds / 3600.0;
     final double speedKmh = distanceKm / durationHours;
 
-    // Lọc tốc độ bất thường do nhảy GPS (giới hạn tối đa 35 km/h)
-    final double clampedSpeed = speedKmh.clamp(0.0, 35.0);
+    // Lọc tốc độ bất thường do nhảy GPS (giới hạn tối đa 45 km/h)
+    final double clampedSpeed = speedKmh.clamp(0.0, 45.0);
 
     final double met = getMetBySpeed(speedKmh: clampedSpeed);
 
@@ -59,7 +59,7 @@ class CalorieCalculator {
     if (timeSeconds <= 0 || distanceMeters <= 0) return 0.0;
 
     final double speedKmh = (distanceMeters / timeSeconds) * 3.6;
-    final double clampedSpeed = speedKmh.clamp(0.0, 35.0);
+    final double clampedSpeed = speedKmh.clamp(0.0, 45.0);
     final double met = getMetBySpeed(speedKmh: clampedSpeed);
 
     final double hours = timeSeconds / 3600.0;
