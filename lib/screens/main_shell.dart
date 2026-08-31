@@ -1280,17 +1280,37 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 Row(
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                        color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: AppTheme.primaryNeon.withValues(alpha: 0.4),
                           width: 1.2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryNeon.withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.directions_run_rounded, color: AppTheme.primaryNeon, size: 24),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.directions_run_rounded,
+                              size: 24,
+                              color: AppTheme.primaryNeon,
+                            );
+                          },
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(
