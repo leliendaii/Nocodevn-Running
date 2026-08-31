@@ -41,44 +41,74 @@ class VoiceCoachService {
     }
   }
 
-  /// 1. Bắt đầu chạy
-  static void speakStart() {
-    speak('Ba, hai, một... Bắt đầu buổi chạy bộ. Chúc bạn có một buổi chạy thật tuyệt vời!');
+  static String formatDurationSpeech(int durationSeconds) {
+    final int hours = durationSeconds ~/ 3600;
+    final int min = (durationSeconds % 3600) ~/ 60;
+    final int sec = durationSeconds % 60;
+
+    if (hours > 0) {
+      if (min > 0 && sec > 0) {
+        return '$hours giờ $min phút $sec giây';
+      } else if (min > 0) {
+        return '$hours giờ $min phút';
+      } else {
+        return '$hours giờ';
+      }
+    } else if (min > 0) {
+      if (sec > 0) {
+        return '$min phút $sec giây';
+      } else {
+        return '$min phút';
+      }
+    } else {
+      return '$sec giây';
+    }
   }
 
-  /// 2. Tạm dừng
-  static void speakPause() {
-    speak('Buổi chạy đã tạm dừng.');
-  }
-
-  /// 3. Tiếp tục chạy
-  static void speakResume() {
-    speak('Tiếp tục chạy bộ.');
-  }
-
-  /// 4. Thông báo mốc 1 KM (Giống Strava / Nike Run Club)
-  static void speakMilestone(int kmCount, String pace) {
-    // Chuyển pace từ dạng "5:20" thành tiếng Việt "5 phút 20 giây"
-    String paceSpeech = pace;
+  static String formatPaceSpeech(String pace) {
     if (pace.contains(':')) {
       final parts = pace.split(':');
       if (parts.length == 2) {
         final min = int.tryParse(parts[0]) ?? 0;
         final sec = int.tryParse(parts[1]) ?? 0;
-        paceSpeech = '$min phút $sec giây';
+        if (sec > 0) {
+          return '$min phút $sec giây';
+        } else {
+          return '$min phút';
+        }
       }
     }
+    return pace;
+  }
 
-    final message = 'Bạn đã hoàn thành ki-lô-mét thứ $kmCount. Pace trung bình $paceSpeech mỗi ki-lô-mét. Cố lên!';
+  /// 1. Bắt đầu chạy (Đọc ngắn gọn)
+  static void speakStart() {
+    speak('Bắt đầu.');
+  }
+
+  /// 2. Tạm dừng
+  static void speakPause() {
+    speak('Tạm dừng.');
+  }
+
+  /// 3. Tiếp tục chạy
+  static void speakResume() {
+    speak('Tiếp tục.');
+  }
+
+  /// 4. Thông báo qua từng KM: "Bạn đã chạy được X km trong vòng Y giờ"
+  static void speakMilestone(int kmCount, int durationSeconds) {
+    final timeStr = formatDurationSpeech(durationSeconds);
+    final message = 'Bạn đã chạy được $kmCount ki-lô-mét trong vòng $timeStr.';
     speak(message);
   }
 
-  /// 5. Kết thúc buổi chạy
-  static void speakFinish(double distanceKm, int durationSeconds) {
-    final int min = durationSeconds ~/ 60;
-    final int sec = durationSeconds % 60;
-    final String kmStr = distanceKm.toStringAsFixed(2);
-    final message = 'Chúc mừng bạn đã hoàn thành buổi chạy! Tổng quãng đường $kmStr ki-lô-mét trong $min phút $sec giây. Bạn làm rất tốt!';
+  /// 5. Kết thúc buổi chạy: "Kết thúc. Bạn đã chạy tổng X km trong vòng Y giờ, tiêu hao Z calo, pace P"
+  static void speakFinish(double distanceKm, int durationSeconds, int calories, String pace) {
+    final timeStr = formatDurationSpeech(durationSeconds);
+    final paceStr = formatPaceSpeech(pace);
+    final String kmStr = distanceKm.toStringAsFixed(1).replaceAll('.0', '');
+    final message = 'Kết thúc. Bạn đã chạy tổng $kmStr ki-lô-mét trong vòng $timeStr, tiêu hao $calories calo, pace $paceStr mỗi ki-lô-mét.';
     speak(message);
   }
 }

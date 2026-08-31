@@ -40,13 +40,13 @@ class _RunningScreenState extends State<RunningScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final running = context.read<RunningProvider>();
-        running.onKilometerMilestone = (int kmCount, String pace) {
+        running.onKilometerMilestone = (int kmCount, String pace, int durationSeconds) {
           HapticFeedback.heavyImpact();
-          VoiceCoachService.speakMilestone(kmCount, pace);
+          VoiceCoachService.speakMilestone(kmCount, durationSeconds);
           if (mounted) {
             TopSyncToast.show(
               context,
-              message: '🎯 Tuyệt vời! Bạn vừa hoàn thành KM thứ $kmCount! (Pace: $pace /km)',
+              message: '🎯 Bạn vừa chạy được $kmCount km trong vòng ${VoiceCoachService.formatDurationSpeech(durationSeconds)}! (Pace: $pace)',
               isSuccess: true,
             );
           }
@@ -359,7 +359,9 @@ class _RunningScreenState extends State<RunningScreen>
                         onPressed: () {
                           final double savedKm = running.distanceKm;
                           final int savedSec = running.durationSeconds;
-                          VoiceCoachService.speakFinish(savedKm, savedSec);
+                          final int savedCalories = running.calories;
+                          final String savedPace = running.currentPace;
+                          VoiceCoachService.speakFinish(savedKm, savedSec, savedCalories, savedPace);
                           running.stopAndSaveTracking(
                             userId: userId,
                             userName: userName,

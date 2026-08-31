@@ -24,7 +24,7 @@ class RealtimeVideoSession {
   String? _savedFilePath;
 
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
-    if (_frames.length < 150) {
+    if (_frames.length < 800) {
       _frames.add(RawFrameData(rawRgbaBytes, frameWidth, frameHeight));
     }
   }
@@ -45,7 +45,7 @@ class RealtimeVideoSession {
       await FlutterQuickVideoEncoder.setup(
         width: width,
         height: height,
-        fps: 30,
+        fps: 25,
         videoBitrate: 8000000,
         profileLevel: ProfileLevel.any,
         audioChannels: 0,

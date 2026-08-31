@@ -578,6 +578,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 try {
                   _controller.reset();
 
+                  // Tính toán số frames chuẩn xác 100% đồng bộ với tốc độ đang chọn (x1, x2, x3):
+                  final double effectiveDurationSec = (_baseDurationMs / 1000.0) / _playbackSpeed;
+                  final int totalSteps = (effectiveDurationSec * 25.0).round().clamp(60, 450);
+
                   final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
                   if (boundary == null) throw Exception('Không tìm thấy khung hình 3D.');
 
@@ -586,12 +590,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   final session = RouteVideoRecorder.startSession(
                     width: firstImg.width,
                     height: firstImg.height,
-                    fps: 30.0,
+                    fps: 25.0,
                   );
                   activeSession = session;
 
-                  // 70 khung hình liên tục (Chuẩn video 30 FPS mượt mà)
-                  const int totalSteps = 70;
                   for (int step = 0; step <= totalSteps; step++) {
                     if (_isDisposed || !mounted) break;
                     final double t = step / totalSteps;
@@ -599,10 +601,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
                     setDialogState(() {
                       progress = (step / (totalSteps + 2)) * 0.95;
-                      status = '🎥 Đang quay video ${_isFlycamMode ? "Flycam" : "Toàn cảnh"} (${(progress * 100).toInt()}%)...';
+                      status = '🎥 Đang quay video ${_isFlycamMode ? "Flycam" : "Toàn cảnh"} ${(_playbackSpeed).toStringAsFixed(1)}x (${(progress * 100).toInt()}%)...';
                     });
 
-                    await Future.delayed(const Duration(milliseconds: 35));
+                    await Future.delayed(const Duration(milliseconds: 25));
 
                     final b = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
                     if (b != null) {
@@ -784,49 +786,242 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     );
   }
 
+  /// Khối widget số đếm tăng dần xếp dọc bên trái ở giữa (Quãng đường, Thời gian, Calo, Pace)
+  Widget _buildVerticalLiveStatsCard(double progress) {
+    final double curProgress = progress.clamp(0.0, 1.0);
+    final double curDistance = _effectiveDistanceKm * curProgress;
+    final int curDurationSec = (_effectiveDurationSec * curProgress).round();
+    final int min = curDurationSec ~/ 60;
+    final int sec = curDurationSec % 60;
+    final String curTimeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+    final int curCalories = (_effectiveCalories * curProgress).round();
+
+    return Container(
+      width: 104,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Quãng đường
+          const Text(
+            'QUÃNG ĐƯỜNG',
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textMuted,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                curDistance.toStringAsFixed(2),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF00E5FF),
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Text(
+                'km',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF00E5FF),
+                ),
+              ),
+            ],
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Container(height: 1, color: const Color(0xFF1E293B)),
+          ),
+
+          // 2. Thời gian
+          const Text(
+            'THỜI GIAN',
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textMuted,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            curTimeStr,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              height: 1.1,
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Container(height: 1, color: const Color(0xFF1E293B)),
+          ),
+
+          // 3. Calo
+          const Text(
+            'CALO',
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textMuted,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '$curCalories',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFF7043),
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Text(
+                'kcal',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFFF7043),
+                ),
+              ),
+            ],
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Container(height: 1, color: const Color(0xFF1E293B)),
+          ),
+
+          // 4. Pace
+          const Text(
+            'PACE',
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textMuted,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                _effectivePace,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF10B981),
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Text(
+                '/km',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF10B981),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0F1D),
       body: Stack(
         children: [
-          // 1. CANVAS VẼ 3D FLYOVER THỂ THAO CAO CẤP
+          // 1. CANVAS VẼ 3D FLYOVER THỂ THAO CAO CẤP + BẢNG THỐNG KÊ LỘ TRÌNH ĐỨNG BÊN TRÁI Ở GIỮA
           Positioned.fill(
             child: RepaintBoundary(
               key: _previewKey,
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
-                  return CustomPaint(
-                    painter: Real3DStravaFlyoverPainter(
-                      pixels: _cachedRoutePixels,
-                      fullPath: _fullVectorPath,
-                      sampledPositions: _sampledPositions,
-                      smoothedCamPositions: _smoothedCamPositions,
-                      sampledHeadings: _sampledHeadings,
-                      startPinPixel: _startPinPixel,
-                      finishPinPixel: _finishPinPixel,
-                      pathMetric: _pathMetric,
-                      totalLength: _totalPathLength,
-                      milestones: _milestones,
-                      progress: _controller.value,
-                      tileCache: MapTileCacheService.memoryCache,
-                      zoom: _zoomLevel,
-                      routeCenterX: _routeCenterX,
-                      routeCenterY: _routeCenterY,
-                      spanW: _spanW,
-                      spanH: _spanH,
-                      isFlycamMode: _isFlycamMode,
-                      tileVersion: _tileVersion,
-                      onTileRequested: (z, x, y) {
-                        MapTileCacheService.getTile(z, x, y).then((img) {
-                          if (img != null && !_isDisposed && mounted) {
-                            setState(() => _tileVersion++);
-                          }
-                        });
-                      },
-                    ),
-                    size: Size.infinite,
+                  return Stack(
+                    children: [
+                      // Bản đồ 3D và lộ trình đường chạy
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: Real3DStravaFlyoverPainter(
+                            pixels: _cachedRoutePixels,
+                            fullPath: _fullVectorPath,
+                            sampledPositions: _sampledPositions,
+                            smoothedCamPositions: _smoothedCamPositions,
+                            sampledHeadings: _sampledHeadings,
+                            startPinPixel: _startPinPixel,
+                            finishPinPixel: _finishPinPixel,
+                            pathMetric: _pathMetric,
+                            totalLength: _totalPathLength,
+                            milestones: _milestones,
+                            progress: _controller.value,
+                            tileCache: MapTileCacheService.memoryCache,
+                            zoom: _zoomLevel,
+                            routeCenterX: _routeCenterX,
+                            routeCenterY: _routeCenterY,
+                            spanW: _spanW,
+                            spanH: _spanH,
+                            isFlycamMode: _isFlycamMode,
+                            tileVersion: _tileVersion,
+                            onTileRequested: (z, x, y) {
+                              MapTileCacheService.getTile(z, x, y).then((img) {
+                                if (img != null && !_isDisposed && mounted) {
+                                  setState(() => _tileVersion++);
+                                }
+                              });
+                            },
+                          ),
+                          size: Size.infinite,
+                        ),
+                      ),
+
+                      // Bảng số đếm tăng dần xếp dọc bên trái ở giữa (Quãng đường, Thời gian, Calo, Pace)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 14.0),
+                          child: _buildVerticalLiveStatsCard(_controller.value),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),

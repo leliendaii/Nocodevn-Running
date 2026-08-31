@@ -51,7 +51,7 @@ class RunningProvider with ChangeNotifier {
 
   // Haptic & Milestone callback cho mỗi 1 KM hoàn thành (giống Nike Run Club / Strava)
   int _lastMilestoneKm = 0;
-  void Function(int kmCount, String pace)? onKilometerMilestone;
+  void Function(int kmCount, String pace, int durationSeconds)? onKilometerMilestone;
 
   // Danh sách toàn bộ lịch sử các buổi chạy
   final List<RunSession> _sessions = [];
@@ -518,7 +518,7 @@ class RunningProvider with ChangeNotifier {
               final int currentKm = _distanceKm.floor();
               if (currentKm > _lastMilestoneKm && currentKm > 0) {
                 _lastMilestoneKm = currentKm;
-                onKilometerMilestone?.call(currentKm, currentPace);
+                onKilometerMilestone?.call(currentKm, currentPace, _durationSeconds);
               }
             } else {
               // Dù là dừng lại hay nhảy GPS, luôn đồng bộ lại mốc vị trí mới nhất
