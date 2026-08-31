@@ -72,8 +72,8 @@ class RunningProvider with ChangeNotifier {
     _loadInitialSessions();
     _loadUserProfiles();
 
-    // Heartbeat Timer: Tự động quét kiểm tra nhắc nhở và đồng bộ nền mỗi 10 giây
-    Timer.periodic(const Duration(seconds: 10), (_) {
+    // Heartbeat Timer: Tự động quét kiểm tra nhắc nhở siêu nhẹ (30 giây/lần, 0% CPU, 0 tốn pin)
+    Timer.periodic(const Duration(seconds: 30), (_) {
       if (_activeUserId != null) {
         checkDailyReminder(_activeUserId!);
       }
