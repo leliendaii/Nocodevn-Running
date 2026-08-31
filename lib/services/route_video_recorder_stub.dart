@@ -32,9 +32,9 @@ Future<bool> _encodeGifInBackground(_EncodeJob job) async {
   try {
     if (job.frames.isEmpty) return false;
 
-    // Giới hạn tối đa 30 khung hình siêu mượt (30 FPS) để xuất cực nhanh trong 1-2 giây
+    // Tối ưu 60-80 khung hình mượt mà (30 FPS)
     final List<RawFrameData> framesToProcess = [];
-    final int step = (job.frames.length / 28).ceil().clamp(1, 4);
+    final int step = (job.frames.length / 60).ceil().clamp(1, 3);
     for (int i = 0; i < job.frames.length; i += step) {
       framesToProcess.add(job.frames[i]);
     }
@@ -42,7 +42,7 @@ Future<bool> _encodeGifInBackground(_EncodeJob job) async {
       framesToProcess.add(job.frames.last);
     }
 
-    final encoder = img.GifEncoder(delay: 7); // ~14 FPS playback speed
+    final encoder = img.GifEncoder(delay: 3); // ~30 FPS mượt mà
 
     for (final frame in framesToProcess) {
       // 1. Tạo image từ raw RGBA
@@ -54,7 +54,7 @@ Future<bool> _encodeGifInBackground(_EncodeJob job) async {
         order: img.ChannelOrder.rgba,
       );
 
-      // 2. Resize tối ưu về 480px chiều rộng để xử lý siêu tốc (nhẹ hơn 80% RAM)
+      // 2. Resize về 720px chuẩn HD sắc nét
       if (frame.width > job.targetWidth) {
         frameImg = img.copyResize(
           frameImg,
@@ -64,7 +64,7 @@ Future<bool> _encodeGifInBackground(_EncodeJob job) async {
       }
 
       // 3. Thêm frame vào GifEncoder
-      encoder.addFrame(frameImg, duration: 70);
+      encoder.addFrame(frameImg, duration: 33);
     }
 
     final encodedBytes = encoder.finish();
@@ -74,7 +74,7 @@ Future<bool> _encodeGifInBackground(_EncodeJob job) async {
       return true;
     }
   } catch (e) {
-    debugPrint('Lỗi Isolate encode GIF: $e');
+    debugPrint('Lỗi Isolate encode: $e');
   }
   return false;
 }
@@ -84,8 +84,8 @@ class RealtimeVideoSession {
   String? _savedFilePath;
 
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
-    // Chỉ lưu tối đa 32 frames để tối ưu bộ nhớ và tốc độ đóng gói
-    if (_frames.length < 32) {
+    // Lưu tối đa 80 frames chuẩn 30 FPS
+    if (_frames.length < 80) {
       _frames.add(RawFrameData(rawRgbaBytes, frameWidth, frameHeight));
     }
   }
@@ -104,7 +104,7 @@ class RealtimeVideoSession {
         _EncodeJob(
           frames: _frames,
           outputPath: outputPath,
-          targetWidth: 480,
+          targetWidth: 720,
         ),
       ).timeout(
         const Duration(seconds: 15),

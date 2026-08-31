@@ -567,7 +567,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
                   if (boundary == null) throw Exception('Không tìm thấy khung hình 3D.');
 
-                  final firstImg = await boundary.toImage(pixelRatio: 1.0);
+                  // Độ nét chuẩn Retina HD 1080p
+                  final firstImg = await boundary.toImage(pixelRatio: 2.0);
                   final session = RouteVideoRecorder.startSession(
                     width: firstImg.width,
                     height: firstImg.height,
@@ -575,23 +576,23 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   );
                   activeSession = session;
 
-                  // 28 khung hình mượt mà, xuất siêu tốc trong 1.5 giây
-                  const int totalSteps = 28;
+                  // 80 khung hình mượt mà liên tục (Chuẩn video 30 FPS, camera di chuyển siêu êm)
+                  const int totalSteps = 80;
                   for (int step = 0; step <= totalSteps; step++) {
                     if (_isDisposed || !mounted) break;
                     final double t = step / totalSteps;
                     _controller.value = t;
 
                     setDialogState(() {
-                      progress = (step / totalSteps) * 0.88;
-                      status = '🎥 Đang quay video (${(progress * 100).toInt()}%)...';
+                      progress = (step / totalSteps) * 0.90;
+                      status = '🎥 Đang quay video HD siêu mượt (${(progress * 100).toInt()}%)...';
                     });
 
-                    await Future.delayed(const Duration(milliseconds: 30));
+                    await Future.delayed(const Duration(milliseconds: 35));
 
                     final b = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
                     if (b != null) {
-                      final img = await b.toImage(pixelRatio: 1.0);
+                      final img = await b.toImage(pixelRatio: 2.0);
                       final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
                       if (raw != null) {
                         session.pushRawFrame(raw.buffer.asUint8List(), img.width, img.height);
@@ -600,8 +601,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   }
 
                   setDialogState(() {
-                    progress = 0.95;
-                    status = '💎 Đang đóng gói video HD...';
+                    progress = 0.96;
+                    status = '💎 Đang đóng gói video HD chất lượng cao...';
                   });
 
                   await session.finishRecording();

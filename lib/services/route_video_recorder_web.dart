@@ -180,6 +180,7 @@ RealtimeVideoSession startRealtimeVideoSession({
   if (mimeType.isNotEmpty) {
     recorderOptions['mimeType'] = mimeType;
   }
+  recorderOptions['videoBitsPerSecond'] = 8000000; // 8 Mbps HD siêu sắc nét
 
   final mediaRecorder = html.MediaRecorder(stream, recorderOptions);
   final List<html.Blob> chunks = [];
