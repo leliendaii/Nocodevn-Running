@@ -78,12 +78,40 @@ class RunningProvider with ChangeNotifier {
     }
   }
 
-  /// Làm mới toàn bộ profile và buổi chạy từ Cloud
+  /// Làm mới toàn bộ profile và buổi chạy từ Cloud tức thì (Siêu tốc < 1s)
   Future<void> refreshAllData() async {
-    await Future.wait([
-      _loadInitialSessions(),
-      _loadUserProfiles(),
-    ]);
+    try {
+      final results = await Future.wait([
+        SupabaseService.fetchRunSessions(),
+        SupabaseService.fetchAllProfiles(),
+      ]);
+
+      final cloudSessions = results[0] as List<RunSession>?;
+      final cloudProfiles = results[1] as List<Map<String, dynamic>>?;
+
+      if (cloudSessions != null && cloudSessions.isNotEmpty) {
+        _sessions.clear();
+        _sessions.addAll(cloudSessions);
+        LocalStorageService.cacheAllRunSessions(_sessions);
+      }
+
+      if (cloudProfiles != null && cloudProfiles.isNotEmpty) {
+        _userProfiles.clear();
+        for (final p in cloudProfiles) {
+          final id = p['id']?.toString() ?? '';
+          if (id.isNotEmpty) {
+            _userProfiles[id] = p;
+          }
+        }
+      }
+
+      notifyListeners();
+
+      // Đồng bộ offline chạy ngầm trong nền không gây đơ kéo vuốt
+      _syncPendingOfflineRuns();
+    } catch (e) {
+      debugPrint('Lỗi refreshAllData: $e');
+    }
   }
 
   /// Lấy Tên Thật của User theo ID (Nếu chưa có thì dùng tên lưu trong session)

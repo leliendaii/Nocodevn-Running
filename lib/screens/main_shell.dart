@@ -355,14 +355,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                                     leftTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
-                                        reservedSize: 34,
+                                        reservedSize: 44,
                                         getTitlesWidget: (val, meta) {
                                           if (val == meta.max || val == 0) return const SizedBox.shrink();
                                           return Text(
-                                            '${val.toInt()}k',
+                                            '${val.toInt()} km',
                                             style: const TextStyle(
                                               color: AppTheme.textMuted,
-                                              fontSize: 10,
+                                              fontSize: 9.5,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           );

@@ -817,11 +817,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   leftTitles: AxisTitles(
                                     sideTitles: SideTitles(
                                       showTitles: true,
-                                      reservedSize: 28,
+                                      reservedSize: 44,
                                       getTitlesWidget: (val, meta) {
                                         if (val % 2 == 0) {
                                           return Text(
-                                            '${val.toInt()}k',
+                                            '${val.toInt()} km',
                                             style: const TextStyle(color: AppTheme.textMuted, fontSize: 9),
                                           );
                                         }

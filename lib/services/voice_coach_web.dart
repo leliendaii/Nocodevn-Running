@@ -3,8 +3,9 @@ import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 
 dynamic _audioContext;
+html.AudioElement? _currentAudio;
 
-/// Phát âm báo thể thao Beep Beep qua Web Audio API (100% phát ra tiếng trên mọi iPhone, Android, PC)
+/// Phát âm thanh hiệu ứng thể thao năng động (Beep / Fanfare)
 void playAthleticBeep({double freq = 880.0, double durationSec = 0.15}) {
   try {
     final dynamic win = html.window;
@@ -21,7 +22,7 @@ void playAthleticBeep({double freq = 880.0, double durationSec = 0.15}) {
       osc.type = 'sine';
       osc.frequency.value = freq;
 
-      gain.gain.setValueAtTime(0.20, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationSec);
 
       osc.connect(gain);
@@ -35,55 +36,52 @@ void playAthleticBeep({double freq = 880.0, double durationSec = 0.15}) {
   }
 }
 
-/// Phát giọng đọc Tiếng Việt chuẩn 100% (ResponsiveVoice Vietnamese Female -> Browser Google/Siri Tiếng Việt)
+/// Phát giọng đọc Tiếng Việt chuẩn 100% trên iPhone / Android / Web
 void speakTextNative(String text, {double rate = 1.0}) {
   try {
-    // 1. Luôn phát âm báo thể thao Beep khởi động loa
-    playAthleticBeep(freq: 800.0, durationSec: 0.12);
+    // 1. Luôn phát âm báo thể thao mở luồng Audio
+    playAthleticBeep(freq: 880.0, durationSec: 0.10);
 
-    final dynamic win = html.window;
-
-    // 2. Cách 1: Sử dụng ResponsiveVoice chuyên giọng đọc Nữ Tiếng Việt (100% giọng Tiếng Việt tự nhiên, tròn vành rõ chữ)
-    if (win.responsiveVoice != null) {
-      try {
-        win.responsiveVoice.cancel();
-        win.responsiveVoice.speak(
-          text,
-          'Vietnamese Female',
-          {'rate': rate, 'pitch': 1.0},
-        );
-        return;
-      } catch (e) {
-        debugPrint('Lỗi ResponsiveVoice: $e');
-      }
-    }
-
-    // 3. Cách 2: Sử dụng Web Speech Synthesis với giọng Tiếng Việt
+    // 2. Cách 1: Web Speech Synthesis API
+    bool synthSuccess = false;
     final synth = html.window.speechSynthesis;
-    if (synth == null) return;
-    synth.resume();
+    if (synth != null) {
+      try {
+        if (synth.paused == true) synth.resume();
+        final utterance = html.SpeechSynthesisUtterance(text)
+          ..lang = 'vi-VN'
+          ..rate = rate
+          ..pitch = 1.0;
 
-    final voices = synth.getVoices();
-    html.SpeechSynthesisVoice? viVoice;
-    for (final v in voices) {
-      final lang = (v.lang ?? '').toLowerCase().replaceAll('_', '-');
-      final name = (v.name ?? '').toLowerCase();
-      if (lang.startsWith('vi') || name.contains('viet') || name.contains('việt')) {
-        viVoice = v;
-        break;
+        final voices = synth.getVoices();
+        for (final v in voices) {
+          final l = (v.lang ?? '').toLowerCase();
+          final n = (v.name ?? '').toLowerCase();
+          if (l.contains('vi') || n.contains('viet') || n.contains('việt') || n.contains('linh') || n.contains('an')) {
+            utterance.voice = v;
+            break;
+          }
+        }
+
+        synth.speak(utterance);
+        synthSuccess = true;
+      } catch (synthErr) {
+        debugPrint('Web Speech Synthesis error: $synthErr');
       }
     }
 
-    final utterance = html.SpeechSynthesisUtterance(text)
-      ..rate = rate
-      ..pitch = 1.0
-      ..lang = 'vi-VN';
-
-    if (viVoice != null) {
-      utterance.voice = viVoice;
+    // 3. Cách 2: Google TTS Audio Streaming (Phát giọng Nữ Tiếng Việt tự nhiên)
+    if (!synthSuccess || html.window.navigator.userAgent.toLowerCase().contains('iphone')) {
+      try {
+        final safeText = Uri.encodeComponent(text);
+        final ttsUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=$safeText';
+        _currentAudio?.pause();
+        _currentAudio = html.AudioElement(ttsUrl)..volume = 1.0;
+        _currentAudio?.play().catchError((err) {
+          debugPrint('Google TTS Audio error: $err');
+        });
+      } catch (_) {}
     }
-
-    synth.speak(utterance);
   } catch (e) {
     debugPrint('Lỗi Voice Coach: $e');
   }
