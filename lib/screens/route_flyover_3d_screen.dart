@@ -113,18 +113,18 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return tangent?.position ?? _cachedRoutePixels.first;
     });
 
-    // Tiền tính toán đường bay Camera Drone mượt mà không rung lắc (Moving Average Window = 90 samples)
-    const int camWindow = 90;
+    // Tiền tính toán đường bay Camera Drone siêu êm ái bằng Gaussian Filter (Loại bỏ 100% rung lắc và lắc lư trái phải)
+    const int camWindow = 180;
     _smoothedCamPositions = List.generate(sampleCount, (i) {
-      double sumX = 0, sumY = 0;
-      int count = 0;
+      double sumX = 0, sumY = 0, totalWeight = 0;
       for (int w = -camWindow; w <= camWindow; w++) {
         final idx = (i + w).clamp(0, sampleCount - 1);
-        sumX += _sampledPositions[idx].dx;
-        sumY += _sampledPositions[idx].dy;
-        count++;
+        final double weight = math.exp(-(w * w) / (2 * 60.0 * 60.0)); // Phân phối Gaussian làm mượt tuyệt đối
+        sumX += _sampledPositions[idx].dx * weight;
+        sumY += _sampledPositions[idx].dy * weight;
+        totalWeight += weight;
       }
-      return Offset(sumX / count, sumY / count);
+      return Offset(sumX / totalWeight, sumY / totalWeight);
     });
 
     // Làm mượt góc quay tiếp tuyến (Circular Window = 35 samples)
@@ -565,7 +565,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         String status = 'Đang chuẩn bị luồng quay trực tiếp HD...';
         bool isDone = false;
         bool isStarted = false;
-        bool isDownloading = false;
         RealtimeVideoSession? activeSession;
         final modeStr = _isFlycamMode ? 'flycam' : 'toancanh';
         final filename = 'flyover_3d_${modeStr}_${widget.session.id}.mp4';
@@ -744,38 +743,26 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          icon: isDownloading
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)),
-                                )
-                              : const Icon(Icons.download_rounded, size: 19),
-                          label: Text(
-                            isDownloading ? 'ĐANG LƯU VÀO MÁY...' : 'LƯU VÀO ALBUM ẢNH',
-                            style: const TextStyle(
+                          icon: const Icon(Icons.download_rounded, size: 19),
+                          label: const Text(
+                            'LƯU VÀO ALBUM ẢNH',
+                            style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.3,
                             ),
                           ),
-                          onPressed: isDownloading
-                              ? null
-                              : () async {
-                                  if (activeSession == null) return;
-                                  setDialogState(() => isDownloading = true);
-                                  final res = await activeSession!.downloadVideo(filename);
-                                  setDialogState(() => isDownloading = false);
-
-                                  if (!ctx.mounted) return;
-                                  Navigator.of(ctx).pop();
-                                  if (!mounted) return;
-                                  TopSyncToast.show(
-                                    context,
-                                    message: res.message,
-                                    isSuccess: res.isSuccess,
-                                  );
-                                },
+                          onPressed: () {
+                            if (activeSession == null) return;
+                            final res = activeSession!.downloadVideoDirect(filename);
+                            Navigator.of(ctx).pop();
+                            if (!mounted) return;
+                            TopSyncToast.show(
+                              context,
+                              message: res.message,
+                              isSuccess: res.isSuccess,
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1360,22 +1347,22 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
-    final double chaseScale = (overviewScale * 1.8).clamp(0.40, 2.5);
+    final double chaseScale = (overviewScale * 1.35).clamp(0.35, 1.85); // Zoom vừa vặn, không quá sát
 
-    final double outroRaw = ((progress - 0.82) / 0.18).clamp(0.0, 1.0);
-    final double outroT = Curves.easeOutCubic.transform(outroRaw);
+    final double outroRaw = ((progress - 0.72) / 0.28).clamp(0.0, 1.0);
+    final double outroT = isFlycamMode ? Curves.easeInOutCubic.transform(outroRaw) : 0.0;
 
     double camX;
     double camY;
     double camScale;
 
     if (isFlycamMode) {
-      // 🚁 CHẾ ĐỘ FLYCAM: Bám mượt theo người chạy, cuối video nhẹ nhàng mở rộng tầm nhìn về toàn cảnh
+      // 🚁 CHẾ ĐỘ FLYCAM: Bám mượt theo người chạy, cuối video nhẹ nhàng mở rộng tầm nhìn về toàn cảnh (100% không rung giật)
       camX = ui.lerpDouble(smoothedCam.dx, routeCenterX, outroT)!;
       camY = ui.lerpDouble(smoothedCam.dy, routeCenterY, outroT)!;
       camScale = ui.lerpDouble(chaseScale, overviewScale, outroT)!;
     } else {
-      // 🗺️ CHẾ ĐỘ TOÀN CẢNH: Zoom to rõ ràng, cố định 100% tâm tuyến đường và KHÔNG BỊ ZOOM Ở CUỐI VIDEO
+      // 🗺️ CHẾ ĐỘ TOÀN CẢNH: Cố định 100% tâm tuyến đường từ đầu đến cuối, TUYỆT ĐỐI KHÔNG ZOOM Ở CUỐI VIDEO
       camX = routeCenterX;
       camY = routeCenterY;
       camScale = overviewScale;

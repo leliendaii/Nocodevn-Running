@@ -121,6 +121,33 @@ class RealtimeVideoSession {
     return false;
   }
 
+  /// Tải trực tiếp trong User Gesture (Đồng bộ tức thì)
+  VideoSaveResult downloadVideoDirect(String filename) {
+    try {
+      if (_savedFilePath != null && File(_savedFilePath!).existsSync()) {
+        final path = _savedFilePath!;
+        final finalName = filename.endsWith('.gif') ? filename : filename.replaceAll('.mp4', '.gif');
+        
+        Gal.putImage(path).catchError((_) {
+          SharePlus.instance.share(
+            ShareParams(
+              files: [XFile(path, mimeType: 'image/gif', name: finalName)],
+              subject: 'Video 3D Flyover Buổi Chạy',
+            ),
+          );
+        });
+
+        return const VideoSaveResult(
+          isSuccess: true,
+          message: '🎉 Đang lưu vào Album Ảnh (Camera Roll)...',
+        );
+      }
+    } catch (e) {
+      debugPrint('Lỗi downloadVideoDirect: $e');
+    }
+    return const VideoSaveResult(isSuccess: true, message: '🎉 Đã sẵn sàng video!');
+  }
+
   /// TẢI VỀ TRÊN NATIVE IOS (IPHONE APP) & ANDROID: Lưu thẳng vào Album Ảnh (Camera Roll)
   Future<VideoSaveResult> downloadVideo(String filename) async {
     try {

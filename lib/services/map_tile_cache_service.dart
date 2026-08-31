@@ -63,9 +63,9 @@ class MapTileCacheService {
         }
       }
 
-      // 3. Tải qua mạng Google Maps Server
+      // 3. Tải qua mạng Google Maps Server với độ phân giải cao Retina HD (@2x)
       final int serverId = (x.abs() + y.abs()) % 4;
-      final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z';
+      final url = 'https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z&scale=2';
 
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {

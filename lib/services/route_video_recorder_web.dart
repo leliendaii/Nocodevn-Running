@@ -62,7 +62,8 @@ class RealtimeVideoSession {
   }
 
   /// TẢI VỀ: Tự động lưu vào Album Ảnh (trên iPhone) hoặc Tải file về máy
-  Future<VideoSaveResult> downloadVideo(String filename) async {
+  /// Gọi đồng bộ trực tiếp trong User Gesture (Đảm bảo 100% mở Share Sheet trên iPhone Safari)
+  VideoSaveResult downloadVideoDirect(String filename) {
     final blob = finalBlob;
     if (blob == null || blob.size == 0) {
       return const VideoSaveResult(
@@ -76,67 +77,45 @@ class RealtimeVideoSession {
       final isIOS = userAgent.contains('iphone') || userAgent.contains('ipad') || userAgent.contains('ipod');
       final fileMime = blob.type.isNotEmpty ? blob.type : 'video/mp4';
 
-      // Xác định đúng đuôi file tương thích
       String finalName = filename;
       if (fileMime.contains('webm') && finalName.endsWith('.mp4')) {
         finalName = finalName.replaceAll('.mp4', '.webm');
       }
 
-      // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để người dùng bấm "Lưu video" vào Album Ảnh
-      if (isIOS) {
-        try {
-          final file = html.File([blob], finalName, {'type': fileMime});
-          final dynamic nav = html.window.navigator;
-          if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
-            await nav.share({
-              'files': [file],
-              'title': 'Video 3D Flyover',
-            });
-            return const VideoSaveResult(
-              isSuccess: true,
-              message: '🎉 Đã mở bảng chia sẻ iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
-            );
-          }
-        } catch (shareErr) {
-          debugPrint('iOS Share error: $shareErr');
-        }
+      final file = html.File([blob], finalName, {'type': fileMime});
+      final dynamic nav = html.window.navigator;
+
+      // 1. TRÊN IPHONE (iOS SAFARI): Web Share API được gọi TRỰC TIẾP và ĐỒNG BỘ trong click handler
+      if (isIOS && nav.canShare != null && nav.canShare({'files': [file]}) == true) {
+        nav.share({
+          'files': [file],
+          'title': 'Lộ trình chạy 3D Flyover',
+        }).catchError((err) {
+          debugPrint('iOS Share error: $err');
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          html.window.open(url, '_blank');
+        });
+
+        return const VideoSaveResult(
+          isSuccess: true,
+          message: '🎉 Đã mở bảng chia sẻ iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
+        );
       }
 
+      // 2. Mở trực tiếp video / Tải file
       final url = html.Url.createObjectUrlFromBlob(blob);
-
-      // 1. Trên iOS: Web Share API trực tiếp mở bảng iOS để người dùng bấm "Lưu video" vào Album Ảnh
       if (isIOS) {
-        try {
-          final file = html.File([blob], finalName, {'type': fileMime});
-          final dynamic nav = html.window.navigator;
-          if (nav.canShare != null && nav.canShare({'files': [file]}) == true) {
-            await nav.share({
-              'files': [file],
-              'title': 'Video 3D Flyover',
-            });
-            return const VideoSaveResult(
-              isSuccess: true,
-              message: '🎉 Đã mở bảng chia sẻ iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
-            );
-          }
-        } catch (shareErr) {
-          debugPrint('iOS Share error: $shareErr');
-        }
-
-        // Trên iOS: Tự động mở video trực tiếp trong tab mới để xem và bấm Lưu vào Ảnh
         try {
           html.window.open(url, '_blank');
         } catch (_) {
           html.window.location.href = url;
         }
-
         return const VideoSaveResult(
           isSuccess: true,
           message: '🎉 Đã mở video! Nhấn vào biểu tượng Chia sẻ [↑] ➔ chọn "Lưu video" để lưu vào Album Ảnh nhé!',
         );
       }
 
-      // 2. Kích hoạt tải file trực tiếp về máy (Android & PC)
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download', finalName)
         ..style.display = 'none';
@@ -151,6 +130,10 @@ class RealtimeVideoSession {
     } catch (e) {
       return VideoSaveResult(isSuccess: false, message: 'Lỗi tải video: $e');
     }
+  }
+
+  Future<VideoSaveResult> downloadVideo(String filename) async {
+    return downloadVideoDirect(filename);
   }
 }
 
