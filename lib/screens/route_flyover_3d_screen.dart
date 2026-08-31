@@ -57,7 +57,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  static const int _baseDurationMs = 13500; // Tốc độ cơ bản êm ái, thư thái chuẩn phong cách Strava Flyover
+  static const int _baseDurationMs = 13500; // Tốc độ cơ bản êm ái chuẩn phong cách Strava Flyover
 
   @override
   void initState() {
@@ -79,13 +79,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
     _smoothRoute = _buildConsistentRoute(widget.session);
 
-    // 3. Tự động tính toán mức Zoom phù hợp
+    // 3. Tự động tính toán mức Zoom rộng bao quát khu vực xung quanh
     _zoomLevel = _calculateOptimalZoom(_smoothRoute);
 
     // 4. Tiền tính toán trước toàn bộ tọa độ Pixel
     _cachedRoutePixels = _smoothRoute.map((p) => _latLngToPixel(p.lat, p.lng, _zoomLevel)).toList();
 
-    // 5. Xây dựng đường cong Vector Bézier Spline mượt mà (Không răng cưa, bo góc ngã tư tự nhiên)
+    // 5. Xây dựng đường cong Vector Bézier Spline mượt mà (Gaussian Smoothing + Bézier Spline)
     _fullVectorPath = _createSmoothSplinePath(_cachedRoutePixels);
     final metrics = _fullVectorPath.computeMetrics().toList();
     _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
@@ -99,8 +99,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return tangent?.position ?? _cachedRoutePixels.first;
     });
 
-    // Tiền tính toán đường bay Camera Drone mượt mà không rung lắc (Moving Average Window = 80 samples)
-    const int camWindow = 80;
+    // Tiền tính toán đường bay Camera Drone mượt mà không rung lắc (Moving Average Window = 90 samples)
+    const int camWindow = 90;
     _smoothedCamPositions = List.generate(sampleCount, (i) {
       double sumX = 0, sumY = 0;
       int count = 0;
@@ -113,8 +113,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return Offset(sumX / count, sumY / count);
     });
 
-    // Làm mượt góc quay tiếp tuyến (Circular Window = 30 samples)
-    const int headWindow = 30;
+    // Làm mượt góc quay tiếp tuyến (Circular Window = 35 samples)
+    const int headWindow = 35;
     _sampledHeadings = List.generate(sampleCount, (i) {
       double sinSum = 0, cosSum = 0;
       for (int w = -headWindow; w <= headWindow; w++) {
@@ -134,7 +134,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _startPinPixel = _sampledPositions.first;
     _finishPinPixel = _sampledPositions.last;
 
-    // Tiền tính toán Bounding Box một lần duy nhất (Zero runtime computation)
+    // Tiền tính toán Bounding Box một lần duy nhất
     double minX = 99999999, maxX = -99999999;
     double minY = 99999999, maxY = -99999999;
     for (final pt in _cachedRoutePixels) {
@@ -150,10 +150,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
     _milestones = _generateMilestonePins(_effectiveDistanceKm, _pathMetric, _totalPathLength, _smoothRoute);
 
-    // 7. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường vào RAM
+    // 7. Tiền tải trước toàn bộ Map Tiles bao phủ tuyến đường và khu vực lân cận vào RAM
     _precacheRouteMapTiles();
 
-    // 8. Khởi tạo AnimationController với tốc độ phát mượt mà
+    // 8. Khởi tạo AnimationController
     _controller = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round()),
@@ -185,7 +185,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     super.dispose();
   }
 
-  // 1. Thuật toán Ramer-Douglas-Peucker: Lọc sạch 100% nhiễu răng cưa và điểm giật lùi của GPS
+  // 1. Thuật toán Ramer-Douglas-Peucker: Lọc sạch 100% nhiễu răng cưa
   static List<Offset> _simplifyPoints(List<Offset> points, double tolerance) {
     if (points.length <= 2) return points;
 
@@ -219,7 +219,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     }
   }
 
-  // 2. Thuật toán Chaikin Curve: Làm mượt đường cong tự nhiên, liền mạch, triệt tiêu mọi góc nhọn
+  // 2. Thuật toán Chaikin Curve: Làm mượt đường cong tự nhiên, bo góc ngã tư
   static List<Offset> _chaikinSmooth(List<Offset> points, int iterations) {
     if (points.length <= 2) return points;
     List<Offset> result = List.from(points);
@@ -241,20 +241,35 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     return result;
   }
 
-  // Tạo đường chạy Vector mượt mà, liền mạch, chuẩn Strava
+  // Tạo đường chạy Vector mượt mà, liền mạch, thanh lịch chuẩn Strava
   static Path _createSmoothSplinePath(List<Offset> pts) {
     final path = Path();
     if (pts.isEmpty) return path;
 
-    // 1. Lọc bỏ điểm trùng hoặc khoảng cách quá ngắn (< 3.0px)
-    final List<Offset> dedup = [pts.first];
-    for (int i = 1; i < pts.length; i++) {
-      if ((pts[i] - dedup.last).distance >= 3.0) {
-        dedup.add(pts[i]);
+    // 1. Tiền xử lý Gaussian Smoothing triệt tiêu 100% nhiễu GPS bước chân ngắn
+    final int len = pts.length;
+    final List<Offset> filtered = [];
+    for (int i = 0; i < len; i++) {
+      double sumX = 0, sumY = 0, totalW = 0;
+      for (int k = -2; k <= 2; k++) {
+        final idx = (i + k).clamp(0, len - 1);
+        final double weight = 1.0 / (1.0 + k.abs() * 0.7);
+        sumX += pts[idx].dx * weight;
+        sumY += pts[idx].dy * weight;
+        totalW += weight;
+      }
+      filtered.add(Offset(sumX / totalW, sumY / totalW));
+    }
+
+    // 2. Lọc bỏ các điểm dồn ứ tại chỗ (< 2.5px)
+    final List<Offset> dedup = [filtered.first];
+    for (int i = 1; i < filtered.length; i++) {
+      if ((filtered[i] - dedup.last).distance >= 2.5) {
+        dedup.add(filtered[i]);
       }
     }
-    if (dedup.length < pts.length && (pts.last - dedup.last).distance > 0.5) {
-      dedup.add(pts.last);
+    if (dedup.length < filtered.length && (filtered.last - dedup.last).distance > 0.5) {
+      dedup.add(filtered.last);
     }
 
     if (dedup.length <= 2) {
@@ -263,13 +278,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return path;
     }
 
-    // 2. Đơn giản hóa nhiễu
-    final simplified = _simplifyPoints(dedup, 2.0);
+    // 3. Đơn giản hóa góc nhọn với Ramer-Douglas-Peucker
+    final simplified = _simplifyPoints(dedup, 1.8);
 
-    // 3. Làm mịn đường cong tự nhiên bằng Chaikin 3 lần
+    // 4. Làm mịn đường cong tự nhiên bằng Chaikin 3 lần
     final smoothed = _chaikinSmooth(simplified, 3);
 
-    // 4. Xây dựng Path liền mạch với Quadratic Bézier
+    // 5. Xây dựng Path liền mạch với Quadratic Bézier
     path.moveTo(smoothed.first.dx, smoothed.first.dy);
     for (int i = 0; i < smoothed.length - 1; i++) {
       final p0 = smoothed[i];
@@ -291,7 +306,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   }
 
   int _calculateOptimalZoom(List<GeoPoint> points) {
-    if (points.isEmpty) return 16;
+    if (points.isEmpty) return 15;
     double minLat = points.first.lat, maxLat = points.first.lat;
     double minLng = points.first.lng, maxLng = points.first.lng;
 
@@ -306,21 +321,17 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final double spanLng = (maxLng - minLng).abs();
     final double maxSpan = math.max(spanLat, spanLng);
 
-    // Quãng đường siêu ngắn (< 500m) -> Zoom 18
-    if (maxSpan < 0.005) {
-      return 18;
-    } else if (maxSpan < 0.015) {
-      // Quãng đường ngắn (0.5km - 1.5km) -> Zoom 17
-      return 17;
-    } else if (maxSpan < 0.035) {
-      // Quãng đường trung bình (1.5km - 4km) -> Zoom 16
-      return 16;
-    } else if (maxSpan < 0.075) {
-      // Quãng đường dài (4km - 10km) -> Zoom 15
+    // Thu nhỏ mức zoom để bao quát khu vực xung quanh rộng rãi, thấy nhiều phố xá
+    if (maxSpan < 0.008) {
+      return 16; // Giảm từ 18 xuống 16 để mở rộng tầm nhìn toàn khu phố
+    } else if (maxSpan < 0.020) {
       return 15;
-    } else {
-      // Quãng đường Marathon (> 10km) -> Zoom 14
+    } else if (maxSpan < 0.050) {
       return 14;
+    } else if (maxSpan < 0.100) {
+      return 13;
+    } else {
+      return 12;
     }
   }
 
@@ -348,7 +359,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return basePoints;
     }
 
-    // Tuyến đường mẫu đẹp mắt
+    // Tuyến đường mẫu
     basePoints = const [
       GeoPoint(10.77665, 106.70085), // 1. BẮT ĐẦU: Trước UBND TP (Đầu Phố Đi Bộ Nguyễn Huệ)
       GeoPoint(10.77580, 106.70155), // 2. Thẳng theo Phố Đi Bộ Nguyễn Huệ
@@ -405,10 +416,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       if (ty > maxTy) maxTy = ty;
     }
 
-    minTx -= 4;
-    maxTx += 4;
-    minTy -= 4;
-    maxTy += 5;
+    minTx -= 5;
+    maxTx += 5;
+    minTy -= 5;
+    maxTy += 6;
 
     for (int x = minTx; x <= maxTx; x++) {
       for (int y = minTy; y <= maxTy; y++) {
@@ -1161,38 +1172,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
   static final Paint _emptyTilePaint = Paint()..color = const Color(0xFFF8FAFC);
 
-  static final Paint _fullPathPaint = Paint()
-    ..isAntiAlias = true
-    ..color = Colors.black.withValues(alpha: 0.12)
-    ..strokeWidth = 3.2
-    ..style = PaintingStyle.stroke
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-
-  static final Paint _shadowPaint = Paint()
-    ..isAntiAlias = true
-    ..color = const Color(0x2E000000)
-    ..strokeWidth = 6.0
-    ..style = PaintingStyle.stroke
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-
-  static final Paint _activePathPaint = Paint()
-    ..isAntiAlias = true
-    ..color = const Color(0xFFFC5200) // Strava Signature Athletic Orange-Red
-    ..strokeWidth = 4.2
-    ..style = PaintingStyle.stroke
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-
-  static final Paint _coreHighlightPaint = Paint()
-    ..isAntiAlias = true
-    ..color = const Color(0xFFFF9E70)
-    ..strokeWidth = 1.6
-    ..style = PaintingStyle.stroke
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
-
   Real3DStravaFlyoverPainter({
     required this.pixels,
     required this.fullPath,
@@ -1232,22 +1211,57 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final Offset smoothedCam = Offset.lerp(smoothedCamPositions[baseIdx], smoothedCamPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
-    // 2. CAMERA STRAVA 3D FLYOVERS ĐẲNG CẤP:
-    // - Khi đang chạy (0% -> 78%): Camera bám theo lộ trình mượt mà (chase cam) ở góc cận cảnh sắc nét.
-    // - Khi về đích (78% -> 100%): Camera chuyển tiếp mượt mà lùi xa toàn cảnh (Zoom-Out) và đưa toàn bộ cung đường về chính giữa!
-    final double targetScaleX = (size.width * 0.76) / (spanW > 10 ? spanW : 80);
-    final double targetScaleY = (size.height * 0.54) / (spanH > 10 ? spanH : 80);
-    final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 2.5);
-    final double chaseScale = (overviewScale * 1.35).clamp(0.25, 3.0);
+    // 2. CAMERA STRAVA 3D FLYOVERS ĐẲNG CẤP (ZOOM NHỎ RỘNG TOÀN CẢNH KHU VỰC PHỐ XÁ XUNG QUANH):
+    final double targetScaleX = (size.width * 0.50) / (spanW > 40 ? spanW : 160);
+    final double targetScaleY = (size.height * 0.36) / (spanH > 40 ? spanH : 160);
+    final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.12, 1.05);
+    final double chaseScale = (overviewScale * 1.20).clamp(0.18, 1.25);
 
     final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
     final double outroT = Curves.easeInOutCubic.transform(outroRaw);
 
     final double camX = ui.lerpDouble(smoothedCam.dx, routeCenterX, outroT)!;
     final double camY = ui.lerpDouble(smoothedCam.dy, routeCenterY, outroT)!;
-    final double camScale = ui.lerpDouble(chaseScale, overviewScale * 0.92, outroT)!;
+    final double camScale = ui.lerpDouble(chaseScale, overviewScale * 0.88, outroT)!;
 
-    // 3. MA TRẬN CAMERA CHUYÊN NGHIỆP
+    // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM (Thanh mảnh, sắc nét, không bị thô dày)
+    final double strokeBase = (3.4 / camScale).clamp(2.4, 4.8);
+    final double strokeCore = (1.2 / camScale).clamp(0.8, 1.8);
+    final double strokeShadow = (5.2 / camScale).clamp(3.6, 7.0);
+
+    final Paint fullPathPaint = Paint()
+      ..isAntiAlias = true
+      ..color = Colors.black.withValues(alpha: 0.12)
+      ..strokeWidth = strokeBase * 0.8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final Paint shadowPaint = Paint()
+      ..isAntiAlias = true
+      ..color = const Color(0x28000000)
+      ..strokeWidth = strokeShadow
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final Paint activePathPaint = Paint()
+      ..isAntiAlias = true
+      ..color = const Color(0xFFFC5200) // Strava Signature Athletic Orange-Red
+      ..strokeWidth = strokeBase
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final Paint coreHighlightPaint = Paint()
+      ..isAntiAlias = true
+      ..color = const Color(0xFFFF9E70)
+      ..strokeWidth = strokeCore
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // 4. MA TRẬN CAMERA CHUYÊN NGHIỆP
     final double screenCenterX = size.width / 2;
     final double screenCenterY = size.height * 0.52;
 
@@ -1256,11 +1270,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     canvas.scale(camScale, camScale);
     canvas.translate(-camX, -camY);
 
-    // 4. VẼ MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ KHUNG NHÌN
+    // 5. VẼ MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ KHUNG NHÌN
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (3.2 / camScale).ceil().clamp(3, 8);
-    final int tileRadiusY = (4.2 / camScale).ceil().clamp(4, 9);
+    final int tileRadiusX = (3.6 / camScale).ceil().clamp(4, 9);
+    final int tileRadiusY = (4.6 / camScale).ceil().clamp(5, 10);
 
     for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
       for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
@@ -1285,18 +1299,18 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       }
     }
 
-    // 5. VẼ ĐƯỜNG DẪN DỰ KIẾN MỜ
-    canvas.drawPath(fullPath, _fullPathPaint);
+    // 6. VẼ ĐƯỜNG DẪN DỰ KIẾN MỜ
+    canvas.drawPath(fullPath, fullPathPaint);
 
-    // 6. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Ribbon Strava Thể Thao Đẳng Cấp)
+    // 7. VẼ VỆT CHẠY ĐÃ HOÀN THÀNH (Đường Ribbon Strava Thể Thao Thanh Lịch)
     if (currentDist > 1.0) {
       final Path activePath = pathMetric.extractPath(0.0, currentDist);
-      canvas.drawPath(activePath, _shadowPaint);
-      canvas.drawPath(activePath, _activePathPaint);
-      canvas.drawPath(activePath, _coreHighlightPaint);
+      canvas.drawPath(activePath, shadowPaint);
+      canvas.drawPath(activePath, activePathPaint);
+      canvas.drawPath(activePath, coreHighlightPaint);
     }
 
-    // 7. VẼ CÁC CỘT MỐC KM 3D
+    // 8. VẼ CÁC CỘT MỐC KM 3D
     for (final m in milestones) {
       final pinPixel = m.pixel;
 
@@ -1320,7 +1334,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 8. VẼ CỘT MỐC BẮT ĐẦU VÀ KẾT THÚC
+    // 9. VẼ CỘT MỐC BẮT ĐẦU VÀ KẾT THÚC
     final bool isLoop = (startPinPixel - finishPinPixel).distance < 40.0;
 
     // Start
@@ -1375,7 +1389,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     finishText.paint(canvas, Offset(-finishText.width / 2, -46 + (24 - finishText.height) / 2));
     canvas.restore();
 
-    // 9. VẼ CON TRỎ ĐỊNH VỊ GPS THỂ THAO NIKE/APPLE ATHLETIC BEACON
+    // 10. VẼ CON TRỎ ĐỊNH VỊ GPS THỂ THAO NIKE/APPLE ATHLETIC BEACON
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
