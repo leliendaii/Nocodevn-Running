@@ -410,10 +410,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       if (ty > maxTy) maxTy = ty;
     }
 
-    minTx -= 7;
-    maxTx += 7;
-    minTy -= 7;
-    maxTy += 8;
+    minTx -= 2;
+    maxTx += 2;
+    minTy -= 2;
+    maxTy += 3;
 
     MapTileCacheService.preloadBoundingBox(
       zoom: _zoomLevel,
@@ -1753,8 +1753,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     ..isAntiAlias = true
     ..filterQuality = FilterQuality.medium;
 
-  static final Paint _emptyTilePaint = Paint()..color = const Color(0xFF0F172A);
-
   Real3DStravaFlyoverPainter({
     required this.pixels,
     required this.fullPath,
@@ -1919,11 +1917,25 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     canvas.scale(effectiveCamScale, effectiveCamScale);
     canvas.translate(-camX, -camY);
 
-    // 5. VẼ MAP TILES GOOGLE MAPS BAO PHỦ TOÀN BỘ KHUNG NHÌN (HỖ TRỢ ROADMAP, TERRAIN, SATELLITE)
+    // 5. VẼ MAP TILES GOOGLE MAPS BAO PHỦ VÙNG NHÌN THỰC TẾ (LOAD SIÊU TỐC, KHÔNG CÓ Ô ĐEN)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (4.5 / effectiveCamScale).ceil().clamp(5, 14);
-    final int tileRadiusY = (5.5 / effectiveCamScale).ceil().clamp(6, 16);
+    final int tileRadiusX = (((size.width / 2) / effectiveCamScale) / tileSize).ceil().clamp(2, 6);
+    final int tileRadiusY = (((size.height / 2) / effectiveCamScale) / tileSize).ceil().clamp(2, 7);
+
+    // Nền đồng nhất liền mạch cho bản đồ trong tích tắc đang tải (Loại bỏ hoàn toàn ô đen)
+    final Color mapBgColor = mapType == 'satellite'
+        ? const Color(0xFF0F172A)
+        : mapType == 'terrain'
+            ? const Color(0xFFE2E8F0)
+            : const Color(0xFFF1F5F9);
+    final totalMapRect = Rect.fromLTRB(
+      (centerTileX - tileRadiusX) * tileSize,
+      (centerTileY - tileRadiusY) * tileSize,
+      (centerTileX + tileRadiusX + 1) * tileSize,
+      (centerTileY + tileRadiusY + 1) * tileSize,
+    );
+    canvas.drawRect(totalMapRect, Paint()..color = mapBgColor);
 
     for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
       for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
@@ -1931,7 +1943,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         final ty = centerTileY + dy;
         final key = '$mapType/$zoom/$tx/$ty';
 
-        final tileRect = Rect.fromLTWH(tx * tileSize - 0.75, ty * tileSize - 0.75, tileSize + 1.5, tileSize + 1.5);
+        final tileRect = Rect.fromLTWH(tx * tileSize - 0.5, ty * tileSize - 0.5, tileSize + 1.0, tileSize + 1.0);
 
         if (tileCache.containsKey(key)) {
           final img = tileCache[key]!;
@@ -1942,8 +1954,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
             _tilePaint,
           );
         } else {
-          // Khung dự phòng hiện đại nền tối thể thao
-          canvas.drawRect(tileRect, _emptyTilePaint);
           onTileRequested(zoom, tx, ty);
         }
       }
