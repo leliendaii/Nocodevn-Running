@@ -24,6 +24,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   bool _isPlaying = true;
   bool _isDisposed = false;
   bool _isFlycamMode = false; // Mặc định: FALSE = Toàn Cảnh (Mượt 100% không rung lắc)
+  bool _isExportingVideo = false; // Bật khi đang quay video để xuất HUD thông số & đếm ngược Story Facebook
 
   late final double _effectiveDistanceKm;
   late final int _effectiveDurationSec;
@@ -576,6 +577,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
               Future.microtask(() async {
                 try {
+                  if (mounted && !_isDisposed) {
+                    setState(() => _isExportingVideo = true);
+                  }
                   _controller.reset();
 
                   // Tính toán số frames chuẩn xác 100% đồng bộ với tốc độ đang chọn (x1, x2, x3):
@@ -629,6 +633,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     isDone = true;
                   });
 
+                  if (mounted && !_isDisposed) {
+                    setState(() => _isExportingVideo = false);
+                  }
+
                   _controller.duration = Duration(milliseconds: (_baseDurationMs / _playbackSpeed).round());
                   _controller.value = previousValue;
                   if (previousPlaying && mounted && !_isDisposed) {
@@ -636,6 +644,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     setState(() => _isPlaying = true);
                   }
                 } catch (e) {
+                  if (mounted && !_isDisposed) {
+                    setState(() => _isExportingVideo = false);
+                  }
                   setDialogState(() {
                     status = 'Lỗi quay video: $e';
                     isDone = true;
@@ -786,176 +797,94 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     );
   }
 
-  /// Khối widget số đếm tăng dần xếp dọc bên trái ở giữa (Quãng đường, Thời gian, Calo, Pace)
-  Widget _buildVerticalLiveStatsCard(double progress) {
-    final double curProgress = progress.clamp(0.0, 1.0);
-    final double curDistance = _effectiveDistanceKm * curProgress;
-    final int curDurationSec = (_effectiveDurationSec * curProgress).round();
-    final int min = curDurationSec ~/ 60;
-    final int sec = curDurationSec % 60;
-    final String curTimeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-    final int curCalories = (_effectiveCalories * curProgress).round();
+  /// Hiệu ứng đếm ngược 3... 2... 1... GO! khi bắt đầu xuất video Story Facebook
+  Widget _buildVideoCountdownBadge(double t) {
+    String countText = '3';
+    Color countColor = const Color(0xFF00E5FF);
+    if (t >= 0.06) {
+      countText = 'GO!';
+      countColor = const Color(0xFF10B981);
+    } else if (t >= 0.04) {
+      countText = '1';
+      countColor = const Color(0xFFFFD700);
+    } else if (t >= 0.02) {
+      countText = '2';
+      countColor = const Color(0xFFFF7043);
+    }
 
     return Container(
-      width: 104,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E293B), width: 1.2),
+        color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: countColor, width: 2.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: countColor.withValues(alpha: 0.5),
+            blurRadius: 24,
+          ),
+        ],
+      ),
+      child: Text(
+        countText,
+        style: TextStyle(
+          fontSize: countText.length > 2 ? 28 : 38,
+          fontWeight: FontWeight.w900,
+          color: countColor,
+          letterSpacing: 2.0,
+        ),
+      ),
+    );
+  }
+
+  /// Thẻ thông số thể thao cao cấp nhúng trực tiếp vào Video khi xuất (Chuẩn Story Facebook / TikTok / Instagram)
+  Widget _buildStoryVideoStatsOverlay({
+    required double distanceKm,
+    required String timeStr,
+    required int calories,
+    required String pace,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF334155), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 18,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Quãng đường
-          const Text(
-            'QUÃNG ĐƯỜNG',
-            style: TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textMuted,
-              letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(height: 1),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Icon(Icons.directions_run_rounded, color: AppTheme.primaryNeon, size: 16),
+              SizedBox(width: 6),
               Text(
-                curDistance.toStringAsFixed(2),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF00E5FF),
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(width: 2),
-              const Text(
-                'km',
+                'LỘ TRÌNH CHẠY BỘ 3D',
                 style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF00E5FF),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primaryNeon,
+                  letterSpacing: 1.0,
                 ),
               ),
             ],
           ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Container(height: 1, color: const Color(0xFF1E293B)),
-          ),
-
-          // 2. Thời gian
-          const Text(
-            'THỜI GIAN',
-            style: TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textMuted,
-              letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            curTimeStr,
-            style: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              height: 1.1,
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Container(height: 1, color: const Color(0xFF1E293B)),
-          ),
-
-          // 3. Calo
-          const Text(
-            'CALO',
-            style: TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textMuted,
-              letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(height: 1),
+          const SizedBox(height: 10),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Text(
-                '$curCalories',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFFFF7043),
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(width: 2),
-              const Text(
-                'kcal',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFFF7043),
-                ),
-              ),
-            ],
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Container(height: 1, color: const Color(0xFF1E293B)),
-          ),
-
-          // 4. Pace
-          const Text(
-            'PACE',
-            style: TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textMuted,
-              letterSpacing: 0.4,
-            ),
-          ),
-          const SizedBox(height: 1),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                _effectivePace,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF10B981),
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(width: 2),
-              const Text(
-                '/km',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF10B981),
-                ),
-              ),
+              _buildSummaryStatItem('QUÃNG ĐƯỜNG', '${distanceKm.toStringAsFixed(2)} km', const Color(0xFF00E5FF)),
+              _buildSummaryStatItem('PACE TB', '$pace /km', const Color(0xFF10B981)),
+              _buildSummaryStatItem('THỜI GIAN', timeStr, Colors.white),
+              _buildSummaryStatItem('CALO', '$calories kcal', const Color(0xFFFF7043)),
             ],
           ),
         ],
@@ -969,13 +898,21 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       backgroundColor: const Color(0xFF0A0F1D),
       body: Stack(
         children: [
-          // 1. CANVAS VẼ 3D FLYOVER THỂ THAO CAO CẤP + BẢNG THỐNG KÊ LỘ TRÌNH ĐỨNG BÊN TRÁI Ở GIỮA
+          // 1. KHUNG HÌNH 3D LỘ TRÌNH & VIDEO STORY (NHẬN DIỆN KHI XUẤT VIDEO)
           Positioned.fill(
             child: RepaintBoundary(
               key: _previewKey,
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
+                  final double t = _controller.value.clamp(0.0, 1.0);
+                  final double curDistance = _effectiveDistanceKm * t;
+                  final int curDurationSec = (_effectiveDurationSec * t).round();
+                  final int min = curDurationSec ~/ 60;
+                  final int sec = curDurationSec % 60;
+                  final String curTimeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+                  final int curCalories = (_effectiveCalories * t).round();
+
                   return Stack(
                     children: [
                       // Bản đồ 3D và lộ trình đường chạy
@@ -992,7 +929,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                             pathMetric: _pathMetric,
                             totalLength: _totalPathLength,
                             milestones: _milestones,
-                            progress: _controller.value,
+                            progress: t,
                             tileCache: MapTileCacheService.memoryCache,
                             zoom: _zoomLevel,
                             routeCenterX: _routeCenterX,
@@ -1013,14 +950,25 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                       ),
 
-                      // Bảng số đếm tăng dần xếp dọc bên trái ở giữa (Quãng đường, Thời gian, Calo, Pace)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 14.0),
-                          child: _buildVerticalLiveStatsCard(_controller.value),
+                      // Hiệu ứng Đếm ngược (Countdown 3... 2... 1... GO!) khi bắt đầu xuất video Story
+                      if (_isExportingVideo && t < 0.08)
+                        Center(
+                          child: _buildVideoCountdownBadge(t),
                         ),
-                      ),
+
+                      // Thẻ thông số thời gian thực trên video khi xuất để đăng Story Facebook
+                      if (_isExportingVideo)
+                        Positioned(
+                          left: 16,
+                          right: 16,
+                          bottom: 32,
+                          child: _buildStoryVideoStatsOverlay(
+                            distanceKm: curDistance,
+                            timeStr: curTimeStr,
+                            calories: curCalories,
+                            pace: _effectivePace,
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -1028,7 +976,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
             ),
           ),
 
-          // 2. VIP TOP HUD: NÚT BACK TRÒN + PILL THỐNG KÊ + NÚT TẢI VIDEO TRÒN
+          // 2. VIP TOP HUD: NÚT BACK TRÒN + NÚT CHUYỂN CHẾ ĐỘ TOÀN CẢNH/FLYCAM Ở GIỮA CÂN ĐỐI + NÚT TẢI VIDEO TRÒN
           Positioned(
             top: 0,
             left: 0,
@@ -1060,72 +1008,49 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
                     ),
 
-                    // Pill Thống Kê Giữa Nhảy Động Theo Tiến Độ Video
-                    AnimatedBuilder(
-                      animation: _controller,
-                      builder: (context, _) {
-                        final double curProgress = _controller.value.clamp(0.0, 1.0);
-                        final double curDistance = _effectiveDistanceKm * curProgress;
-                        final int curDurationSec = (_effectiveDurationSec * curProgress).round();
-
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: const Color(0xFF1E293B)),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 10),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFF10B981),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${curDistance.toStringAsFixed(2)} km',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                child: Container(width: 1, height: 14, color: const Color(0xFF334155)),
-                              ),
-                              Text(
-                                '$_effectivePace /km',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  color: AppTheme.secondaryNeon,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                child: Container(width: 1, height: 14, color: const Color(0xFF334155)),
-                              ),
-                              Text(
-                                _formatDuration(curDurationSec),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
+                    // Nút Chuyển Đổi [🗺️ TOÀN CẢNH] / [🚁 FLYCAM] Ở CHÍNH GIỮA CÂN ĐỐI
+                    InkWell(
+                      onTap: () {
+                        setState(() => _isFlycamMode = !_isFlycamMode);
                       },
+                      borderRadius: BorderRadius.circular(24),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon).withValues(alpha: 0.3),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isFlycamMode ? Icons.airplanemode_active_rounded : Icons.map_outlined,
+                              size: 16,
+                              color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isFlycamMode ? 'CHẾ ĐỘ FLYCAM' : 'CHẾ ĐỘ TOÀN CẢNH',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w900,
+                                color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
 
                     // Nút Tròn Tải Video
@@ -1149,57 +1074,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
                     ),
                   ],
-                ),
-              ),
-            ),
-          ),
-
-          // 3. NÚT CHUYỂN ĐỔI GÓC NHÌN (TOÀN CẢNH / FLYCAM) DƯỚI GÓC PHẢI
-          Positioned(
-            top: 72,
-            right: 16,
-            child: SafeArea(
-              child: InkWell(
-                onTap: () {
-                  setState(() => _isFlycamMode = !_isFlycamMode);
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon).withValues(alpha: 0.25),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _isFlycamMode ? Icons.airplanemode_active_rounded : Icons.map_outlined,
-                        size: 15,
-                        color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _isFlycamMode ? 'FLYCAM' : 'TOÀN CẢNH',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
-                          color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
