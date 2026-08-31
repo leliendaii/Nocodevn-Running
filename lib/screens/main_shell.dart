@@ -1243,17 +1243,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  // Modal Thông tin Ứng dụng & Hỗ trợ Chuyên Nghiệp Dành Riêng Cho Chạy Bộ
+  // Modal Thông tin Ứng dụng & Hỗ trợ - Ngắn gọn, tinh tế, chuẩn thể thao
   void _showAppAboutDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.88,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
           decoration: const BoxDecoration(
             color: Color(0xFF0F172A),
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -1264,244 +1261,107 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 12),
-                // Thanh kéo Modal
-                Container(
-                  width: 44,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF475569),
-                    borderRadius: BorderRadius.circular(3),
+                // Thanh kéo
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF475569),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                // Tiêu Đề Modal
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: const Icon(Icons.directions_run_rounded, color: AppTheme.primaryNeon, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'RUNNING TRACKER',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Phiên bản 1.2.0 • 2026',
+                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Mô tả ngắn gọn (2 dòng cốt lõi)
+                const Text(
+                  'Ứng dụng theo dõi chạy bộ chuyên nghiệp, đo chính xác GPS, tốc độ Pace, calo và tái hiện video 3D hành trình của bạn.',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+
+                // 3 Tính năng cốt lõi (gọn gàng)
+                _buildQuickFeatureRow(Icons.gps_fixed_rounded, AppTheme.primaryNeon, 'GPS Thể Thao: Đo quãng đường, pace & calo chuẩn xác theo thời gian thực.'),
+                const SizedBox(height: 8),
+                _buildQuickFeatureRow(Icons.shield_rounded, const Color(0xFF10B981), 'Chống Mất Dữ Liệu: Tự động lưu và khôi phục khi sập nguồn hoặc tắt app.'),
+                const SizedBox(height: 8),
+                _buildQuickFeatureRow(Icons.videocam_rounded, AppTheme.secondaryNeon, 'Mô Phỏng 3D: Tái hiện hành trình và lưu video trực tiếp vào Album Ảnh.'),
+                const SizedBox(height: 14),
+
+                // Hỗ trợ & Bản quyền
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                                width: 1,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.directions_run_rounded,
-                              color: AppTheme.primaryNeon,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'VỀ ỨNG DỤNG & HỖ TRỢ',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Running Tracker • Phiên bản 1.2.0 (2026)',
-                                style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted, size: 22),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
+                    children: const [
+                      Text('Tác giả: Liên Đài', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                      Text('Bảo mật dữ liệu 100%', style: TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
-                const Divider(color: Color(0xFF1E293B), height: 20),
+                const SizedBox(height: 16),
 
-                // Nội Dung Chi Tiết (Cuộn Được)
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 1. MỤC ĐÍCH & SỨ MỆNH ỨNG DỤNG
-                        _buildAboutSectionHeader('🎯 MỤC ĐÍCH & SỨ MỆNH ỨNG DỤNG'),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B).withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFF334155), width: 1),
-                          ),
-                          child: const Text(
-                            'Running Tracker là ứng dụng thể thao chuyên sâu được thiết kế để đồng hành cùng bạn trên mọi hành trình rèn luyện sức khỏe. Ứng dụng giúp bạn theo dõi chính xác từng bước chạy, tối ưu hóa hiệu suất thể lực và bứt phá các mục tiêu cá nhân từ chạy nhẹ rèn luyện hàng ngày đến các cự ly dài.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textSecondary,
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // 2. CÁC TÍNH NĂNG THỂ THAO NỔI BẬT
-                        _buildAboutSectionHeader('🚀 TÍNH NĂNG THEO DÕI CHẠY BỘ NỔI BẬT'),
-                        const SizedBox(height: 8),
-                        _buildFeatureCard(
-                          icon: Icons.gps_fixed_rounded,
-                          iconColor: AppTheme.primaryNeon,
-                          title: 'Định Vị GPS Thể Thao Độ Chính Xác Cao',
-                          description:
-                              'Đo đạc chính xác quãng đường (km), nhịp tốc độ (Pace phút/km), thời gian thực tế và lượng calo tiêu thụ theo thời gian thực với bộ lọc chống nhiễu chuyên dụng.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildFeatureCard(
-                          icon: Icons.shield_rounded,
-                          iconColor: const Color(0xFF10B981),
-                          title: 'Bảo Vệ Dữ Liệu & Chống Mất Hành Trình',
-                          description:
-                              'Tự động ghi nhớ liên tục từng mét đường vào bộ nhớ an toàn. Nếu điện thoại vô tình sập nguồn hoặc tắt app đột ngột, toàn bộ phiên chạy sẽ được tự động khôi phục nguyên vẹn.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildFeatureCard(
-                          icon: Icons.videocam_rounded,
-                          iconColor: AppTheme.secondaryNeon,
-                          title: 'Mô Phỏng Lộ Trình 3D & Xuất Video Kỷ Niệm',
-                          description:
-                              'Tái hiện hành trình chạy dưới dạng mô phỏng chuyển động 3D (chế độ Toàn Cảnh bao quát & Flycam cận cảnh) và hỗ trợ lưu video chất lượng cao trực tiếp vào Album Ảnh điện thoại.',
-                        ),
-                        const SizedBox(height: 10),
-                        _buildFeatureCard(
-                          icon: Icons.insights_rounded,
-                          iconColor: AppTheme.accentOrange,
-                          title: 'Thống Kê Nhật Ký & Phân Tích Hiệu Suất',
-                          description:
-                              'Lưu trữ đầy đủ lịch sử các buổi tập, phân tích chi tiết tốc độ từng kilomet giúp bạn dễ dàng theo dõi sự tiến bộ và duy trì phong độ bền bỉ.',
-                        ),
-                        const SizedBox(height: 20),
-
-                        // 3. HƯỚNG DẪN & TRUNG TÂM HỖ TRỢ
-                        _buildAboutSectionHeader('💬 TRUNG TÂM HỖ TRỢ & HƯỚNG DẪN'),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B).withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFF334155), width: 1),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              _SupportGuideItem(
-                                title: 'Cấp quyền vị trí (GPS)',
-                                text:
-                                    'Hãy chọn "Luôn cho phép" hoặc "Khi dùng ứng dụng" để đảm bảo tuyến đường chạy được vẽ chính xác nhất kể cả khi tắt màn hình.',
-                              ),
-                              SizedBox(height: 10),
-                              _SupportGuideItem(
-                                title: 'Quyền truy cập Album Ảnh',
-                                text:
-                                    'Cho phép ứng dụng lưu ảnh/video để có thể tải video mô phỏng 3D trực tiếp vào Thư viện Ảnh của iPhone.',
-                              ),
-                              SizedBox(height: 10),
-                              _SupportGuideItem(
-                                title: 'Bảo mật & Quyền riêng tư',
-                                text:
-                                    'Toàn bộ tọa độ GPS và thông số luyện tập của bạn được bảo mật tuyệt đối, chỉ phục vụ cho mục đích theo dõi sức khỏe của riêng bạn.',
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // 4. BẢN QUYỀN & TÁC GIẢ
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0B1120),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFF1E293B), width: 1),
-                          ),
-                          child: Column(
-                            children: const [
-                              Text(
-                                'PHÁT TRIỂN & BẢN QUYỀN',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.textMuted,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Tác giả: Liên Đài • 2026',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.primaryNeon,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Chúc bạn luôn duy trì nguồn năng lượng tích cực trên từng bước chạy!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
+                // Nút Đóng
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryNeon,
+                      foregroundColor: const Color(0xFF0F172A),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 4,
                     ),
-                  ),
-                ),
-
-                // Nút Đóng Dưới Cùng
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryNeon,
-                        foregroundColor: const Color(0xFF0F172A),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 6,
-                        shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                      ),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text(
-                        'ĐÃ HIỂU',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('ĐÓNG', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                   ),
                 ),
               ],
@@ -1512,98 +1372,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  static Widget _buildAboutSectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
-        color: AppTheme.primaryNeon,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
-
-  static Widget _buildFeatureCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String description,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF334155), width: 1),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: iconColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppTheme.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupportGuideItem extends StatelessWidget {
-  final String title;
-  final String text;
-
-  const _SupportGuideItem({required this.title, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
+  static Widget _buildQuickFeatureRow(IconData icon, Color color, String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('• ', style: TextStyle(fontSize: 13, color: AppTheme.secondaryNeon, fontWeight: FontWeight.bold)),
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
         Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
-              children: [
-                TextSpan(
-                  text: '$title: ',
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
-                ),
-                TextSpan(text: text),
-              ],
-            ),
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, height: 1.35),
           ),
         ),
       ],
