@@ -769,11 +769,22 @@ class RunningProvider with ChangeNotifier {
   List<RunSession> getFilteredSessions({
     required TimeFilter filter,
     String? targetUserId,
+    String? targetUserEmail,
+    String? targetUserName,
   }) {
     final now = DateTime.now();
+    final cleanId = targetUserId?.toLowerCase().trim() ?? '';
+    final cleanEmail = targetUserEmail?.toLowerCase().trim() ?? '';
+    final cleanName = targetUserName?.toLowerCase().trim() ?? '';
+
     return _sessions.where((session) {
-      if (targetUserId != null && targetUserId.isNotEmpty && session.userId != targetUserId) {
-        return false;
+      if (cleanId.isNotEmpty || cleanEmail.isNotEmpty || cleanName.isNotEmpty) {
+        final sId = session.userId.toLowerCase().trim();
+        final sName = session.userName.toLowerCase().trim();
+        final bool isMatch = (cleanId.isNotEmpty && sId == cleanId) ||
+            (cleanEmail.isNotEmpty && sId == cleanEmail) ||
+            (cleanName.isNotEmpty && sName == cleanName);
+        if (!isMatch) return false;
       }
       switch (filter) {
         case TimeFilter.day:
@@ -792,28 +803,28 @@ class RunningProvider with ChangeNotifier {
     }).toList();
   }
 
-  double getFilteredTotalDistance(TimeFilter filter, [String? targetUserId]) {
-    return getFilteredSessions(filter: filter, targetUserId: targetUserId)
+  double getFilteredTotalDistance(TimeFilter filter, [String? targetUserId, String? email, String? name]) {
+    return getFilteredSessions(filter: filter, targetUserId: targetUserId, targetUserEmail: email, targetUserName: name)
         .fold(0.0, (sum, item) => sum + item.distanceKm);
   }
 
-  int getFilteredTotalDurationSeconds(TimeFilter filter, [String? targetUserId]) {
-    return getFilteredSessions(filter: filter, targetUserId: targetUserId)
+  int getFilteredTotalDurationSeconds(TimeFilter filter, [String? targetUserId, String? email, String? name]) {
+    return getFilteredSessions(filter: filter, targetUserId: targetUserId, targetUserEmail: email, targetUserName: name)
         .fold(0, (sum, item) => sum + item.durationSeconds);
   }
 
-  int getFilteredTotalCalories(TimeFilter filter, [String? targetUserId]) {
-    return getFilteredSessions(filter: filter, targetUserId: targetUserId)
+  int getFilteredTotalCalories(TimeFilter filter, [String? targetUserId, String? email, String? name]) {
+    return getFilteredSessions(filter: filter, targetUserId: targetUserId, targetUserEmail: email, targetUserName: name)
         .fold(0, (sum, item) => sum + item.calories);
   }
 
-  int getFilteredUniqueAthletesCount(TimeFilter filter, [String? targetUserId]) {
-    final list = getFilteredSessions(filter: filter, targetUserId: targetUserId);
+  int getFilteredUniqueAthletesCount(TimeFilter filter, [String? targetUserId, String? email, String? name]) {
+    final list = getFilteredSessions(filter: filter, targetUserId: targetUserId, targetUserEmail: email, targetUserName: name);
     return list.map((s) => s.userId).toSet().length;
   }
 
-  List<ChartDataPoint> getFilteredChartData(TimeFilter filter, [String? targetUserId]) {
-    final sessions = getFilteredSessions(filter: filter, targetUserId: targetUserId);
+  List<ChartDataPoint> getFilteredChartData(TimeFilter filter, [String? targetUserId, String? email, String? name]) {
+    final sessions = getFilteredSessions(filter: filter, targetUserId: targetUserId, targetUserEmail: email, targetUserName: name);
     final now = DateTime.now();
     final List<ChartDataPoint> points = [];
 
@@ -878,39 +889,55 @@ class RunningProvider with ChangeNotifier {
   List<ChartDataPoint> getChartData(TimeFilter filter) => getFilteredChartData(filter);
   List<RunSession> getSessionsByFilter(TimeFilter filter) => getFilteredSessions(filter: filter);
 
-  // Lấy danh sách buổi chạy của riêng một User
-  List<RunSession> getUserSessions(String userId) {
-    return _sessions.where((s) => s.userId == userId).toList();
+  // Lấy danh sách buổi chạy của riêng một User (Khớp chính xác theo ID, email, username hoặc tên)
+  List<RunSession> getUserSessions(String userId, [String? email, String? username, String? name]) {
+    final cleanId = userId.toLowerCase().trim();
+    final cleanEmail = email?.toLowerCase().trim() ?? '';
+    final cleanUser = username?.toLowerCase().trim().replaceAll('@', '') ?? '';
+    final cleanName = name?.toLowerCase().trim() ?? '';
+
+    return _sessions.where((s) {
+      final sId = s.userId.toLowerCase().trim();
+      final sName = s.userName.toLowerCase().trim();
+      if (cleanId.isNotEmpty && sId == cleanId) return true;
+      if (cleanEmail.isNotEmpty && (sId == cleanEmail || sName == cleanEmail)) return true;
+      if (cleanUser.isNotEmpty && (sId == cleanUser || sName == cleanUser)) return true;
+      if (cleanName.isNotEmpty && sName == cleanName) return true;
+      return false;
+    }).toList();
   }
 
   // Lấy dữ liệu biểu đồ cho riêng một User
-  List<ChartDataPoint> getUserChartData(String userId, TimeFilter filter) =>
-      getFilteredChartData(filter, userId);
+  List<ChartDataPoint> getUserChartData(String userId, TimeFilter filter, [String? email, String? username, String? name]) =>
+      getFilteredChartData(filter, userId, email, name);
 
   // Danh sách tất cả buổi chạy
   List<RunSession> get sessions => List.unmodifiable(_sessions);
 
   // Lấy tổng quãng đường (KM) của riêng một User (kèm cộng dồn khi đang chạy)
-  double getUserTotalDistance(String? userId) {
-    final history = (userId == null || userId.isEmpty)
-        ? _sessions.fold(0.0, (sum, s) => sum + s.distanceKm)
-        : _sessions.where((s) => s.userId == userId).fold(0.0, (sum, s) => sum + s.distanceKm);
+  double getUserTotalDistance(String? userId, [String? email, String? username, String? name]) {
+    final list = (userId == null || userId.isEmpty)
+        ? _sessions
+        : getUserSessions(userId, email, username, name);
+    final history = list.fold(0.0, (sum, s) => sum + s.distanceKm);
     return history + (isRunning ? _distanceKm : 0.0);
   }
 
   // Lấy tổng thời gian (giây) của riêng một User (kèm cộng dồn khi đang chạy)
-  int getUserTotalDurationSeconds(String? userId) {
-    final history = (userId == null || userId.isEmpty)
-        ? _sessions.fold(0, (sum, s) => sum + s.durationSeconds)
-        : _sessions.where((s) => s.userId == userId).fold(0, (sum, s) => sum + s.durationSeconds);
+  int getUserTotalDurationSeconds(String? userId, [String? email, String? username, String? name]) {
+    final list = (userId == null || userId.isEmpty)
+        ? _sessions
+        : getUserSessions(userId, email, username, name);
+    final history = list.fold(0, (sum, s) => sum + s.durationSeconds);
     return history + (isRunning ? _durationSeconds : 0);
   }
 
   // Lấy tổng Calo của riêng một User (kèm cộng dồn khi đang chạy)
-  int getUserTotalCalories(String? userId) {
-    final history = (userId == null || userId.isEmpty)
-        ? _sessions.fold(0, (sum, s) => sum + s.calories)
-        : _sessions.where((s) => s.userId == userId).fold(0, (sum, s) => sum + s.calories);
+  int getUserTotalCalories(String? userId, [String? email, String? username, String? name]) {
+    final list = (userId == null || userId.isEmpty)
+        ? _sessions
+        : getUserSessions(userId, email, username, name);
+    final history = list.fold(0, (sum, s) => sum + s.calories);
     return history + (isRunning ? _calories : 0);
   }
 }

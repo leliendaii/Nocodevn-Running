@@ -16,7 +16,7 @@ class HistoryScreen extends StatelessWidget {
     final running = context.watch<RunningProvider>();
     final currentUser = context.watch<AuthProvider>().currentUser;
     final sessions = currentUser != null
-        ? running.getUserSessions(currentUser.id)
+        ? running.getUserSessions(currentUser.id, currentUser.email, currentUser.username, currentUser.name)
         : running.allSessions;
     final double totalKm = sessions.fold(0.0, (sum, s) => sum + s.distanceKm);
     final int totalSeconds = sessions.fold(0, (sum, s) => sum + s.durationSeconds);

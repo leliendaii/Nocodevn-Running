@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/run_session.dart';
 import 'calorie_calculator.dart';
@@ -83,28 +85,51 @@ class SupabaseService {
 
   /// Lấy thông tin chi tiết và quyền hạn từ bảng profiles (1 Query duy nhất - Tốc độ < 0.5s)
   static Future<Map<String, dynamic>?> fetchProfile(String userId, [String? email, String? username]) async {
+    final List<String> orFilters = [];
+    if (userId.isNotEmpty) orFilters.add('id.eq.$userId');
+    if (email != null && email.isNotEmpty) orFilters.add('email.ilike.${email.trim()}');
+    if (username != null && username.isNotEmpty) orFilters.add('username.ilike.${username.trim()}');
+
+    if (orFilters.isEmpty) return null;
+
     final supa = client;
-    if (supa == null) return null;
-    try {
-      final List<String> orFilters = [];
-      if (userId.isNotEmpty) orFilters.add('id.eq.$userId');
-      if (email != null && email.isNotEmpty) orFilters.add('email.ilike.${email.trim()}');
-      if (username != null && username.isNotEmpty) orFilters.add('username.ilike.${username.trim()}');
-
-      if (orFilters.isEmpty) return null;
-
-      final res = await supa
-          .from('profiles')
-          .select()
-          .or(orFilters.join(','))
-          .limit(1)
-          .maybeSingle()
-          .timeout(const Duration(seconds: 8), onTimeout: () => null);
-      return res;
-    } catch (e) {
-      debugPrint('Fetch profiles (offline fallback): $e');
-      return null;
+    if (supa != null) {
+      try {
+        final res = await supa
+            .from('profiles')
+            .select('id, name, username, email, role, avatar_url')
+            .or(orFilters.join(','))
+            .limit(1)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+        if (res != null) return res;
+      } catch (e) {
+        debugPrint('Fetch profile SDK: $e, fallback REST direct');
+      }
     }
+
+    // Direct REST Fallback
+    try {
+      final filterParam = orFilters.length == 1 ? orFilters.first : '(${orFilters.join(",")})';
+      final url = Uri.parse('$supabaseUrl/rest/v1/profiles?select=id,name,username,email,role,avatar_url&or=$filterParam&limit=1');
+      final resp = await http.get(
+        url,
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': 'Bearer $supabaseAnonKey',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 4));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data is List && data.isNotEmpty) {
+          return data.first as Map<String, dynamic>;
+        }
+      }
+    } catch (e) {
+      debugPrint('Fetch profile REST error: $e');
+    }
+    return null;
   }
 
   /// Cập nhật thông tin vào bảng profiles
@@ -130,17 +155,39 @@ class SupabaseService {
   /// Lấy toàn bộ danh sách hồ sơ người dùng (profiles) từ Supabase Cloud
   static Future<List<Map<String, dynamic>>?> fetchAllProfiles() async {
     final supa = client;
-    if (supa == null) return null;
-    try {
-      final res = await supa
-          .from('profiles')
-          .select()
-          .timeout(const Duration(seconds: 12));
-      return List<Map<String, dynamic>>.from(res);
-    } catch (e) {
-      debugPrint('FetchAllProfiles (dùng cache): $e');
-      return null;
+    if (supa != null) {
+      try {
+        final res = await supa
+            .from('profiles')
+            .select('id, name, username, email, role, avatar_url')
+            .timeout(const Duration(seconds: 4));
+        return List<Map<String, dynamic>>.from(res);
+      } catch (e) {
+        debugPrint('FetchAllProfiles SDK: $e, fallback REST direct');
+      }
     }
+
+    // Direct REST Fallback
+    try {
+      final url = Uri.parse('$supabaseUrl/rest/v1/profiles?select=id,name,username,email,role,avatar_url');
+      final resp = await http.get(
+        url,
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': 'Bearer $supabaseAnonKey',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 4));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+    } catch (e) {
+      debugPrint('FetchAllProfiles REST error: $e');
+    }
+    return null;
   }
 
   /// Lấy vai trò (role) chính xác từ Supabase DB
@@ -383,15 +430,47 @@ class SupabaseService {
   /// Lấy toàn bộ danh sách buổi chạy từ Supabase Cloud
   static Future<List<RunSession>?> fetchRunSessions() async {
     final supa = client;
-    if (supa == null) return null;
+    List<dynamic>? data;
+
+    if (supa != null) {
+      try {
+        final res = await supa
+            .from('run_sessions')
+            .select()
+            .order('start_time', ascending: false)
+            .timeout(const Duration(seconds: 4));
+        data = res;
+      } catch (e) {
+        debugPrint('Tải dữ liệu Supabase SDK: $e, fallback REST direct');
+      }
+    }
+
+    // Direct REST Fallback
+    if (data == null) {
+      try {
+        final url = Uri.parse('$supabaseUrl/rest/v1/run_sessions?select=*&order=start_time.desc');
+        final resp = await http.get(
+          url,
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': 'Bearer $supabaseAnonKey',
+            'Content-Type': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 4));
+        if (resp.statusCode == 200) {
+          final decoded = jsonDecode(resp.body);
+          if (decoded is List) {
+            data = decoded;
+          }
+        }
+      } catch (e) {
+        debugPrint('Tải dữ liệu Supabase REST error: $e');
+      }
+    }
+
+    if (data == null) return null;
 
     try {
-      final data = await supa
-          .from('run_sessions')
-          .select()
-          .order('start_time', ascending: false)
-          .timeout(const Duration(seconds: 12));
-
       final List<RunSession> list = [];
       for (final item in data) {
         final List<RunPoint> routePoints = [];
@@ -420,7 +499,7 @@ class SupabaseService {
       }
       return list;
     } catch (e) {
-      debugPrint('Tải dữ liệu Supabase (dùng cache): $e');
+      debugPrint('Lỗi parse run_sessions: $e');
       return null;
     }
   }

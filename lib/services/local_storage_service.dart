@@ -329,6 +329,12 @@ class LocalStorageService {
 
       final List<RunSession> sessions = [];
       for (final item in list) {
+        final id = item['id']?.toString() ?? '';
+        final uName = item['user_name']?.toString() ?? '';
+        if (id.startsWith('sample_') || uName == 'Admin Runner') {
+          continue;
+        }
+
         final List<RunPoint> routePoints = [];
         if (item['route_points'] is List) {
           for (final pt in item['route_points']) {
@@ -340,7 +346,7 @@ class LocalStorageService {
 
         sessions.add(
           RunSession(
-            id: item['id'].toString(),
+            id: id,
             userId: item['user_id'] ?? 'user_default',
             userName: item['user_name'] ?? 'Người chạy',
             startTime: DateTime.parse(item['start_time']),

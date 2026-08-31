@@ -609,9 +609,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               Consumer<RunningProvider>(
                 builder: (context, running, _) {
                   // Tính tổng dồn từ lịch sử của user + phiên chạy đang diễn ra (nếu có)
-                  final totalKm = running.getUserTotalDistance(user?.id);
-                  final totalSeconds = running.getUserTotalDurationSeconds(user?.id);
-                  final totalCalories = running.getUserTotalCalories(user?.id);
+                  final totalKm = running.getUserTotalDistance(user?.id, user?.email, user?.username, user?.name);
+                  final totalSeconds = running.getUserTotalDurationSeconds(user?.id, user?.email, user?.username, user?.name);
+                  final totalCalories = running.getUserTotalCalories(user?.id, user?.email, user?.username, user?.name);
 
                   // Luôn tính bằng giờ (chuẩn hóa không dùng phút)
                   final totalHours = totalSeconds / 3600.0;
@@ -965,14 +965,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final firstDayWeekday = DateTime(year, month, 1).weekday; // 1: Mon, 7: Sun
 
     // Lọc các ngày mà user đã chạy trong tháng được chọn
-    final userSessionsInMonth = running.sessions.where((s) {
-      final isSameUser = (user?.id != null && user!.id.isNotEmpty)
-          ? s.userId == user.id
-          : true;
-      return isSameUser &&
-          s.startTime.year == year &&
-          s.startTime.month == month;
-    }).toList();
+    final userSessionsInMonth = running.getUserSessions(
+      user?.id ?? '',
+      user?.email,
+      user?.username,
+      user?.name,
+    ).where((s) => s.startTime.year == year && s.startTime.month == month).toList();
 
     final activeDaysSet = userSessionsInMonth.map((s) => s.startTime.day).toSet();
     if (running.isRunning && year == now.year && month == now.month) {
