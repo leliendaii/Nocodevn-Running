@@ -70,11 +70,14 @@ class UserAvatar extends StatelessWidget {
 
   Widget _buildImage(String initial, Color accentColor) {
     final url = avatarUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      return _buildFallbackInitial(initial, accentColor);
+    }
 
-    // 1. Nếu là ảnh base64
-    if (url.startsWith('data:image')) {
+    // 1. Nếu là ảnh base64 (có tiền tố data:image hoặc chuỗi base64 thô)
+    if (url.startsWith('data:image') || (url.length > 50 && !url.startsWith('http'))) {
       try {
-        final base64Str = url.split(',').last;
+        final base64Str = url.contains(',') ? url.split(',').last.trim() : url;
         Uint8List? bytes = _avatarMemoryCache[base64Str];
         if (bytes == null) {
           bytes = base64Decode(base64Str);
@@ -138,12 +141,10 @@ class UserAvatar extends StatelessWidget {
           style: TextStyle(
             fontSize: radius * 0.85,
             fontWeight: FontWeight.w900,
-            color: accentColor,
-            letterSpacing: 0.5,
+            color: Colors.white,
           ),
         ),
       ),
     );
   }
 }
-

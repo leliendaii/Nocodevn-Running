@@ -127,8 +127,12 @@ class HistoryScreen extends StatelessWidget {
   Widget _buildSessionCard(BuildContext context, RunSession session) {
     final dateFormat = DateFormat('dd/MM/yyyy • HH:mm');
     final running = context.read<RunningProvider>();
+    final currentUser = context.read<AuthProvider>().currentUser;
     final realName = running.getUserRealName(session.userId, session.userName);
-    final realAvatar = running.getUserRealAvatar(session.userId);
+    String realAvatar = running.getUserRealAvatar(session.userId);
+    if (realAvatar.isEmpty && currentUser != null && currentUser.id == session.userId && currentUser.avatarUrl.isNotEmpty) {
+      realAvatar = currentUser.avatarUrl;
+    }
     final isAdmin = running.isUserAdmin(session.userId);
 
     return Card(
@@ -230,8 +234,12 @@ class HistoryScreen extends StatelessWidget {
 
   void _showDetailBottomSheet(BuildContext context, RunSession session) {
     final running = context.read<RunningProvider>();
+    final currentUser = context.read<AuthProvider>().currentUser;
     final realName = running.getUserRealName(session.userId, session.userName);
-    final realAvatar = running.getUserRealAvatar(session.userId);
+    String realAvatar = running.getUserRealAvatar(session.userId);
+    if (realAvatar.isEmpty && currentUser != null && currentUser.id == session.userId && currentUser.avatarUrl.isNotEmpty) {
+      realAvatar = currentUser.avatarUrl;
+    }
     final isAdmin = running.isUserAdmin(session.userId);
 
     // Xử lý an toàn thứ trong tuần trên mọi hệ điều hành (kể cả khi chưa load locale)

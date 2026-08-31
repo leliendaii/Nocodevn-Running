@@ -98,8 +98,12 @@ class RunningProvider with ChangeNotifier {
   /// Lấy Avatar Thật của User theo ID
   String getUserRealAvatar(String userId) {
     final p = _userProfiles[userId];
-    if (p != null && p['avatar_url'] != null) {
+    if (p != null && p['avatar_url'] != null && (p['avatar_url'] as String).trim().isNotEmpty) {
       return (p['avatar_url'] as String).trim();
+    }
+    final savedUser = LocalStorageService.getSavedUserSessionFast();
+    if (savedUser != null && savedUser.id == userId && savedUser.avatarUrl.trim().isNotEmpty) {
+      return savedUser.avatarUrl.trim();
     }
     return '';
   }
