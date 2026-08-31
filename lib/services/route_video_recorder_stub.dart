@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_quick_video_encoder/flutter_quick_video_encoder.dart';
 import 'package:gal/gal.dart';
-import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -19,119 +19,70 @@ class RawFrameData {
   RawFrameData(this.bytes, this.width, this.height);
 }
 
-/// Dữ liệu đầu vào cho Isolate mã hóa nền (Background Isolate)
-class _EncodeJob {
-  final List<RawFrameData> frames;
-  final String outputPath;
-  final int targetWidth;
-  _EncodeJob({required this.frames, required this.outputPath, this.targetWidth = 480});
-}
-
-/// Hàm chạy ngầm trong Isolate riêng biệt - Không bao giờ làm đơ UI hoặc đứng 90%!
-Future<bool> _encodeGifInBackground(_EncodeJob job) async {
-  try {
-    if (job.frames.isEmpty) return false;
-
-    // Tối ưu 60-80 khung hình mượt mà (30 FPS)
-    final List<RawFrameData> framesToProcess = [];
-    final int step = (job.frames.length / 60).ceil().clamp(1, 3);
-    for (int i = 0; i < job.frames.length; i += step) {
-      framesToProcess.add(job.frames[i]);
-    }
-    if (framesToProcess.isEmpty || framesToProcess.last != job.frames.last) {
-      framesToProcess.add(job.frames.last);
-    }
-
-    final encoder = img.GifEncoder(delay: 3); // ~30 FPS mượt mà
-
-    for (final frame in framesToProcess) {
-      // 1. Tạo image từ raw RGBA
-      var frameImg = img.Image.fromBytes(
-        width: frame.width,
-        height: frame.height,
-        bytes: frame.bytes.buffer,
-        numChannels: 4,
-        order: img.ChannelOrder.rgba,
-      );
-
-      // 2. Resize về 720px chuẩn HD sắc nét
-      if (frame.width > job.targetWidth) {
-        frameImg = img.copyResize(
-          frameImg,
-          width: job.targetWidth,
-          interpolation: img.Interpolation.linear,
-        );
-      }
-
-      // 3. Thêm frame vào GifEncoder
-      encoder.addFrame(frameImg, duration: 33);
-    }
-
-    final encodedBytes = encoder.finish();
-    if (encodedBytes != null && encodedBytes.isNotEmpty) {
-      final file = File(job.outputPath);
-      await file.writeAsBytes(encodedBytes, flush: true);
-      return true;
-    }
-  } catch (e) {
-    debugPrint('Lỗi Isolate encode: $e');
-  }
-  return false;
-}
-
 class RealtimeVideoSession {
   final List<RawFrameData> _frames = [];
   String? _savedFilePath;
 
   void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
-    // Lưu tối đa 80 frames chuẩn 30 FPS
-    if (_frames.length < 80) {
+    if (_frames.length < 150) {
       _frames.add(RawFrameData(rawRgbaBytes, frameWidth, frameHeight));
     }
   }
 
-  /// Đóng gói video chạy trên background isolate (chống treo máy)
+  /// Xuất video MP4 chuẩn phần cứng H.264 (AVFoundation trên iOS / MediaCodec trên Android)
   Future<bool> finishRecording() async {
     try {
       if (_frames.isEmpty) return false;
 
       final tempDir = await getTemporaryDirectory();
-      final outputPath = '${tempDir.path}/flyover_3d_${DateTime.now().millisecondsSinceEpoch}.gif';
+      final outputPath = '${tempDir.path}/flyover_3d_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
-      // Chạy mã hóa trên Background Isolate qua compute()
-      final bool success = await compute(
-        _encodeGifInBackground,
-        _EncodeJob(
-          frames: _frames,
-          outputPath: outputPath,
-          targetWidth: 720,
-        ),
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => false,
+      final firstFrame = _frames.first;
+      // Đảm bảo kích thước chia hết cho 2 theo chuẩn H.264
+      final int width = (firstFrame.width ~/ 2) * 2;
+      final int height = (firstFrame.height ~/ 2) * 2;
+
+      await FlutterQuickVideoEncoder.setup(
+        width: width,
+        height: height,
+        fps: 30,
+        videoBitrate: 8000000,
+        profileLevel: ProfileLevel.any,
+        audioChannels: 0,
+        audioBitrate: 0,
+        sampleRate: 44100,
+        filepath: outputPath,
       );
 
-      if (success && await File(outputPath).exists()) {
+      for (final frame in _frames) {
+        await FlutterQuickVideoEncoder.appendVideoFrame(frame.bytes);
+      }
+
+      await FlutterQuickVideoEncoder.finish();
+
+      if (await File(outputPath).exists()) {
         _savedFilePath = outputPath;
         return true;
       }
     } catch (e) {
-      debugPrint('Lỗi hoàn tất quay native: $e');
+      debugPrint('Lỗi xuất video phần cứng MP4: $e');
     }
     return false;
   }
 
-  /// Tải trực tiếp trong User Gesture (Đồng bộ tức thì)
+  /// Tải trực tiếp trong User Gesture (Lưu thẳng 1 chạm vào Album Ảnh qua Gal.putVideo)
   VideoSaveResult downloadVideoDirect(String filename) {
     try {
       if (_savedFilePath != null && File(_savedFilePath!).existsSync()) {
         final path = _savedFilePath!;
-        final finalName = filename.endsWith('.gif') ? filename : filename.replaceAll('.mp4', '.gif');
         
-        Gal.putImage(path).catchError((_) {
+        Gal.putVideo(path).then((_) {
+          debugPrint('Lưu Gal.putVideo thành công vào Album Ảnh!');
+        }).catchError((galErr) {
+          debugPrint('Gal.putVideo error, fallback SharePlus: $galErr');
           SharePlus.instance.share(
             ShareParams(
-              files: [XFile(path, mimeType: 'image/gif', name: finalName)],
+              files: [XFile(path, mimeType: 'video/mp4', name: filename)],
               subject: 'Video 3D Flyover Buổi Chạy',
             ),
           );
@@ -139,7 +90,7 @@ class RealtimeVideoSession {
 
         return const VideoSaveResult(
           isSuccess: true,
-          message: '🎉 Đang lưu vào Album Ảnh (Camera Roll)...',
+          message: '🎉 Đã lưu video thành công vào Album Ảnh (Camera Roll)!',
         );
       }
     } catch (e) {
@@ -153,9 +104,8 @@ class RealtimeVideoSession {
     try {
       if (_savedFilePath != null && await File(_savedFilePath!).exists()) {
         final path = _savedFilePath!;
-        final finalName = filename.endsWith('.gif') ? filename : filename.replaceAll('.mp4', '.gif');
 
-        // 1. Thử lưu trực tiếp vào Thư viện Ảnh bằng thư viện Gal (có timeout 4 giây chống treo)
+        // 1. Lưu trực tiếp vào Thư viện Ảnh bằng thư viện Gal.putVideo()
         try {
           bool hasAccess = await Gal.hasAccess(toAlbum: false).timeout(
             const Duration(seconds: 2),
@@ -169,32 +119,28 @@ class RealtimeVideoSession {
           }
 
           if (hasAccess) {
-            // Lưu ảnh động vào Album Ảnh iPhone (tự động hiển thị và chạy trong Thư viện Ảnh)
-            await Gal.putImage(path).timeout(
-              const Duration(seconds: 5),
-            );
-
+            await Gal.putVideo(path).timeout(const Duration(seconds: 5));
             return const VideoSaveResult(
               isSuccess: true,
               message: '🎉 Đã lưu video thành công vào Album Ảnh (Camera Roll)!',
             );
           }
         } catch (galError) {
-          debugPrint('Lưu Gal thất bại/timeout, mở bảng chia sẻ gốc iPhone: $galError');
+          debugPrint('Lưu Gal.putVideo thất bại/timeout, mở bảng chia sẻ gốc iPhone: $galError');
         }
 
-        // 2. Dự phòng chuẩn Apple iOS: Mở Native iOS Share Sheet để người dùng bấm "Lưu hình ảnh / Tệp"
+        // 2. Dự phòng: Mở Native iOS Share Sheet
         try {
           await SharePlus.instance.share(
             ShareParams(
-              files: [XFile(path, mimeType: 'image/gif', name: finalName)],
+              files: [XFile(path, mimeType: 'video/mp4', name: filename)],
               subject: 'Video 3D Flyover Buổi Chạy',
             ),
           );
 
           return const VideoSaveResult(
             isSuccess: true,
-            message: '🎉 Đã mở bảng chia sẻ của iPhone! Hãy chọn "Lưu hình ảnh" để lưu vào Thư viện Ảnh.',
+            message: '🎉 Đã mở bảng chia sẻ của iPhone! Hãy chọn "Lưu video" để lưu vào Thư viện Ảnh.',
           );
         } catch (shareErr) {
           debugPrint('Share fallback error: $shareErr');
