@@ -71,6 +71,13 @@ class RunningProvider with ChangeNotifier {
   RunningProvider() {
     _loadInitialSessions();
     _loadUserProfiles();
+
+    // Heartbeat Timer: Tự động quét kiểm tra nhắc nhở và đồng bộ nền mỗi 10 giây
+    Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_activeUserId != null) {
+        checkDailyReminder(_activeUserId!);
+      }
+    });
   }
 
   /// Tải danh sách profile thật của tất cả user từ Cloud
@@ -229,6 +236,7 @@ class RunningProvider with ChangeNotifier {
     _reminderEnabled = enabled;
     _reminderHour = hour;
     _reminderMinute = minute;
+    _lastReminderTriggerDate = null; // Reset để sẵn sàng kích hoạt ngay khi tới giờ mới cài
     await LocalStorageService.saveReminderConfig(
       userId: userId,
       enabled: enabled,

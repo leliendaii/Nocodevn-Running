@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'web_notification_stub.dart'
+    if (dart.library.html) 'web_notification_web.dart';
 
 /// Dịch vụ thông báo trực tiếp thời gian thực khi chạy ngầm / tắt màn hình (Live Workout Widget)
 class LiveWorkoutNotificationService {
@@ -13,6 +15,10 @@ class LiveWorkoutNotificationService {
   static Future<void> initialize() async {
     if (_isInitialized) return;
     try {
+      if (kIsWeb) {
+        await requestPlatformNotificationPermission();
+      }
+
       const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
@@ -52,7 +58,7 @@ class LiveWorkoutNotificationService {
       }
 
       _isInitialized = true;
-      debugPrint('✅ Khởi tạo LiveWorkoutNotificationService thành công!');
+      debugPrint('Khởi tạo LiveWorkoutNotificationService thành công');
     } catch (e) {
       debugPrint('Lỗi khởi tạo LiveWorkoutNotificationService: $e');
     }
@@ -138,6 +144,10 @@ class LiveWorkoutNotificationService {
     try {
       if (!_isInitialized) await initialize();
 
+      if (kIsWeb) {
+        showPlatformBrowserNotification(title: title, body: body, tag: 'morning_reminder');
+      }
+
       const androidDetails = AndroidNotificationDetails(
         'running_daily_reminder_channel',
         'Nhắc nhở luyện tập hàng ngày',
@@ -179,6 +189,12 @@ class LiveWorkoutNotificationService {
     try {
       if (!_isInitialized) await initialize();
 
+      final body = 'Đã hoàn thành ${distanceKm.toStringAsFixed(2)} km trong $durationStr. Thành tích đã được lưu.';
+
+      if (kIsWeb) {
+        showPlatformBrowserNotification(title: 'Tự động kết thúc phiên chạy', body: body, tag: 'auto_end');
+      }
+
       const androidDetails = AndroidNotificationDetails(
         'running_auto_end_channel',
         'Tự động kết thúc phiên chạy',
@@ -204,7 +220,7 @@ class LiveWorkoutNotificationService {
       await _notifications.show(
         889,
         'Tự động kết thúc phiên chạy',
-        'Đã hoàn thành ${distanceKm.toStringAsFixed(2)} km trong $durationStr. Thành tích đã được lưu.',
+        body,
         details,
       );
     } catch (e) {
