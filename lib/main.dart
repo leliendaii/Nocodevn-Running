@@ -18,9 +18,23 @@ void main() async {
     await initializeDateFormatting('vi_VN', null);
     await initializeDateFormatting('vi', null);
   } catch (_) {}
-  await LocalStorageService.init();
-  await SupabaseService.initialize();
-  await LiveWorkoutNotificationService.initialize();
+  try {
+    await LocalStorageService.init();
+  } catch (e) {
+    debugPrint('LocalStorageService init error: $e');
+  }
+
+  try {
+    await SupabaseService.initialize();
+  } catch (e) {
+    debugPrint('SupabaseService init error: $e');
+  }
+
+  try {
+    await LiveWorkoutNotificationService.initialize();
+  } catch (e) {
+    debugPrint('LiveWorkoutNotificationService init error: $e');
+  }
   runApp(
     DevicePreview(
       enabled: !kReleaseMode, // Bật khung điện thoại ảo khi chạy debug trên Chrome / Windows

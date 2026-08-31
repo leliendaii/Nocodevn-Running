@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 
 Future<void> requestPlatformNotificationPermission() async {
   try {
-    if (html.Notification.permission != 'granted') {
-      await html.Notification.requestPermission();
+    if (html.Notification.permission != 'granted' && html.Notification.permission != 'denied') {
+      html.Notification.requestPermission();
     }
   } catch (e) {
     debugPrint('Web notification permission error: $e');
