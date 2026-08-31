@@ -870,8 +870,8 @@ class RunningProvider with ChangeNotifier {
         final sId = session.userId.toLowerCase().trim();
         final sName = session.userName.toLowerCase().trim();
         final bool isMatch = (cleanId.isNotEmpty && sId == cleanId) ||
-            (cleanEmail.isNotEmpty && sId == cleanEmail) ||
-            (cleanName.isNotEmpty && sName == cleanName);
+            (cleanEmail.isNotEmpty && (sId == cleanEmail || sName == cleanEmail)) ||
+            (cleanName.isNotEmpty && (sId == cleanName || sName == cleanName));
         if (!isMatch) return false;
       }
       switch (filter) {
@@ -945,7 +945,9 @@ class RunningProvider with ChangeNotifier {
         break;
 
       case TimeFilter.month:
-        for (int w = 1; w <= 4; w++) {
+        final int daysInCurrentMonth = DateTime(now.year, now.month + 1, 0).day;
+        final int totalWeeksInMonth = ((daysInCurrentMonth - 1) ~/ 7) + 1;
+        for (int w = 1; w <= totalWeeksInMonth; w++) {
           final weekSessions = sessions.where((s) => ((s.startTime.day - 1) ~/ 7) + 1 == w);
           final dist = weekSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
           final dur = weekSessions.fold(0, (sum, s) => sum + s.durationSeconds) / 60.0;

@@ -188,9 +188,23 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   // TAB 3: THỐNG KÊ CÁ NHÂN CỦA NGƯỜI DÙNG (DÙNG CHUNG CHO CẢ USER VÀ ADMIN KHI CHẠY)
   Widget _buildPersonalStatsTab(String userId) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.currentUser;
     final running = context.watch<RunningProvider>();
-    final userRuns = running.getUserSessions(userId);
-    final chartData = running.getUserChartData(userId, _personalFilter);
+
+    final userRuns = running.getFilteredSessions(
+      filter: _personalFilter,
+      targetUserId: userId,
+      targetUserEmail: user?.email,
+      targetUserName: user?.name,
+    );
+    final chartData = running.getUserChartData(
+      userId,
+      _personalFilter,
+      user?.email,
+      user?.username,
+      user?.name,
+    );
 
     final double totalKm = userRuns.fold(0.0, (sum, s) => sum + s.distanceKm);
     final int totalSec = userRuns.fold(0, (sum, s) => sum + s.durationSeconds);

@@ -56,7 +56,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  int _baseDurationMs = 13500; // Tốc độ cơ bản tính theo quãng đường
+  int _baseDurationMs = 20000; // Thời lượng chuẩn 20s (2s xem điểm đầu -> 11s chạy -> 2s zoom đích -> zoom toàn cảnh -> 5s ngắm trọn vẹn)
 
   @override
   void initState() {
@@ -77,19 +77,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveCalories = 165;
     }
 
-    // Tự động điều chỉnh thời lượng video theo quãng đường:
-    // Ngắn -> quay chậm rãi thưởng ngoạn; Dài -> lướt nhanh gọn
-    if (_effectiveDistanceKm < 1.0) {
-      _baseDurationMs = 10000;
-    } else if (_effectiveDistanceKm < 5.0) {
-      _baseDurationMs = 13000;
-    } else if (_effectiveDistanceKm < 10.0) {
-      _baseDurationMs = 16000;
-    } else if (_effectiveDistanceKm < 21.0) {
-      _baseDurationMs = 19000;
-    } else {
-      _baseDurationMs = 22000;
-    }
+    _baseDurationMs = 20000;
 
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
     _smoothRoute = _buildConsistentRoute(widget.session);
@@ -797,98 +785,93 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     );
   }
 
-  /// Hiệu ứng đếm ngược 3... 2... 1... GO! khi bắt đầu xuất video Story Facebook
-  Widget _buildVideoCountdownBadge(double t) {
-    String countText = '3';
-    Color countColor = const Color(0xFF00E5FF);
-    if (t >= 0.06) {
-      countText = 'GO!';
-      countColor = const Color(0xFF10B981);
-    } else if (t >= 0.04) {
-      countText = '1';
-      countColor = const Color(0xFFFFD700);
-    } else if (t >= 0.02) {
-      countText = '2';
-      countColor = const Color(0xFFFF7043);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: countColor, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: countColor.withValues(alpha: 0.5),
-            blurRadius: 24,
-          ),
-        ],
-      ),
-      child: Text(
-        countText,
-        style: TextStyle(
-          fontSize: countText.length > 2 ? 28 : 38,
-          fontWeight: FontWeight.w900,
-          color: countColor,
-          letterSpacing: 2.0,
-        ),
-      ),
-    );
-  }
-
-  /// Thẻ thông số thể thao cao cấp nhúng trực tiếp vào Video khi xuất (Chuẩn Story Facebook / TikTok / Instagram)
+  /// Thẻ thông số thể thao cao cấp nhúng trực tiếp vào Video khi xuất (Chuẩn Story Facebook / TikTok / Instagram - Chữ & Số To Rõ)
   Widget _buildStoryVideoStatsOverlay({
     required double distanceKm,
     required String timeStr,
     required int calories,
     required String pace,
+    required bool isFinished,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF334155), width: 1.5),
+        color: const Color(0xFF0F172A).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isFinished ? const Color(0xFF10B981) : const Color(0xFF334155),
+          width: 1.8,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 18,
-            offset: const Offset(0, 5),
+            color: isFinished ? const Color(0xFF10B981).withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.55),
+            blurRadius: 22,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.directions_run_rounded, color: AppTheme.primaryNeon, size: 16),
-              SizedBox(width: 6),
+              Icon(
+                isFinished ? Icons.emoji_events_rounded : Icons.directions_run_rounded,
+                color: isFinished ? const Color(0xFFFFD700) : AppTheme.primaryNeon,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
               Text(
-                'LỘ TRÌNH CHẠY BỘ 3D',
+                isFinished ? 'HOÀN THÀNH LỘ TRÌNH CHẠY BỘ' : 'ĐANG THEO DÕI LỘ TRÌNH CHẠY BỘ',
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w900,
-                  color: AppTheme.primaryNeon,
+                  color: isFinished ? const Color(0xFF10B981) : AppTheme.primaryNeon,
                   letterSpacing: 1.0,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSummaryStatItem('QUÃNG ĐƯỜNG', '${distanceKm.toStringAsFixed(2)} km', const Color(0xFF00E5FF)),
-              _buildSummaryStatItem('PACE TB', '$pace /km', const Color(0xFF10B981)),
-              _buildSummaryStatItem('THỜI GIAN', timeStr, Colors.white),
-              _buildSummaryStatItem('CALO', '$calories kcal', const Color(0xFFFF7043)),
+              _buildBigStoryStatItem('QUÃNG ĐƯỜNG', '${distanceKm.toStringAsFixed(2)} km', const Color(0xFF00E5FF)),
+              _buildBigStoryStatItem('PACE TB', '$pace /km', const Color(0xFF10B981)),
+              _buildBigStoryStatItem('THỜI GIAN', timeStr, Colors.white),
+              _buildBigStoryStatItem('CALO', '$calories kcal', const Color(0xFFFF7043)),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBigStoryStatItem(String label, String value, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15.5,
+            fontWeight: FontWeight.w900,
+            color: color,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textMuted,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
     );
   }
 
@@ -906,12 +889,22 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 animation: _controller,
                 builder: (context, _) {
                   final double t = _controller.value.clamp(0.0, 1.0);
-                  final double curDistance = _effectiveDistanceKm * t;
-                  final int curDurationSec = (_effectiveDurationSec * t).round();
+                  double curProgress = 0.0;
+                  if (t < 0.10) {
+                    curProgress = 0.0;
+                  } else if (t < 0.65) {
+                    curProgress = ((t - 0.10) / 0.55).clamp(0.0, 1.0);
+                  } else {
+                    curProgress = 1.0;
+                  }
+
+                  final double curDistance = _effectiveDistanceKm * curProgress;
+                  final int curDurationSec = (_effectiveDurationSec * curProgress).round();
                   final int min = curDurationSec ~/ 60;
                   final int sec = curDurationSec % 60;
                   final String curTimeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-                  final int curCalories = (_effectiveCalories * t).round();
+                  final int curCalories = (_effectiveCalories * curProgress).round();
+                  final bool isFinished = curProgress >= 0.99;
 
                   return Stack(
                     children: [
@@ -950,13 +943,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                       ),
 
-                      // Hiệu ứng Đếm ngược (Countdown 3... 2... 1... GO!) khi bắt đầu xuất video Story
-                      if (_isExportingVideo && t < 0.08)
-                        Center(
-                          child: _buildVideoCountdownBadge(t),
-                        ),
-
-                      // Thẻ thông số thời gian thực trên video khi xuất để đăng Story Facebook
+                      // Thẻ thông số thời gian thực to rõ trên video khi xuất để đăng Story Facebook
                       if (_isExportingVideo)
                         Positioned(
                           left: 16,
@@ -967,6 +954,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                             timeStr: curTimeStr,
                             calories: curCalories,
                             pace: _effectivePace,
+                            isFinished: isFinished,
                           ),
                         ),
                     ],
@@ -1091,7 +1079,16 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, _) {
-                    final double curProgress = _controller.value.clamp(0.0, 1.0);
+                    final double t = _controller.value.clamp(0.0, 1.0);
+                    double curProgress = 0.0;
+                    if (t < 0.10) {
+                      curProgress = 0.0;
+                    } else if (t < 0.65) {
+                      curProgress = ((t - 0.10) / 0.55).clamp(0.0, 1.0);
+                    } else {
+                      curProgress = 1.0;
+                    }
+
                     final double curDistance = _effectiveDistanceKm * curProgress;
                     final int curDurationSec = (_effectiveDurationSec * curProgress).round();
                     final int curCalories = (_effectiveCalories * curProgress).round();
@@ -1301,18 +1298,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         Text(
           value,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 14.5,
             fontWeight: FontWeight.w900,
             color: color,
+            letterSpacing: 0.2,
           ),
         ),
-        const SizedBox(height: 1),
+        const SizedBox(height: 2),
         Text(
           label,
           style: const TextStyle(
-            fontSize: 8.5,
-            fontWeight: FontWeight.bold,
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
             color: AppTheme.textMuted,
+            letterSpacing: 0.4,
           ),
         ),
       ],
@@ -1399,43 +1398,90 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (pixels.isEmpty || sampledPositions.isEmpty) return;
 
-    // 1. TIẾN ĐỘ CHẠY & NỘI SUY BẰNG BẢNG SAMPLING 2.000 ĐIỂM
-    final double flightProgress = (progress / 0.82).clamp(0.0, 1.0);
+    // 1. TÍNH TOÁN CÁC MỐC TỈ LỆ ZOOM CAMERA
+    final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
+    final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
+    final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
+    final double chaseScale = (overviewScale * 1.35).clamp(0.35, 1.85); // Zoom Flycam vừa vặn
+    final double startScale = (overviewScale * 1.65).clamp(0.45, 2.40); // Zoom cận cảnh điểm BẮT ĐẦU
+    final double finishScale = (overviewScale * 1.65).clamp(0.45, 2.40); // Zoom cận cảnh điểm KẾT THÚC
+
+    // 2. TIMELINE ĐIỆN ẢNH CHUYÊN NGHIỆP:
+    // - Phase 1 [0.00 - 0.10] (~2s): Zoom cận cảnh vị trí BẮT ĐẦU để user nhìn rõ điểm xuất phát
+    // - Phase 2 [0.10 - 0.65] (~11s): Chạy lộ trình mượt mà từ 0% đến 100%
+    // - Phase 3 [0.65 - 0.75] (~2s): Zoom cận cảnh vị trí KẾT THÚC
+    // - Phase 4 [0.75 - 0.82] (~1.4s): Thu nhỏ mở rộng bản đồ ra lại TOÀN CẢNH
+    // - Phase 5 [0.82 - 1.00] (~4-5s): Giữ nguyên TOÀN CẢNH để chiêm ngưỡng toàn bộ cung đường & thông số
+    double camX;
+    double camY;
+    double camScale;
+    double flightProgress;
+
+    if (progress < 0.10) {
+      // 1. Giai đoạn BẮT ĐẦU: Giữ zoom cận cảnh điểm xuất phát (2s)
+      flightProgress = 0.0;
+      camX = startPinPixel.dx;
+      camY = startPinPixel.dy;
+      camScale = startScale;
+    } else if (progress < 0.65) {
+      // 2. Giai đoạn CHẠY: Tiến độ lộ trình từ 0.0 đến 1.0
+      flightProgress = ((progress - 0.10) / 0.55).clamp(0.0, 1.0);
+
+      final double fIndex = (sampledPositions.length - 1) * flightProgress;
+      final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
+      final int nextIdx = math.min(baseIdx + 1, sampledPositions.length - 1);
+      final double subFrac = fIndex - baseIdx;
+      final Offset smoothedCam = Offset.lerp(smoothedCamPositions[baseIdx], smoothedCamPositions[nextIdx], subFrac)!;
+
+      if (isFlycamMode) {
+        final double introTransit = Curves.easeInOutCubic.transform((flightProgress / 0.15).clamp(0.0, 1.0));
+        camX = ui.lerpDouble(startPinPixel.dx, smoothedCam.dx, introTransit)!;
+        camY = ui.lerpDouble(startPinPixel.dy, smoothedCam.dy, introTransit)!;
+        camScale = ui.lerpDouble(startScale, chaseScale, introTransit)!;
+      } else {
+        final double introTransit = Curves.easeInOutCubic.transform((flightProgress / 0.18).clamp(0.0, 1.0));
+        camX = ui.lerpDouble(startPinPixel.dx, routeCenterX, introTransit)!;
+        camY = ui.lerpDouble(startPinPixel.dy, routeCenterY, introTransit)!;
+        camScale = ui.lerpDouble(startScale, overviewScale, introTransit)!;
+      }
+    } else if (progress < 0.75) {
+      // 3. Giai đoạn ĐÍCH: Zoom cận cảnh điểm KẾT THÚC (2s)
+      flightProgress = 1.0;
+      final double tFinish = Curves.easeInOutCubic.transform(((progress - 0.65) / 0.10).clamp(0.0, 1.0));
+      final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
+      final double fromScale = isFlycamMode ? chaseScale : overviewScale;
+      final double fromX = isFlycamMode ? lastCam.dx : routeCenterX;
+      final double fromY = isFlycamMode ? lastCam.dy : routeCenterY;
+
+      camX = ui.lerpDouble(fromX, finishPinPixel.dx, tFinish)!;
+      camY = ui.lerpDouble(fromY, finishPinPixel.dy, tFinish)!;
+      camScale = ui.lerpDouble(fromScale, finishScale, tFinish)!;
+    } else if (progress < 0.82) {
+      // 4. Giai đoạn THU NHỎ: Thu nhỏ bản đồ về lại TOÀN CẢNH
+      flightProgress = 1.0;
+      final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.75) / 0.07).clamp(0.0, 1.0));
+
+      camX = ui.lerpDouble(finishPinPixel.dx, routeCenterX, tOverview)!;
+      camY = ui.lerpDouble(finishPinPixel.dy, routeCenterY, tOverview)!;
+      camScale = ui.lerpDouble(finishScale, overviewScale, tOverview)!;
+    } else {
+      // 5. Giai đoạn GIỮ 5 GIÂY: Giữ cố định TOÀN CẢNH để xem trọn vẹn lộ trình và thông số
+      flightProgress = 1.0;
+      camX = routeCenterX;
+      camY = routeCenterY;
+      camScale = overviewScale;
+    }
+
     final double currentDist = totalLength * flightProgress;
 
-    final double fIndex = (sampledPositions.length - 1) * flightProgress;
+    final double fIndex = (sampledPositions.length - 1) * flightProgress.clamp(0.0, 1.0);
     final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
     final int nextIdx = math.min(baseIdx + 1, sampledPositions.length - 1);
     final double subFrac = fIndex - baseIdx;
 
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
-    final Offset smoothedCam = Offset.lerp(smoothedCamPositions[baseIdx], smoothedCamPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
-
-    // 2. CAMERA STRAVA 3D FLYOVER - MƯỢT MÀ 100% TUYỆT ĐỐI KHÔNG RUNG LẮC:
-    final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
-    final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
-    final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
-    final double chaseScale = (overviewScale * 1.35).clamp(0.35, 1.85); // Zoom vừa vặn, không quá sát
-
-    final double outroRaw = ((progress - 0.72) / 0.28).clamp(0.0, 1.0);
-    final double outroT = isFlycamMode ? Curves.easeInOutCubic.transform(outroRaw) : 0.0;
-
-    double camX;
-    double camY;
-    double camScale;
-
-    if (isFlycamMode) {
-      // 🚁 CHẾ ĐỘ FLYCAM: Bám mượt theo người chạy, cuối video nhẹ nhàng mở rộng tầm nhìn về toàn cảnh (100% không rung giật)
-      camX = ui.lerpDouble(smoothedCam.dx, routeCenterX, outroT)!;
-      camY = ui.lerpDouble(smoothedCam.dy, routeCenterY, outroT)!;
-      camScale = ui.lerpDouble(chaseScale, overviewScale, outroT)!;
-    } else {
-      // 🗺️ CHẾ ĐỘ TOÀN CẢNH: Cố định 100% tâm tuyến đường từ đầu đến cuối, TUYỆT ĐỐI KHÔNG ZOOM Ở CUỐI VIDEO
-      camX = routeCenterX;
-      camY = routeCenterY;
-      camScale = overviewScale;
-    }
+    final double outroT = ((progress - 0.75) / 0.25).clamp(0.0, 1.0);
 
     // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM
     final double strokeBase = (3.6 / camScale).clamp(2.4, 5.0);
