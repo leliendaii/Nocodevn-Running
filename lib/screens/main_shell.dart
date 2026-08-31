@@ -1243,14 +1243,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-  // Modal Thông tin Ứng dụng & Hỗ trợ - Đơn giản, ngắn gọn, dễ hiểu
+  // Modal Thông tin Ứng dụng & Hỗ trợ - Đơn giản, ngắn gọn, tự động co giãn không tràn màn hình
   void _showAppAboutDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           decoration: const BoxDecoration(
             color: Color(0xFF0F172A),
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -1259,132 +1263,135 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             ),
           ),
           child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Thanh kéo
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF475569),
-                      borderRadius: BorderRadius.circular(2),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Thanh kéo
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF475569),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                          width: 1.2,
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryNeon.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.directions_run_rounded,
+                                size: 24,
+                                color: AppTheme.primaryNeon,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'RUNNING TRACKER',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Phiên bản 1.2.0 • 2026',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           ),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(11),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.directions_run_rounded,
-                              size: 24,
-                              color: AppTheme.primaryNeon,
-                            );
-                          },
-                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Mô tả đơn giản
+                  const Text(
+                    'Ứng dụng đơn giản giúp bạn ghi lại quá trình chạy bộ mỗi ngày, xem lại lộ trình trên bản đồ và tải video kỷ niệm về máy.',
+                    style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Các chức năng có trong app
+                  _buildQuickFeatureRow(Icons.gps_fixed_rounded, AppTheme.primaryNeon, 'Đo GPS khi chạy: Tự đo quãng đường (km), thời gian, tốc độ (pace) và calo.'),
+                  const SizedBox(height: 7),
+                  _buildQuickFeatureRow(Icons.videocam_rounded, AppTheme.secondaryNeon, 'Xem & Tải video 3D: Xem lại đường chạy mô phỏng và tải video về điện thoại.'),
+                  const SizedBox(height: 7),
+                  _buildQuickFeatureRow(Icons.history_rounded, const Color(0xFFF59E0B), 'Lịch sử chạy bộ: Lưu lại đầy đủ các lần chạy kèm bản đồ chi tiết.'),
+                  const SizedBox(height: 7),
+                  _buildQuickFeatureRow(Icons.shield_rounded, const Color(0xFF10B981), 'Tự động lưu: Đang chạy mà lỡ tắt app hay hết pin thì mở lại vẫn còn nguyên.'),
+                  const SizedBox(height: 7),
+                  _buildQuickFeatureRow(Icons.volume_up_rounded, const Color(0xFF38BDF8), 'Giọng nói nhắc nhở: Tự đọc số km và tốc độ khi chạy.'),
+                  const SizedBox(height: 12),
+
+                  // Tác giả
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('Phát triển bởi: Liên Đài • 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Nút Đóng
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryNeon,
+                        foregroundColor: const Color(0xFF0F172A),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 4,
                       ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('ĐÓNG', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                     ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'RUNNING TRACKER',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Phiên bản 1.2.0 • 2026',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Mô tả đơn giản
-                const Text(
-                  'Ứng dụng đơn giản giúp bạn ghi lại quá trình chạy bộ mỗi ngày, xem lại lộ trình trên bản đồ và tải video kỷ niệm về máy.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
-                ),
-                const SizedBox(height: 14),
-
-                // Các chức năng có trong app
-                _buildQuickFeatureRow(Icons.gps_fixed_rounded, AppTheme.primaryNeon, 'Đo GPS khi chạy: Tự đo quãng đường (km), thời gian, tốc độ (pace) và calo.'),
-                const SizedBox(height: 8),
-                _buildQuickFeatureRow(Icons.videocam_rounded, AppTheme.secondaryNeon, 'Xem & Tải video 3D: Xem lại đường chạy mô phỏng và tải video về điện thoại.'),
-                const SizedBox(height: 8),
-                _buildQuickFeatureRow(Icons.history_rounded, const Color(0xFFF59E0B), 'Lịch sử chạy bộ: Lưu lại đầy đủ các lần chạy kèm bản đồ chi tiết.'),
-                const SizedBox(height: 8),
-                _buildQuickFeatureRow(Icons.shield_rounded, const Color(0xFF10B981), 'Tự động lưu: Đang chạy mà lỡ tắt app hay hết pin thì mở lại vẫn còn nguyên.'),
-                const SizedBox(height: 8),
-                _buildQuickFeatureRow(Icons.volume_up_rounded, const Color(0xFF38BDF8), 'Giọng nói nhắc nhở: Tự đọc số km và tốc độ khi chạy.'),
-                const SizedBox(height: 14),
-
-                // Tác giả
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B).withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
-                    child: Text('Phát triển bởi: Liên Đài • 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Nút Đóng
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryNeon,
-                      foregroundColor: const Color(0xFF0F172A),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      elevation: 4,
-                    ),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('ĐÓNG', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
