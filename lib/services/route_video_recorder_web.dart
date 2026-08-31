@@ -26,7 +26,7 @@ class RealtimeVideoSession {
   });
 
   /// Đẩy khung hình raw GPU (RGBA) trực tiếp vào Canvas
-  void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
+  Future<void> pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) async {
     try {
       final imgData = ctx.createImageData(frameWidth, frameHeight);
       imgData.data.setRange(0, rawRgbaBytes.lengthInBytes, rawRgbaBytes);
