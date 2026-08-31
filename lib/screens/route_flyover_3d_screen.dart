@@ -878,164 +878,197 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                         ),
                 ),
 
-                // 2. TOP HUD: BẢNG CHỈ SỐ THỂ THAO + NÚT CHUYỂN GÓC NHÌN TOÀN CẢNH / FLYCAM
+                // 2. TOP HUD: THANH TIÊU ĐỀ THỂ THAO TINH TẾ & GỌN GÀNG (KHÔNG NHỒI NHÉT)
                 Positioned(
                   top: 12,
                   left: 16,
                   right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface.withValues(alpha: 0.94),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.divider, width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: AnimatedBuilder(
-                      animation: _controller,
-                      builder: (context, _) {
-                        final runProgress = (_controller.value / 0.78).clamp(0.0, 1.0);
-                        final currentDistance = (_effectiveDistanceKm * runProgress).toStringAsFixed(2);
-                        final elapsedSec = (_effectiveDurationSec * runProgress).toInt();
-                        final int minutes = elapsedSec ~/ 60;
-                        final int seconds = elapsedSec % 60;
-                        final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-                        final isFinished = _controller.value >= 0.78;
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, _) {
+                      final runProgress = (_controller.value / 0.78).clamp(0.0, 1.0);
+                      final currentDistance = (_effectiveDistanceKm * runProgress).toStringAsFixed(2);
+                      final elapsedSec = (_effectiveDurationSec * runProgress).toInt();
+                      final int minutes = elapsedSec ~/ 60;
+                      final int seconds = elapsedSec % 60;
+                      final elapsedFormatted = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+                      final isFinished = _controller.value >= 0.78;
 
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                      return Row(
+                        children: [
+                          // Nút Quay Lại
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface.withValues(alpha: 0.92),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppTheme.divider, width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
                               onPressed: _handleExit,
                             ),
-                            // Nút chuyển đổi góc nhìn Toàn Cảnh / Flycam
-                            InkWell(
-                              onTap: () {
-                                setState(() => _isFlycamMode = !_isFlycamMode);
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _isFlycamMode
-                                      ? AppTheme.primaryNeon.withValues(alpha: 0.18)
-                                      : AppTheme.secondaryNeon.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                                    width: 1,
+                          ),
+                          const SizedBox(width: 10),
+
+                          // Bảng Chỉ Số Chính
+                          Expanded(
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surface.withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(color: AppTheme.divider, width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 3),
                                   ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _isFlycamMode ? Icons.airplanemode_active_rounded : Icons.map_outlined,
-                                      size: 14,
-                                      color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _isFlycamMode ? 'FLYCAM' : 'TOÀN CẢNH',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                                        letterSpacing: 0.5,
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: isFinished ? const Color(0xFF10B981) : AppTheme.primaryNeon,
+                                        ),
                                       ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        '$currentDistance km',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(width: 1, height: 16, color: const Color(0xFF334155)),
+                                  Text(
+                                    '$_effectivePace /km',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.secondaryNeon,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  Container(width: 1, height: 16, color: const Color(0xFF334155)),
+                                  Text(
+                                    elapsedFormatted,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 7,
-                                      height: 7,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: isFinished ? const Color(0xFF10B981) : AppTheme.primaryNeon,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      isFinished ? 'HOÀN THÀNH' : 'ĐANG CHẠY',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w900,
-                                        color: isFinished ? const Color(0xFF10B981) : AppTheme.primaryNeon,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '$currentDistance km',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                  ),
+                          ),
+                          const SizedBox(width: 10),
+
+                          // Nút Tải Video
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface.withValues(alpha: 0.92),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppTheme.divider, width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text('PACE', style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '$_effectivePace /km',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppTheme.secondaryNeon),
-                                ),
-                              ],
-                            ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text('THỜI GIAN', style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  elapsedFormatted,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.download_rounded, color: AppTheme.secondaryNeon, size: 22),
+                            child: IconButton(
+                              icon: const Icon(Icons.download_rounded, color: AppTheme.secondaryNeon, size: 20),
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
                               onPressed: _handleDownloadVideo,
                             ),
-                          ],
-                        );
-                      },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+                // 3. FLOATING CAPSULE: NÚT CHUYỂN GÓC NHÌN TÁCH BIỆT NẰM GÓC PHẢI
+                Positioned(
+                  top: 66,
+                  right: 16,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() => _isFlycamMode = !_isFlycamMode);
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon).withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isFlycamMode ? Icons.airplanemode_active_rounded : Icons.map_outlined,
+                            size: 15,
+                            color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            _isFlycamMode ? 'FLYCAM 2.2x' : 'TOÀN CẢNH',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
 
-                // 3. THẺ TỔNG KẾT VINH DANH THÀNH TÍCH 3D (XUẤT HIỆN TỰ ĐỘNG KHI VỀ ĐÍCH - ACT 3)
+                // 4. THẺ TỔNG KẾT VINH DANH THÀNH TÍCH 3D (NẰM TRÊN THANH ĐIỀU KHIỂN - KHÔNG BỊ ĐÈ NHAU)
                 Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 110,
+                  left: 16,
+                  right: 16,
+                  bottom: 140, // Đặt ở vị trí cao hơn hẳn thanh điều khiển để không bị che khuất
                   child: AnimatedBuilder(
                     animation: _controller,
                     builder: (context, _) {
@@ -1048,9 +1081,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       return Opacity(
                         opacity: cardOpacity,
                         child: Transform.scale(
-                          scale: 0.85 + 0.15 * cardScale,
+                          scale: 0.90 + 0.10 * cardScale,
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
@@ -1060,7 +1093,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: const Color(0xFF10B981).withValues(alpha: 0.6),
                                 width: 1.5,
@@ -1068,8 +1101,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(0xFF10B981).withValues(alpha: 0.25 * cardOpacity),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 8),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 6),
                                 ),
                               ],
                             ),
@@ -1079,12 +1112,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD700), size: 20),
-                                    const SizedBox(width: 8),
+                                    const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD700), size: 18),
+                                    const SizedBox(width: 6),
                                     const Text(
                                       'HOÀN THÀNH XUẤT SẮC',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 12.5,
                                         fontWeight: FontWeight.w900,
                                         color: Color(0xFF10B981),
                                         letterSpacing: 1.0,
@@ -1092,9 +1125,9 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
                                 const Divider(height: 1, color: Color(0xFF334155)),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                                   children: [
@@ -1113,22 +1146,22 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   ),
                 ),
 
-                // 4. BOTTOM HUD: THANH ĐIỀU KHIỂN VIDEO
+                // 5. BOTTOM HUD: THANH ĐIỀU KHIỂN VIDEO GỌN GÀNG DƯỚI CÙNG
                 Positioned(
                   bottom: 24,
                   left: 16,
                   right: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppTheme.surface.withValues(alpha: 0.95),
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: AppTheme.divider, width: 1.2),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.5),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
+                          blurRadius: 18,
+                          offset: const Offset(0, 5),
                         ),
                       ],
                     ),
@@ -1165,7 +1198,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               onTap: _openSpeedSelectorModal,
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
                                   color: AppTheme.surfaceLight,
                                   borderRadius: BorderRadius.circular(12),
@@ -1179,7 +1212,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                     Text(
                                       _formatSpeed(_playbackSpeed),
                                       style: const TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 12.5,
                                         fontWeight: FontWeight.w900,
                                         color: Colors.white,
                                       ),
@@ -1192,15 +1225,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               onTap: _togglePlayPause,
                               borderRadius: BorderRadius.circular(30),
                               child: Container(
-                                width: 50,
-                                height: 50,
+                                width: 46,
+                                height: 46,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: AppTheme.primaryNeon,
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppTheme.primaryNeon.withValues(alpha: 0.4),
-                                      blurRadius: 14,
+                                      blurRadius: 12,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
@@ -1216,7 +1249,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                     return Icon(
                                       icon,
                                       color: const Color(0xFF0F172A),
-                                      size: 28,
+                                      size: 26,
                                     );
                                   },
                                 ),
@@ -1227,7 +1260,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                               builder: (context, _) {
                                 final percent = (_controller.value * 100).toInt();
                                 return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                                   child: Text(
                                     '$percent%',
                                     style: const TextStyle(
@@ -1260,7 +1293,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         Text(
           value,
           style: TextStyle(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w900,
             color: color,
           ),
@@ -1269,7 +1302,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         Text(
           label,
           style: const TextStyle(
-            fontSize: 9.5,
+            fontSize: 9,
             fontWeight: FontWeight.bold,
             color: AppTheme.textMuted,
           ),
