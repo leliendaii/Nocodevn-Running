@@ -23,8 +23,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   double _playbackSpeed = 1.0;
   bool _isPlaying = true;
   bool _isDisposed = false;
-  bool _isFlycamMode = false; // Mặc định: FALSE = Toàn Cảnh (Mượt 100% không rung lắc)
-  bool _isExportingVideo = false; // Bật khi đang quay video để xuất HUD thông số & đếm ngược Story Facebook
+  bool _isFlycamMode = true; // Mặc định: TRUE = Theo Dõi (Bám mượt theo người chạy)
+  bool _isExportingVideo = false; // Bật khi đang quay video để xuất HUD thông số Story Facebook
 
   late final double _effectiveDistanceKm;
   late final int _effectiveDurationSec;
@@ -56,7 +56,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  int _baseDurationMs = 20000; // Thời lượng chuẩn 20s (2s xem điểm đầu -> 11s chạy -> 2s zoom đích -> zoom toàn cảnh -> 5s ngắm trọn vẹn)
+  int _baseDurationMs = 13500; // Thời lượng chuẩn ~13.5s (1.5s zoom điểm đầu -> 9s chạy -> 1.5s zoom điểm cuối -> 1.5s zoom mở rộng toàn cảnh)
 
   @override
   void initState() {
@@ -77,7 +77,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveCalories = 165;
     }
 
-    _baseDurationMs = 20000;
+    _baseDurationMs = 13500;
 
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
     _smoothRoute = _buildConsistentRoute(widget.session);
@@ -885,10 +885,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                 builder: (context, _) {
                   final double t = _controller.value.clamp(0.0, 1.0);
                   double curProgress = 0.0;
-                  if (t < 0.10) {
+                  if (t < 0.12) {
                     curProgress = 0.0;
-                  } else if (t < 0.65) {
-                    curProgress = ((t - 0.10) / 0.55).clamp(0.0, 1.0);
+                  } else if (t < 0.80) {
+                    curProgress = ((t - 0.12) / 0.68).clamp(0.0, 1.0);
                   } else {
                     curProgress = 1.0;
                   }
@@ -991,7 +991,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                       ),
                     ),
 
-                    // Nút Chuyển Đổi [🗺️ TOÀN CẢNH] / [🚁 FLYCAM] Ở CHÍNH GIỮA CÂN ĐỐI
+                    // Nút Chuyển Đổi [🗺️ TOÀN CẢNH] / [🎯 THEO DÕI] Ở CHÍNH GIỮA CÂN ĐỐI
                     InkWell(
                       onTap: () {
                         setState(() => _isFlycamMode = !_isFlycamMode);
@@ -1017,13 +1017,13 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _isFlycamMode ? Icons.airplanemode_active_rounded : Icons.map_outlined,
+                              _isFlycamMode ? Icons.gps_fixed_rounded : Icons.map_outlined,
                               size: 16,
                               color: _isFlycamMode ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _isFlycamMode ? 'CHẾ ĐỘ FLYCAM' : 'CHẾ ĐỘ TOÀN CẢNH',
+                              _isFlycamMode ? 'THEO DÕI' : 'TOÀN CẢNH',
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w900,
@@ -1076,10 +1076,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   builder: (context, _) {
                     final double t = _controller.value.clamp(0.0, 1.0);
                     double curProgress = 0.0;
-                    if (t < 0.10) {
+                    if (t < 0.12) {
                       curProgress = 0.0;
-                    } else if (t < 0.65) {
-                      curProgress = ((t - 0.10) / 0.55).clamp(0.0, 1.0);
+                    } else if (t < 0.80) {
+                      curProgress = ((t - 0.12) / 0.68).clamp(0.0, 1.0);
                     } else {
                       curProgress = 1.0;
                     }
@@ -1402,25 +1402,24 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double finishScale = (overviewScale * 1.65).clamp(0.45, 2.40); // Zoom cận cảnh điểm KẾT THÚC
 
     // 2. TIMELINE ĐIỆN ẢNH CHUYÊN NGHIỆP:
-    // - Phase 1 [0.00 - 0.10] (~2s): Zoom cận cảnh vị trí BẮT ĐẦU để user nhìn rõ điểm xuất phát
-    // - Phase 2 [0.10 - 0.65] (~11s): Chạy lộ trình mượt mà từ 0% đến 100%
-    // - Phase 3 [0.65 - 0.75] (~2s): Zoom cận cảnh vị trí KẾT THÚC
-    // - Phase 4 [0.75 - 0.82] (~1.4s): Thu nhỏ mở rộng bản đồ ra lại TOÀN CẢNH
-    // - Phase 5 [0.82 - 1.00] (~4-5s): Giữ nguyên TOÀN CẢNH để chiêm ngưỡng toàn bộ cung đường & thông số
+    // - Phase 1 [0.00 - 0.12] (~1.5s): Zoom cận cảnh vị trí BẮT ĐẦU để user nhìn rõ điểm xuất phát
+    // - Phase 2 [0.12 - 0.80] (~9.0s): Chạy lộ trình mượt mà từ 0% đến 100%
+    // - Phase 3 [0.80 - 0.90] (~1.5s): Giữ zoom cận cảnh vị trí KẾT THÚC
+    // - Phase 4 [0.90 - 1.00] (~1.5s): Thu nhỏ mở rộng bản đồ ra lại TOÀN CẢNH
     double camX;
     double camY;
     double camScale;
     double flightProgress;
 
-    if (progress < 0.10) {
-      // 1. Giai đoạn BẮT ĐẦU: Giữ zoom cận cảnh điểm xuất phát (2s)
+    if (progress < 0.12) {
+      // 1. Giai đoạn BẮT ĐẦU: Giữ zoom cận cảnh điểm xuất phát (1.5s)
       flightProgress = 0.0;
       camX = startPinPixel.dx;
       camY = startPinPixel.dy;
       camScale = startScale;
-    } else if (progress < 0.65) {
+    } else if (progress < 0.80) {
       // 2. Giai đoạn CHẠY: Tiến độ lộ trình từ 0.0 đến 1.0
-      flightProgress = ((progress - 0.10) / 0.55).clamp(0.0, 1.0);
+      flightProgress = ((progress - 0.12) / 0.68).clamp(0.0, 1.0);
 
       final double fIndex = (sampledPositions.length - 1) * flightProgress;
       final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
@@ -1439,10 +1438,10 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camY = ui.lerpDouble(startPinPixel.dy, routeCenterY, introTransit)!;
         camScale = ui.lerpDouble(startScale, overviewScale, introTransit)!;
       }
-    } else if (progress < 0.75) {
-      // 3. Giai đoạn ĐÍCH: Zoom cận cảnh điểm KẾT THÚC (2s)
+    } else if (progress < 0.90) {
+      // 3. Giai đoạn ĐÍCH: Giữ zoom cận cảnh điểm KẾT THÚC (1.5s)
       flightProgress = 1.0;
-      final double tFinish = Curves.easeInOutCubic.transform(((progress - 0.65) / 0.10).clamp(0.0, 1.0));
+      final double tFinish = Curves.easeInOutCubic.transform(((progress - 0.80) / 0.10).clamp(0.0, 1.0));
       final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
       final double fromScale = isFlycamMode ? chaseScale : overviewScale;
       final double fromX = isFlycamMode ? lastCam.dx : routeCenterX;
@@ -1451,20 +1450,14 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camX = ui.lerpDouble(fromX, finishPinPixel.dx, tFinish)!;
       camY = ui.lerpDouble(fromY, finishPinPixel.dy, tFinish)!;
       camScale = ui.lerpDouble(fromScale, finishScale, tFinish)!;
-    } else if (progress < 0.82) {
-      // 4. Giai đoạn THU NHỎ: Thu nhỏ bản đồ về lại TOÀN CẢNH
+    } else {
+      // 4. Giai đoạn THU NHỎ: Thu nhỏ bản đồ về lại TOÀN CẢNH (1.5s)
       flightProgress = 1.0;
-      final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.75) / 0.07).clamp(0.0, 1.0));
+      final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.90) / 0.10).clamp(0.0, 1.0));
 
       camX = ui.lerpDouble(finishPinPixel.dx, routeCenterX, tOverview)!;
       camY = ui.lerpDouble(finishPinPixel.dy, routeCenterY, tOverview)!;
       camScale = ui.lerpDouble(finishScale, overviewScale, tOverview)!;
-    } else {
-      // 5. Giai đoạn GIỮ 5 GIÂY: Giữ cố định TOÀN CẢNH để xem trọn vẹn lộ trình và thông số
-      flightProgress = 1.0;
-      camX = routeCenterX;
-      camY = routeCenterY;
-      camScale = overviewScale;
     }
 
     final double currentDist = totalLength * flightProgress;
@@ -1476,7 +1469,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
-    final double outroT = ((progress - 0.75) / 0.25).clamp(0.0, 1.0);
+    final double outroT = ((progress - 0.80) / 0.20).clamp(0.0, 1.0);
 
     // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM
     final double strokeBase = (3.6 / camScale).clamp(2.4, 5.0);
