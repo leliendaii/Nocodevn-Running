@@ -49,6 +49,7 @@ dependencies:
   image: ^4.9.2
   http: ^1.2.2
   flutter_quick_video_encoder: ^1.7.2
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:

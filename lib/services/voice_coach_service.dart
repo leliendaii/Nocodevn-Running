@@ -17,6 +17,7 @@ class VoiceCoachService {
       final prefs = await SharedPreferences.getInstance();
       _isEnabled = prefs.getBool(_prefKey) ?? true;
       _isInitialized = true;
+      await initSpeechNative();
     } catch (_) {
       _isEnabled = true;
     }

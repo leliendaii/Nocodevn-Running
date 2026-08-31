@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 dynamic _audioContext;
 html.AudioElement? _currentAudio;
 
+Future<void> initSpeechNative() async {}
+
 /// Phát âm thanh hiệu ứng thể thao năng động (Beep / Fanfare)
 void playAthleticBeep({double freq = 880.0, double durationSec = 0.15}) {
   try {

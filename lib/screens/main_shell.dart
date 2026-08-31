@@ -14,6 +14,7 @@ import 'history_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'auto_end_schedule_screen.dart';
 import 'account_info_screen.dart';
+import '../services/voice_coach_service.dart';
 import '../widgets/top_sync_toast.dart';
 
 class MainShell extends StatefulWidget {
@@ -32,6 +33,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    VoiceCoachService.initialize();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshAllAppData();
     });
