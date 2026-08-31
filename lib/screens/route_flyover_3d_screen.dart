@@ -1371,11 +1371,12 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final Offset smoothedCam = Offset.lerp(smoothedCamPositions[baseIdx], smoothedCamPositions[nextIdx], subFrac)!;
     final double runnerHeading = ui.lerpDouble(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac)!;
 
-    // 2. CAMERA STRAVA 3D FLYOVERS ĐẲNG CẤP (HYBRID TOÀN CẢNH / FLYCAM):
-    final double targetScaleX = (size.width * 0.50) / (spanW > 40 ? spanW : 160);
-    final double targetScaleY = (size.height * 0.36) / (spanH > 40 ? spanH : 160);
+    // 2. CAMERA STRAVA 3D FLYOVERS ĐẲNG CẤP (PHÂN BIỆT RÕ RÀNG 2 GÓC NHÌN):
+    final double targetScaleX = (size.width * 0.48) / (spanW > 40 ? spanW : 160);
+    final double targetScaleY = (size.height * 0.35) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.12, 1.05);
-    final double chaseScale = (overviewScale * 1.20).clamp(0.18, 1.25);
+    // Chế độ Flycam phóng to cận cảnh 220% để bám sát theo bước chân người chạy
+    final double chaseScale = (overviewScale * 2.2).clamp(0.35, 2.4);
 
     final double outroRaw = ((progress - 0.78) / 0.22).clamp(0.0, 1.0);
     final double outroT = Curves.easeInOutCubic.transform(outroRaw);
@@ -1385,15 +1386,15 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     double camScale;
 
     if (isFlycamMode) {
-      // Chế độ Flycam: Lướt theo người chạy
+      // 🚁 CHẾ ĐỘ FLYCAM: Phóng to cận cảnh 2.2x và bay bám sát theo người chạy theo thời gian thực
       camX = ui.lerpDouble(smoothedCam.dx, routeCenterX, outroT)!;
       camY = ui.lerpDouble(smoothedCam.dy, routeCenterY, outroT)!;
-      camScale = ui.lerpDouble(chaseScale, overviewScale * 0.88, outroT)!;
+      camScale = ui.lerpDouble(chaseScale, overviewScale * 0.90, outroT)!;
     } else {
-      // Chế độ Toàn Cảnh: Khóa tâm 100% tại trung tâm tuyến đường, mượt tuyệt đối không rung lắc
+      // 🗺️ CHẾ ĐỘ TOÀN CẢNH: Khóa chết tâm 100% ở góc nhìn xa bao quát cả khu phố, mượt mà tuyệt đối 0% rung lắc
       camX = routeCenterX;
       camY = routeCenterY;
-      camScale = ui.lerpDouble(overviewScale, overviewScale * 0.88, outroT)!;
+      camScale = ui.lerpDouble(overviewScale, overviewScale * 0.90, outroT)!;
     }
 
     // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM (Thanh mảnh, sắc nét, không bị thô dày)
