@@ -76,7 +76,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveCalories = 165;
     }
 
-    _baseDurationMs = 14000;
+    _baseDurationMs = 16000;
 
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
     _smoothRoute = _buildConsistentRoute(widget.session);
@@ -814,10 +814,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
     // 2. Tính toán các chỉ số thành tích thời gian thực
     double curProgress = 0.0;
-    if (t < 0.15) {
+    if (t < 0.10) {
       curProgress = 0.0;
-    } else if (t < 0.75) {
-      curProgress = ((t - 0.15) / 0.60).clamp(0.0, 1.0);
+    } else if (t < 0.58) {
+      curProgress = ((t - 0.10) / 0.48).clamp(0.0, 1.0);
     } else {
       curProgress = 1.0;
     }
@@ -830,10 +830,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final int curCalories = (_effectiveCalories * curProgress).round();
     final bool isFinished = curProgress >= 0.99;
 
-    // 3. Vẽ huy hiệu Watermark VIP góc trên
-    _drawStoryTopHeader(canvas, Size(width, height));
-
-    // 4. Vẽ Thẻ thống số nổi bật ở vùng an toàn đáy Story
+    // 3. Vẽ Thẻ thống số nổi bật ở vùng an toàn đáy Story (Không vẽ watermark Nocodevn Running theo yêu cầu)
     _drawStoryStatsCard(
       canvas: canvas,
       size: Size(width, height),
@@ -1246,10 +1243,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   builder: (context, _) {
                     final double t = _controller.value.clamp(0.0, 1.0);
                     double curProgress = 0.0;
-                    if (t < 0.15) {
+                    if (t < 0.10) {
                       curProgress = 0.0;
-                    } else if (t < 0.75) {
-                      curProgress = ((t - 0.15) / 0.60).clamp(0.0, 1.0);
+                    } else if (t < 0.58) {
+                      curProgress = ((t - 0.10) / 0.48).clamp(0.0, 1.0);
                     } else {
                       curProgress = 1.0;
                     }
@@ -1570,25 +1567,26 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double chaseScale = (overviewScale * 1.35).clamp(0.35, 1.85); // Zoom Flycam vừa vặn
     final double startScale = (overviewScale * 1.65).clamp(0.45, 2.40); // Zoom cận cảnh điểm BẮT ĐẦU
 
-    // 2. TIMELINE ĐIỆN ẢNH CHUYÊN NGHIỆP:
-    // - Phase 1 [0.00 - 0.15] (~2.0s): Zoom cận cảnh vị trí BẮT ĐẦU để user nhìn rõ điểm xuất phát
-    // - Phase 2 [0.15 - 0.75] (~8.5s): Chạy lộ trình mượt mà từ 0% đến 100%
-    // - Phase 3 [0.75 - 0.88] (~2.0s): Dừng tại điểm KẾT THÚC (KHÔNG zoom to), giữ nguyên 2s
-    // - Phase 4 [0.88 - 1.00] (~1.5s): Thu nhỏ mở rộng bản đồ ra lại TOÀN CẢNH
+    // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
+    // - Phase 1 [0.00 - 0.10] (~1.5s): Zoom cận cảnh vị trí BẮT ĐẦU
+    // - Phase 2 [0.10 - 0.58] (~7.7s): Chạy lộ trình mượt mà từ 0% đến 100%
+    // - Phase 3 [0.58 - 0.65] (~1.0s): Dừng tại điểm KẾT THÚC đúng 1 giây (giữ nguyên góc camera đích)
+    // - Phase 4 [0.65 - 0.74] (~1.5s): Thu nhỏ mở rộng bản đồ ra lại TOÀN CẢNH
+    // - Phase 5 [0.74 - 1.00] (~5.0s): Đợi 5 giây ở TOÀN CẢNH để thấy trọn vẹn thông số & cung đường
     double camX;
     double camY;
     double camScale;
     double flightProgress;
 
-    if (progress < 0.15) {
-      // 1. Giai đoạn BẮT ĐẦU: Giữ zoom cận cảnh điểm xuất phát (2s)
+    if (progress < 0.10) {
+      // 1. Giai đoạn BẮT ĐẦU: Giữ zoom cận cảnh điểm xuất phát (1.5s)
       flightProgress = 0.0;
       camX = startPinPixel.dx;
       camY = startPinPixel.dy;
       camScale = startScale;
-    } else if (progress < 0.75) {
+    } else if (progress < 0.58) {
       // 2. Giai đoạn CHẠY: Tiến độ lộ trình từ 0.0 đến 1.0
-      flightProgress = ((progress - 0.15) / 0.60).clamp(0.0, 1.0);
+      flightProgress = ((progress - 0.10) / 0.48).clamp(0.0, 1.0);
 
       final double fIndex = (sampledPositions.length - 1) * flightProgress;
       final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
@@ -1607,17 +1605,17 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camY = ui.lerpDouble(startPinPixel.dy, routeCenterY, introTransit)!;
         camScale = ui.lerpDouble(startScale, overviewScale, introTransit)!;
       }
-    } else if (progress < 0.88) {
-      // 3. Giai đoạn ĐÍCH: Dừng tại điểm KẾT THÚC (KHÔNG zoom to lên), giữ 2s
+    } else if (progress < 0.65) {
+      // 3. Giai đoạn ĐÍCH: Dừng tại điểm KẾT THÚC đúng 1 giây (KHÔNG zoom to lên)
       flightProgress = 1.0;
       final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
       camX = isFlycamMode ? lastCam.dx : routeCenterX;
       camY = isFlycamMode ? lastCam.dy : routeCenterY;
       camScale = isFlycamMode ? chaseScale : overviewScale;
-    } else {
+    } else if (progress < 0.74) {
       // 4. Giai đoạn THU NHỎ: Thu nhỏ bản đồ về lại TOÀN CẢNH
       flightProgress = 1.0;
-      final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.88) / 0.12).clamp(0.0, 1.0));
+      final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.65) / 0.09).clamp(0.0, 1.0));
       final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
       final double fromX = isFlycamMode ? lastCam.dx : routeCenterX;
       final double fromY = isFlycamMode ? lastCam.dy : routeCenterY;
@@ -1626,6 +1624,12 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camX = ui.lerpDouble(fromX, routeCenterX, tOverview)!;
       camY = ui.lerpDouble(fromY, routeCenterY, tOverview)!;
       camScale = ui.lerpDouble(fromScale, overviewScale, tOverview)!;
+    } else {
+      // 5. Giai đoạn ĐỢI 5 GIÂY TOÀN CẢNH: Giữ nguyên toàn cảnh và các thông số hiển thị trọn vẹn
+      flightProgress = 1.0;
+      camX = routeCenterX;
+      camY = routeCenterY;
+      camScale = overviewScale;
     }
 
     final double currentDist = totalLength * flightProgress;

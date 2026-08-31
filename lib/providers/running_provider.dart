@@ -72,11 +72,9 @@ class RunningProvider with ChangeNotifier {
     _loadInitialSessions();
     _loadUserProfiles();
 
-    // Heartbeat Timer: Tự động quét kiểm tra nhắc nhở siêu nhẹ (30 giây/lần, 0% CPU, 0 tốn pin)
-    Timer.periodic(const Duration(seconds: 30), (_) {
-      if (_activeUserId != null) {
-        checkDailyReminder(_activeUserId!);
-      }
+    // Heartbeat Timer: Tự động quét kiểm tra nhắc nhở siêu nhẹ (15 giây/lần, 0% CPU, 0 tốn pin)
+    Timer.periodic(const Duration(seconds: 15), (_) {
+      checkDailyReminder(_activeUserId ?? 'default_user');
     });
   }
 
@@ -92,9 +90,7 @@ class RunningProvider with ChangeNotifier {
         }
       }
       notifyListeners();
-      if (_activeUserId != null) {
-        checkDailyReminder(_activeUserId!);
-      }
+      checkDailyReminder(_activeUserId ?? 'default_user');
     }
   }
 
@@ -104,7 +100,7 @@ class RunningProvider with ChangeNotifier {
       final results = await Future.wait([
         SupabaseService.fetchRunSessions(),
         SupabaseService.fetchAllProfiles(),
-      ]);
+      ]).timeout(const Duration(seconds: 3), onTimeout: () => [null, null]);
 
       final cloudSessions = results[0] as List<RunSession>?;
       final cloudProfiles = results[1] as List<Map<String, dynamic>>?;

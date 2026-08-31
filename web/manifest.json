@@ -1,6 +1,6 @@
 {
-    "name": "Nocodevn Running",
-    "short_name": "Nocodevn Running",
+    "name": "Chạy bộ",
+    "short_name": "Chạy bộ",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0D0E15",

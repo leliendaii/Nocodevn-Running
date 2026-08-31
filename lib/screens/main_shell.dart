@@ -16,6 +16,7 @@ import 'auto_end_schedule_screen.dart';
 import 'account_info_screen.dart';
 import '../services/voice_coach_service.dart';
 import '../widgets/top_sync_toast.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -820,7 +821,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       icon: Icons.info_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
                       title: 'Về Ứng Dụng & Hỗ Trợ',
-                      subtitle: 'Running Tracker v1.2.0 • Hướng dẫn & Bản quyền',
+                      subtitle: 'Nocodevn Running v1.2.0 • Hướng dẫn & Bản quyền',
                       onTap: () => _showAppAboutDialog(context),
                     ),
                   ],
@@ -1397,7 +1398,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
                           Text(
-                            'RUNNING TRACKER',
+                            'NOCODEVN RUNNING',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
@@ -1433,18 +1434,50 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   _buildQuickFeatureRow(Icons.shield_rounded, const Color(0xFF10B981), 'Tự động lưu: Đang chạy mà lỡ tắt app hay hết pin thì mở lại vẫn còn nguyên.'),
                   const SizedBox(height: 7),
                   _buildQuickFeatureRow(Icons.volume_up_rounded, const Color(0xFF38BDF8), 'Giọng nói nhắc nhở: Tự đọc số km và tốc độ khi chạy.'),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // Tác giả
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+                  // Tác giả & Link Zalo
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () async {
+                        try {
+                          final uri = Uri.parse('https://zalo.me/0328376198');
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (e) {
+                          debugPrint('Lỗi mở Zalo: $e');
+                        }
+                      },
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text('Phát triển bởi: Liên Đài • 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF0088FF).withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF0088FF),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.chat_bubble_rounded, size: 12, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Phát triển bởi: Lê Liên Đài',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Colors.white),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.open_in_new_rounded, size: 13, color: Color(0xFF38BDF8)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

@@ -438,7 +438,8 @@ class SupabaseService {
             .from('run_sessions')
             .select()
             .order('start_time', ascending: false)
-            .timeout(const Duration(seconds: 4));
+            .limit(300)
+            .timeout(const Duration(seconds: 3));
         data = res;
       } catch (e) {
         debugPrint('Tải dữ liệu Supabase SDK: $e, fallback REST direct');
@@ -448,7 +449,7 @@ class SupabaseService {
     // Direct REST Fallback
     if (data == null) {
       try {
-        final url = Uri.parse('$supabaseUrl/rest/v1/run_sessions?select=*&order=start_time.desc');
+        final url = Uri.parse('$supabaseUrl/rest/v1/run_sessions?select=*&order=start_time.desc&limit=300');
         final resp = await http.get(
           url,
           headers: {
@@ -456,7 +457,7 @@ class SupabaseService {
             'Authorization': 'Bearer $supabaseAnonKey',
             'Content-Type': 'application/json',
           },
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 3));
         if (resp.statusCode == 200) {
           final decoded = jsonDecode(resp.body);
           if (decoded is List) {

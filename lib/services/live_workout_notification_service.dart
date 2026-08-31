@@ -23,7 +23,7 @@ class LiveWorkoutNotificationService {
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
-        requestSoundPermission: false,
+        requestSoundPermission: true,
       );
 
       const initSettings = InitializationSettings(
@@ -48,13 +48,14 @@ class LiveWorkoutNotificationService {
             showBadge: false,
           ),
         );
+        await androidImplementation.requestNotificationsPermission();
       }
 
       // Yêu cầu quyền thông báo trên iOS / Android 13+
       if (!kIsWeb) {
         await _notifications
             .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-            ?.requestPermissions(alert: true, badge: true, sound: false);
+            ?.requestPermissions(alert: true, badge: true, sound: true);
       }
 
       _isInitialized = true;

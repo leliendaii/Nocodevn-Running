@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
     <application
-        android:label="Nocodevn Running"
+        android:label="Chạy bộ"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity
