@@ -6,11 +6,12 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 /// Dịch vụ Cache Map Tiles Đa Tầng (RAM Memory Cache + Persistent Disk Cache)
-/// Tối ưu hóa siêu tốc: Tải song song đa luồng, tái sử dụng kết nối HTTP, giải mã GPU phần cứng tức thì!
+/// Hỗ trợ 2 chế độ chính: [🗺️ ĐỊA HÌNH] và [🛰️ VỆ TINH] chuẩn Google Maps + Esri 4K
 class MapTileCacheService {
   static final Map<String, ui.Image> _memoryCache = {};
   static final Set<String> _pendingFetches = {};
   static final http.Client _client = http.Client();
+  static final ValueNotifier<int> tileNotifier = ValueNotifier<int>(0);
   static Directory? _diskCacheDir;
   static bool _isDiskDirInitialized = false;
 
@@ -35,25 +36,10 @@ class MapTileCacheService {
     _isDiskDirInitialized = true;
   }
 
-  /// Chuyển đổi mã loại bản đồ sang tham số Google Maps Server
-  /// - roadmap -> lyrs=m (Đường phố)
-  /// - terrain -> lyrs=p (Địa hình đồi núi 3D)
-  /// - satellite -> lyrs=y (Ảnh vệ tinh hybrid có tên đường)
-  static String _getGoogleLayerCode(String mapType) {
-    switch (mapType) {
-      case 'terrain':
-        return 'p';
-      case 'satellite':
-        return 'y';
-      case 'roadmap':
-      default:
-        return 'm';
-    }
-  }
-
-  /// Tải Map Tile với cơ chế 3 tầng: RAM ➔ Ổ đĩa Disk ➔ Mạng Network (Tối ưu kết nối tái sử dụng)
-  static Future<ui.Image?> getTile(int z, int x, int y, {String mapType = 'roadmap'}) async {
-    final key = '$mapType/$z/$x/$y';
+  /// Tải Map Tile với cơ chế 3 tầng: RAM ➔ Ổ đĩa Disk ➔ Mạng Network (Google Maps + Esri Fallback)
+  static Future<ui.Image?> getTile(int z, int x, int y, {String mapType = 'terrain'}) async {
+    final normalizedType = (mapType == 'satellite') ? 'satellite' : 'terrain';
+    final key = '$normalizedType/$z/$x/$y';
 
     // 1. Kiểm tra RAM Cache (0ms - Phản hồi tức thì)
     if (_memoryCache.containsKey(key)) {
@@ -68,38 +54,58 @@ class MapTileCacheService {
 
       // 2. Kiểm tra Disk Cache trên thiết bị (< 2ms)
       if (!kIsWeb && _diskCacheDir != null) {
-        final diskFile = File('${_diskCacheDir!.path}/tile_${mapType}_${z}_${x}_$y.png');
+        final diskFile = File('${_diskCacheDir!.path}/tile_${normalizedType}_${z}_${x}_$y.png');
         if (await diskFile.exists()) {
           final bytes = await diskFile.readAsBytes();
           final image = await _decodeImageFromBytes(bytes);
           if (image != null) {
             _memoryCache[key] = image;
             _pendingFetches.remove(key);
+            tileNotifier.value++;
             return image;
           }
         }
       }
 
-      // 3. Tải qua mạng Google Maps Server với kết nối đa luồng HTTP tái sử dụng
+      // 3. Danh sách URL tải theo thứ tự ưu tiên (Google Maps ➔ Esri Satellite Fallback)
       final int serverId = (x.abs() + y.abs()) % 4;
-      final String layerCode = _getGoogleLayerCode(mapType);
-      final url = 'https://mt$serverId.google.com/vt/lyrs=$layerCode&hl=vi&x=$x&y=$y&z=$z&scale=2';
+      final List<String> candidateUrls = [];
 
-      final response = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-        final bytes = response.bodyBytes;
+      if (normalizedType == 'satellite') {
+        // Vệ tinh: Google Hybrid (ảnh vệ tinh kèm tên đường) ➔ Esri World Imagery
+        candidateUrls.add('https://mt$serverId.google.com/vt/lyrs=y&hl=vi&x=$x&y=$y&z=$z');
+        candidateUrls.add('https://mt$serverId.google.com/vt/lyrs=s,h&hl=vi&x=$x&y=$y&z=$z');
+        candidateUrls.add('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$z/$y/$x');
+      } else {
+        // Địa hình / Đường phố: Google Maps Vector HD
+        candidateUrls.add('https://mt$serverId.google.com/vt/lyrs=m&hl=vi&x=$x&y=$y&z=$z');
+        candidateUrls.add('https://mt$serverId.google.com/vt/lyrs=p&hl=vi&x=$x&y=$y&z=$z');
+      }
 
+      Uint8List? downloadedBytes;
+      for (final url in candidateUrls) {
+        try {
+          final response = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 4));
+          if (response.statusCode == 200 && response.bodyBytes.length > 200) {
+            downloadedBytes = response.bodyBytes;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (downloadedBytes != null) {
         // Lưu ngầm vào Disk Cache không chặn UI
         if (!kIsWeb && _diskCacheDir != null) {
-          final diskFile = File('${_diskCacheDir!.path}/tile_${mapType}_${z}_${x}_$y.png');
-          diskFile.writeAsBytes(bytes).catchError((_) => diskFile);
+          final diskFile = File('${_diskCacheDir!.path}/tile_${normalizedType}_${z}_${x}_$y.png');
+          diskFile.writeAsBytes(downloadedBytes).catchError((_) => diskFile);
         }
 
         // Decode nhanh bằng phần cứng GPU
-        final image = await _decodeImageFromBytes(bytes);
+        final image = await _decodeImageFromBytes(downloadedBytes);
         if (image != null) {
           _memoryCache[key] = image;
           _pendingFetches.remove(key);
+          tileNotifier.value++;
           return image;
         }
       }
@@ -130,17 +136,19 @@ class MapTileCacheService {
     required int maxX,
     required int minY,
     required int maxY,
-    String mapType = 'roadmap',
+    String mapType = 'terrain',
     VoidCallback? onTileLoaded,
   }) async {
     final double centerX = (minX + maxX) / 2;
     final double centerY = (minY + maxY) / 2;
 
+    final normalizedType = (mapType == 'satellite') ? 'satellite' : 'terrain';
+
     // 1. Tạo danh sách tọa độ tile
     final List<PointTile> tilesToLoad = [];
     for (int x = minX; x <= maxX; x++) {
       for (int y = minY; y <= maxY; y++) {
-        final key = '$mapType/$zoom/$x/$y';
+        final key = '$normalizedType/$zoom/$x/$y';
         if (!_memoryCache.containsKey(key)) {
           final distSq = (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY);
           tilesToLoad.add(PointTile(x, y, distSq));
@@ -151,13 +159,13 @@ class MapTileCacheService {
     // 2. Sắp xếp ưu tiên các tile ở trung tâm đường chạy tải TRƯỚC TIÊN
     tilesToLoad.sort((a, b) => a.distanceSq.compareTo(b.distanceSq));
 
-    // 3. Tải song song theo từng đợt (Batch of 12) để không làm nghẽn băng thông
-    const int batchSize = 12;
+    // 3. Tải song song theo từng đợt (Batch of 10)
+    const int batchSize = 10;
     for (int i = 0; i < tilesToLoad.length; i += batchSize) {
       final end = (i + batchSize < tilesToLoad.length) ? i + batchSize : tilesToLoad.length;
       final batch = tilesToLoad.sublist(i, end);
 
-      await Future.wait(batch.map((t) => getTile(zoom, t.x, t.y, mapType: mapType).then((img) {
+      await Future.wait(batch.map((t) => getTile(zoom, t.x, t.y, mapType: normalizedType).then((img) {
         if (img != null) {
           onTileLoaded?.call();
         }
