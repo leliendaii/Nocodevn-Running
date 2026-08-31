@@ -12,60 +12,75 @@ class VideoSaveResult {
   const VideoSaveResult({required this.isSuccess, required this.message});
 }
 
-class RawFrameData {
-  final Uint8List bytes;
+class RealtimeVideoSession {
   final int width;
   final int height;
-  RawFrameData(this.bytes, this.width, this.height);
-}
-
-class RealtimeVideoSession {
-  final List<RawFrameData> _frames = [];
+  final int fps;
   String? _savedFilePath;
+  bool _isSetup = false;
+  bool _isFinished = false;
 
-  void pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) {
-    if (_frames.length < 800) {
-      _frames.add(RawFrameData(rawRgbaBytes, frameWidth, frameHeight));
-    }
-  }
+  RealtimeVideoSession({
+    required this.width,
+    required this.height,
+    required this.fps,
+  });
 
-  /// Xuất video MP4 chuẩn phần cứng H.264 (AVFoundation trên iOS / MediaCodec trên Android)
-  Future<bool> finishRecording() async {
+  Future<void> _ensureSetup() async {
+    if (_isSetup) return;
     try {
-      if (_frames.isEmpty) return false;
-
       final tempDir = await getTemporaryDirectory();
       final outputPath = '${tempDir.path}/flyover_3d_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      _savedFilePath = outputPath;
 
-      final firstFrame = _frames.first;
-      // Đảm bảo kích thước chia hết cho 2 theo chuẩn H.264
-      final int width = (firstFrame.width ~/ 2) * 2;
-      final int height = (firstFrame.height ~/ 2) * 2;
+      final int w = (width ~/ 2) * 2;
+      final int h = (height ~/ 2) * 2;
 
       await FlutterQuickVideoEncoder.setup(
-        width: width,
-        height: height,
-        fps: 25,
-        videoBitrate: 8000000,
+        width: w,
+        height: h,
+        fps: fps,
+        videoBitrate: 6000000,
         profileLevel: ProfileLevel.any,
         audioChannels: 0,
         audioBitrate: 0,
         sampleRate: 44100,
         filepath: outputPath,
       );
+      _isSetup = true;
+    } catch (e) {
+      debugPrint('Lỗi setup FlutterQuickVideoEncoder: $e');
+    }
+  }
 
-      for (final frame in _frames) {
-        await FlutterQuickVideoEncoder.appendVideoFrame(frame.bytes);
+  /// Đẩy trực tiếp khung hình vào bộ mã hóa phần cứng (H.264), không lưu vào RAM tránh tràn bộ nhớ
+  Future<void> pushRawFrame(Uint8List rawRgbaBytes, int frameWidth, int frameHeight) async {
+    if (_isFinished) return;
+    try {
+      if (!_isSetup) {
+        await _ensureSetup();
       }
-
-      await FlutterQuickVideoEncoder.finish();
-
-      if (await File(outputPath).exists()) {
-        _savedFilePath = outputPath;
-        return true;
+      if (_isSetup) {
+        await FlutterQuickVideoEncoder.appendVideoFrame(rawRgbaBytes);
       }
     } catch (e) {
-      debugPrint('Lỗi xuất video phần cứng MP4: $e');
+      debugPrint('Lỗi appendVideoFrame: $e');
+    }
+  }
+
+  /// Xuất video MP4 chuẩn phần cứng H.264 (AVFoundation trên iOS / MediaCodec trên Android)
+  Future<bool> finishRecording() async {
+    if (_isFinished) return true;
+    _isFinished = true;
+    try {
+      if (_isSetup) {
+        await FlutterQuickVideoEncoder.finish();
+        if (_savedFilePath != null && await File(_savedFilePath!).exists()) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi hoàn tất video phần cứng MP4: $e');
     }
     return false;
   }
@@ -161,7 +176,11 @@ class RealtimeVideoSession {
 RealtimeVideoSession startRealtimeVideoSession({
   required int width,
   required int height,
-  double fps = 60.0,
+  double fps = 25.0,
 }) {
-  return RealtimeVideoSession();
+  return RealtimeVideoSession(
+    width: width,
+    height: height,
+    fps: fps.toInt(),
+  );
 }

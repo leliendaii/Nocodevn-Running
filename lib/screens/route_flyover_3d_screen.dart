@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/run_session.dart';
@@ -564,9 +565,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                   final double effectiveDurationSec = (_baseDurationMs / 1000.0) / _playbackSpeed;
                   final int totalSteps = (effectiveDurationSec * 25.0).round().clamp(60, 450);
 
-                  // KÍCH THƯỚC CHUẨN 100% FACEBOOK STORY / INSTAGRAM / TIKTOK: 1080 x 1920 (TỶ LỆ 9:16)
-                  const double exportWidth = 1080.0;
-                  const double exportHeight = 1920.0;
+                  // KÍCH THƯỚC CHUẨN 100% FACEBOOK STORY / INSTAGRAM / TIKTOK: 720 x 1280 (TỶ LỆ 9:16)
+                  // Tối ưu phần cứng siêu mượt, không tốn RAM, không bao giờ bị tràn bộ nhớ hay thoát app
+                  const double exportWidth = 720.0;
+                  const double exportHeight = 1280.0;
 
                   final session = RouteVideoRecorder.startSession(
                     width: exportWidth.toInt(),
@@ -582,32 +584,33 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
                     setDialogState(() {
                       progress = (step / (totalSteps + 125)) * 0.95;
-                      status = 'Đang quay video 1080p Story ${_isFlycamMode ? "Theo dõi" : "Toàn cảnh"} ${(_playbackSpeed).toStringAsFixed(1)}x (${(progress * 100).toInt()}%)...';
+                      status = 'Đang xuất video Story ${_isFlycamMode ? "Theo dõi" : "Toàn cảnh"} ${(_playbackSpeed).toStringAsFixed(1)}x (${(progress * 100).toInt()}%)...';
                     });
 
-                    // Render khung hình 3D + Thẻ thông số trực tiếp vào Canvas 1080x1920 siêu nét
-                    final img = await _renderStoryFrameImage(
+                    // Render khung hình 3D + Thẻ thông số trực tiếp vào Canvas 9:16 và giải phóng GPU texture tức thì
+                    final frameBytes = await _renderStoryFrameBytes(
                       t: t,
                       width: exportWidth,
                       height: exportHeight,
                     );
-                    final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-                    if (raw != null) {
-                      final frameBytes = raw.buffer.asUint8List();
-                      session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
+                    if (frameBytes != null) {
+                      await session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
 
-                      // Ở frame cuối (t = 1.0), giữ nguyên toàn cảnh 5 giây (125 frames) để thấy trọn vẹn thông số & cung đường
+                      // Ở frame cuối (t = 1.0), giữ nguyên toàn cảnh 5 giây (125 frames) để thấy trọn vẹn thông số
                       if (step == totalSteps) {
                         for (int hold = 0; hold < 125; hold++) {
-                          session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
+                          await session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
                         }
                       }
                     }
+
+                    // Tạm dừng 1ms để hệ điều hành dọn dẹp rác (GC) chống tràn RAM
+                    await Future.delayed(const Duration(milliseconds: 1));
                   }
 
                   setDialogState(() {
                     progress = 0.98;
-                    status = 'Đang hoàn tất video Full HD 1080x1920...';
+                    status = 'Đang hoàn tất video Story 9:16...';
                   });
 
                   await session.finishRecording();
@@ -774,7 +777,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       },
     );
   }
-  Future<ui.Image> _renderStoryFrameImage({
+  /// Render khung hình chuẩn 720 x 1280 (Tỷ lệ 9:16 chuyên dụng Facebook Story / Reels / TikTok)
+  Future<Uint8List?> _renderStoryFrameBytes({
     required double t,
     required double width,
     required double height,
@@ -805,7 +809,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       onTileRequested: (z, x, y) {},
     );
 
-    // 1. Vẽ bản đồ 3D và lộ trình đường chạy trên khung hình 1080x1920
+    // 1. Vẽ bản đồ 3D và lộ trình đường chạy trên khung hình 9:16
     painter.paint(canvas, Size(width, height));
 
     // 2. Tính toán các chỉ số thành tích thời gian thực
@@ -841,18 +845,27 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     );
 
     final picture = recorder.endRecording();
-    return await picture.toImage(width.toInt(), height.toInt());
+    final img = await picture.toImage(width.toInt(), height.toInt());
+    picture.dispose(); // Giải phóng GPU Picture ngay
+
+    final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+    img.dispose(); // Giải phóng GPU Texture ngay lập tức chống tràn RAM
+
+    if (raw != null) {
+      return raw.buffer.asUint8List();
+    }
+    return null;
   }
 
   void _drawStoryTopHeader(Canvas canvas, Size size) {
-    const double cardW = 460.0;
-    const double cardH = 74.0;
+    final double cardW = size.width * 0.46;
+    final double cardH = size.height * 0.040;
     final double cardX = (size.width - cardW) / 2;
-    const double cardY = 120.0; // Vùng an toàn dưới thanh profile Story
+    final double cardY = size.height * 0.065; // Vùng an toàn dưới thanh profile Story
 
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(cardX, cardY, cardW, cardH),
-      const Radius.circular(37),
+      Radius.circular(cardH / 2),
     );
 
     // Nền kính mờ
@@ -862,7 +875,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // Viền phát sáng Neon
     final borderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
+      ..strokeWidth = 2.0
       ..color = const Color(0xFF00E5FF);
     canvas.drawRRect(rrect, borderPaint);
 
@@ -871,11 +884,11 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: 'NOCODEVN RUNNING',
       center: Offset(size.width / 2, cardY + (cardH / 2)),
-      fontSize: 22,
+      fontSize: size.width * 0.024,
       fontWeight: FontWeight.w900,
       color: const Color(0xFF00E5FF),
-      letterSpacing: 1.5,
-      maxWidth: 420,
+      letterSpacing: 1.2,
+      maxWidth: cardW - 20,
     );
   }
 
@@ -888,14 +901,14 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     required String pace,
     required bool isFinished,
   }) {
-    const double cardW = 980.0;
-    const double cardH = 260.0;
+    final double cardW = size.width * 0.90;
+    final double cardH = size.height * 0.145;
     final double cardX = (size.width - cardW) / 2;
-    final double cardY = size.height - cardH - 180.0; // Vùng an toàn trên thanh comment Story
+    final double cardY = size.height - cardH - (size.height * 0.09); // Vùng an toàn trên thanh comment Story
 
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(cardX, cardY, cardW, cardH),
-      const Radius.circular(40),
+      const Radius.circular(28),
     );
 
     // Nền thẻ kính mờ cao cấp
@@ -905,7 +918,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // Viền thẻ
     final borderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
+      ..strokeWidth = 2.5
       ..color = isFinished ? const Color(0xFF10B981) : const Color(0xFF334155);
     canvas.drawRRect(rrect, borderPaint);
 
@@ -916,35 +929,35 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     _drawCanvasText(
       canvas: canvas,
       text: title,
-      center: Offset(size.width / 2, cardY + 45),
-      fontSize: 25,
+      center: Offset(size.width / 2, cardY + (cardH * 0.18)),
+      fontSize: size.width * 0.024,
       fontWeight: FontWeight.w900,
       color: titleColor,
-      letterSpacing: 1.0,
-      maxWidth: 900,
+      letterSpacing: 0.8,
+      maxWidth: cardW - 30,
     );
 
     // Đường gạch ngang tinh tế
     final divPaint = Paint()
       ..color = const Color(0x22FFFFFF)
-      ..strokeWidth = 1.5;
+      ..strokeWidth = 1.2;
     canvas.drawLine(
-      Offset(cardX + 40, cardY + 80),
-      Offset(cardX + cardW - 40, cardY + 80),
+      Offset(cardX + 25, cardY + (cardH * 0.34)),
+      Offset(cardX + cardW - 25, cardY + (cardH * 0.34)),
       divPaint,
     );
 
     // 4 Cột thông số
     final colW = cardW / 4;
-    final double yVal = cardY + 140;
-    final double yLbl = cardY + 200;
+    final double yVal = cardY + (cardH * 0.58);
+    final double yLbl = cardY + (cardH * 0.82);
 
     // Cột 1: Quãng đường
     _drawCanvasText(
       canvas: canvas,
       text: '${distanceKm.toStringAsFixed(2)} km',
       center: Offset(cardX + colW * 0.5, yVal),
-      fontSize: 36,
+      fontSize: size.width * 0.034,
       fontWeight: FontWeight.w900,
       color: const Color(0xFF00E5FF),
       maxWidth: colW,
@@ -953,10 +966,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: 'QUÃNG ĐƯỜNG',
       center: Offset(cardX + colW * 0.5, yLbl),
-      fontSize: 19,
+      fontSize: size.width * 0.017,
       fontWeight: FontWeight.w800,
       color: const Color(0xFF94A3B8),
-      letterSpacing: 0.5,
+      letterSpacing: 0.4,
       maxWidth: colW,
     );
 
@@ -965,7 +978,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: '$pace /km',
       center: Offset(cardX + colW * 1.5, yVal),
-      fontSize: 36,
+      fontSize: size.width * 0.034,
       fontWeight: FontWeight.w900,
       color: const Color(0xFF10B981),
       maxWidth: colW,
@@ -974,10 +987,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: 'PACE TB',
       center: Offset(cardX + colW * 1.5, yLbl),
-      fontSize: 19,
+      fontSize: size.width * 0.017,
       fontWeight: FontWeight.w800,
       color: const Color(0xFF94A3B8),
-      letterSpacing: 0.5,
+      letterSpacing: 0.4,
       maxWidth: colW,
     );
 
@@ -986,7 +999,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: timeStr,
       center: Offset(cardX + colW * 2.5, yVal),
-      fontSize: 36,
+      fontSize: size.width * 0.034,
       fontWeight: FontWeight.w900,
       color: Colors.white,
       maxWidth: colW,
@@ -995,10 +1008,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: 'THỜI GIAN',
       center: Offset(cardX + colW * 2.5, yLbl),
-      fontSize: 19,
+      fontSize: size.width * 0.017,
       fontWeight: FontWeight.w800,
       color: const Color(0xFF94A3B8),
-      letterSpacing: 0.5,
+      letterSpacing: 0.4,
       maxWidth: colW,
     );
 
@@ -1007,7 +1020,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: '$calories kcal',
       center: Offset(cardX + colW * 3.5, yVal),
-      fontSize: 36,
+      fontSize: size.width * 0.034,
       fontWeight: FontWeight.w900,
       color: const Color(0xFFFF7043),
       maxWidth: colW,
@@ -1016,10 +1029,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       canvas: canvas,
       text: 'CALO',
       center: Offset(cardX + colW * 3.5, yLbl),
-      fontSize: 19,
+      fontSize: size.width * 0.017,
       fontWeight: FontWeight.w800,
       color: const Color(0xFF94A3B8),
-      letterSpacing: 0.5,
+      letterSpacing: 0.4,
       maxWidth: colW,
     );
   }
