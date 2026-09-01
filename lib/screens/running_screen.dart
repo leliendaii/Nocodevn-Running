@@ -479,7 +479,7 @@ class _RunningScreenState extends State<RunningScreen>
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18.0, 10.0, 18.0, 10.0),
+                  padding: const EdgeInsets.fromLTRB(18.0, 10.0, 18.0, 30.0),
                   child: Column(
                     children: [
               // HEADER GỘP: THÔNG TIN USER + TRẠNG THÁI + NÚT VOICE COACH + NÚT ĐĂNG XUẤT
@@ -686,110 +686,113 @@ class _RunningScreenState extends State<RunningScreen>
                         return AnimatedBuilder(
                           animation: _pulseAnimation,
                           builder: (context, _) {
-                            return Transform.scale(
-                              scale: isRunning ? _pulseAnimation.value : 1.0,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    distanceKm.toStringAsFixed(2),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 84,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.primaryNeon,
-                                      height: 0.95,
-                                      letterSpacing: -2.0,
+                            return Transform.translate(
+                              offset: const Offset(0, -10),
+                              child: Transform.scale(
+                                scale: isRunning ? _pulseAnimation.value : 1.0,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      distanceKm.toStringAsFixed(2),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 84,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.primaryNeon,
+                                        height: 0.95,
+                                        letterSpacing: -2.0,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  const Text(
-                                    'KILOMET',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.primaryNeon,
-                                      letterSpacing: 3.5,
+                                    const SizedBox(height: 5),
+                                    const Text(
+                                      'KILOMET',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.primaryNeon,
+                                        letterSpacing: 3.5,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Badge trạng thái hoạt động
-                                  Selector<RunningProvider, (String, double, bool)>(
-                                    selector: (_, p) => (p.currentActivityType, p.instantSpeedKmh, p.isRunning),
-                                    builder: (context, activityData, _) {
-                                      final activity = activityData.$1;
-                                      final speed = activityData.$2;
-                                      final runningState = activityData.$3;
+                                    const SizedBox(height: 12),
+                                    // Badge trạng thái hoạt động
+                                    Selector<RunningProvider, (String, double, bool)>(
+                                      selector: (_, p) => (p.currentActivityType, p.instantSpeedKmh, p.isRunning),
+                                      builder: (context, activityData, _) {
+                                        final activity = activityData.$1;
+                                        final speed = activityData.$2;
+                                        final runningState = activityData.$3;
 
-                                      IconData icon;
-                                      Color color;
+                                        IconData icon;
+                                        Color color;
 
-                                      switch (activity) {
-                                        case 'Đứng yên':
-                                          icon = Icons.pause_circle_outline_rounded;
-                                          color = AppTheme.textMuted;
-                                          break;
-                                        case 'Đi bộ':
-                                          icon = Icons.directions_walk_rounded;
-                                          color = AppTheme.secondaryNeon;
-                                          break;
-                                        case 'Chạy bộ':
-                                          icon = Icons.directions_run_rounded;
-                                          color = AppTheme.primaryNeon;
-                                          break;
-                                        case 'Bứt tốc':
-                                          icon = Icons.bolt_rounded;
-                                          color = AppTheme.accentOrange;
-                                          break;
-                                        default:
-                                          icon = Icons.directions_run_rounded;
-                                          color = AppTheme.primaryNeon;
-                                      }
+                                        switch (activity) {
+                                          case 'Đứng yên':
+                                            icon = Icons.pause_circle_outline_rounded;
+                                            color = AppTheme.textMuted;
+                                            break;
+                                          case 'Đi bộ':
+                                            icon = Icons.directions_walk_rounded;
+                                            color = AppTheme.secondaryNeon;
+                                            break;
+                                          case 'Chạy bộ':
+                                            icon = Icons.directions_run_rounded;
+                                            color = AppTheme.primaryNeon;
+                                            break;
+                                          case 'Bứt tốc':
+                                            icon = Icons.bolt_rounded;
+                                            color = AppTheme.accentOrange;
+                                            break;
+                                          default:
+                                            icon = Icons.directions_run_rounded;
+                                            color = AppTheme.primaryNeon;
+                                        }
 
-                                      final String labelText = runningState && speed > 0.5
-                                          ? '${activity.toUpperCase()} • ${speed.toStringAsFixed(1)} KM/H'
-                                          : activity.toUpperCase();
+                                        final String labelText = runningState && speed > 0.5
+                                            ? '${activity.toUpperCase()} • ${speed.toStringAsFixed(1)} KM/H'
+                                            : activity.toUpperCase();
 
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 7,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface,
-                                          borderRadius: BorderRadius.circular(24),
-                                          border: Border.all(
-                                            color: color.withValues(alpha: 0.5),
-                                            width: 1.2,
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 7,
                                           ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: color.withValues(alpha: 0.15),
-                                              blurRadius: 16,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.surface,
+                                            borderRadius: BorderRadius.circular(24),
+                                            border: Border.all(
+                                              color: color.withValues(alpha: 0.5),
+                                              width: 1.2,
                                             ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(icon, size: 16, color: color),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              labelText,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w900,
-                                                color: color,
-                                                letterSpacing: 1.0,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: color.withValues(alpha: 0.15),
+                                                blurRadius: 16,
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(icon, size: 16, color: color),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                labelText,
+                                                style: TextStyle(
+                                                  color: color,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 12,
+                                                  letterSpacing: 1.0,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
                               ),
                             );
                           },
