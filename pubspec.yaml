@@ -52,6 +52,7 @@ dependencies:
   flutter_tts: ^4.2.5
   flutter_local_notifications: 18.0.1
   url_launcher: ^6.3.2
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:

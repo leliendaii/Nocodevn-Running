@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'web_notification_stub.dart'
     if (dart.library.html) 'web_notification_web.dart';
 
@@ -8,6 +10,7 @@ class LiveWorkoutNotificationService {
   static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   static bool _isInitialized = false;
   static const int _notificationId = 888;
+  static const int _reminderNotificationId = 999;
   static const String _channelId = 'live_workout_tracking_channel';
   static const String _channelName = 'Theo dõi chạy bộ trực tiếp';
 
@@ -15,6 +18,8 @@ class LiveWorkoutNotificationService {
   static Future<void> initialize() async {
     if (_isInitialized) return;
     try {
+      tz.initializeTimeZones();
+
       if (kIsWeb) {
         await requestPlatformNotificationPermission();
       }
@@ -213,13 +218,100 @@ class LiveWorkoutNotificationService {
       );
 
       await _notifications.show(
-        999,
+        _reminderNotificationId,
         title,
         body,
         details,
       );
     } catch (e) {
       debugPrint('Lỗi hiển thị thông báo nhắc nhở: $e');
+    }
+  }
+
+  /// Lên lịch thông báo nhắc nhở hàng ngày đúng giờ (Kể cả khi app bị tắt / chạy ngầm)
+  static Future<void> scheduleDailyReminderNotification({
+    required int hour,
+    required int minute,
+    required String title,
+    required String body,
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+
+      // Hủy lịch cũ trước khi đặt lịch mới
+      await cancelDailyReminder();
+
+      if (kIsWeb) {
+        return; // Web browser không hỗ trợ Alarm Manager native khi tắt tab
+      }
+
+      final now = tz.TZDateTime.now(tz.local);
+      var scheduledDate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day,
+        hour,
+        minute,
+      );
+
+      // Nếu giờ cài đặt đã trôi qua hôm nay -> Lên lịch cho đúng giờ này ngày mai
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      const androidDetails = AndroidNotificationDetails(
+        'running_daily_reminder_channel',
+        'Nhắc nhở luyện tập hàng ngày',
+        channelDescription: 'Thông báo nhắc nhở chạy bộ hàng ngày theo lịch cài đặt',
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: '@mipmap/launcher_icon',
+        playSound: true,
+        enableVibration: true,
+        showWhen: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBanner: true,
+        presentBadge: true,
+        presentSound: true,
+        presentList: true,
+        interruptionLevel: InterruptionLevel.active,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.zonedSchedule(
+        _reminderNotificationId,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time, // Tự động lặp lại hàng ngày
+      );
+
+      debugPrint('🔔 [REMINDER] Đã lên lịch nhắc nhở chạy bộ lặp lại hàng ngày lúc $hour:$minute');
+    } catch (e) {
+      debugPrint('Lỗi lập lịch nhắc nhở hàng ngày: $e');
+    }
+  }
+
+  /// Hủy lịch nhắc nhở hàng ngày
+  static Future<void> cancelDailyReminder() async {
+    try {
+      if (!_isInitialized) await initialize();
+      await _notifications.cancel(_reminderNotificationId);
+      debugPrint('🛑 [REMINDER] Đã hủy lịch nhắc nhở hàng ngày.');
+    } catch (e) {
+      debugPrint('Lỗi hủy lịch nhắc nhở: $e');
     }
   }
 

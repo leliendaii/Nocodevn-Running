@@ -207,8 +207,19 @@ class RunningProvider with ChangeNotifier {
     _reminderHour = reminder['hour'] ?? 5;
     _reminderMinute = reminder['minute'] ?? 30;
 
+    if (_reminderEnabled) {
+      final timeStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
+      LiveWorkoutNotificationService.scheduleDailyReminderNotification(
+        hour: _reminderHour,
+        minute: _reminderMinute,
+        title: '⏰ Đã đến giờ chạy bộ ($timeStr)',
+        body: 'Hãy mang giày vào và hoàn thành buổi chạy hôm nay để duy trì phong độ nhé!',
+      );
+    } else {
+      LiveWorkoutNotificationService.cancelDailyReminder();
+    }
+
     notifyListeners();
-    checkDailyReminder(userId);
   }
 
   /// Cập nhật khung giờ chạy và giờ tự động chốt cho riêng User đang đăng nhập
@@ -237,7 +248,7 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cập nhật cấu hình Nhắc nhở
+  /// Cập nhật cấu hình Nhắc nhở & Đồng bộ Alarm thông báo hệ thống lặp lại hàng ngày
   Future<void> updateReminderSchedule({
     required String userId,
     required bool enabled,
@@ -248,25 +259,41 @@ class RunningProvider with ChangeNotifier {
     _reminderEnabled = enabled;
     _reminderHour = hour;
     _reminderMinute = minute;
-    _lastReminderTriggerDate = null; // Reset để sẵn sàng kích hoạt ngay khi tới giờ mới cài
+    _lastReminderTriggerDate = null;
+
     await LocalStorageService.saveReminderConfig(
       userId: userId,
       enabled: enabled,
       hour: hour,
       minute: minute,
     );
-    notifyListeners();
+
     if (enabled) {
-      checkDailyReminder(userId);
+      final timeStr = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+      await LiveWorkoutNotificationService.scheduleDailyReminderNotification(
+        hour: hour,
+        minute: minute,
+        title: '⏰ Đã đến giờ chạy bộ ($timeStr)',
+        body: 'Hãy mang giày vào và bắt đầu buổi chạy hôm nay để duy trì sức khỏe nhé!',
+      );
+    } else {
+      await LiveWorkoutNotificationService.cancelDailyReminder();
     }
+
+    notifyListeners();
   }
 
-  /// Kiểm tra và kích hoạt thông báo nhắc nhở thông minh
+  /// Kiểm tra và kích hoạt thông báo nhắc nhở thông minh khi app đang chạy đúng phút cài đặt
   Future<void> checkDailyReminder(String userId) async {
     if (!_reminderEnabled) return;
     final now = DateTime.now();
 
-    // Nếu hôm nay đã gửi nhắc nhở rồi thì không lặp lại
+    // 1. Chỉ kích hoạt khi thời gian hiện tại đúng khớp với giờ & phút đã cài
+    if (now.hour != _reminderHour || now.minute != _reminderMinute) {
+      return;
+    }
+
+    // 2. Nếu hôm nay đã gửi nhắc nhở rồi thì không lặp lại
     if (_lastReminderTriggerDate != null &&
         _lastReminderTriggerDate!.year == now.year &&
         _lastReminderTriggerDate!.month == now.month &&
@@ -274,7 +301,7 @@ class RunningProvider with ChangeNotifier {
       return;
     }
 
-    // Kiểm tra xem người dùng hôm nay đã có buổi chạy nào chưa
+    // 3. Kiểm tra xem người dùng hôm nay đã có buổi chạy nào chưa
     final userRuns = _sessions.where((s) => s.userId == userId).toList();
     final bool hasRunToday = userRuns.any((s) =>
         s.startTime.year == now.year &&
@@ -286,18 +313,12 @@ class RunningProvider with ChangeNotifier {
       return;
     }
 
-    // Nếu thời gian hiện tại đã đến hoặc đã vượt quá giờ nhắc nhở trong ngày
-    final currentMinutes = now.hour * 60 + now.minute;
-    final reminderMinutes = _reminderHour * 60 + _reminderMinute;
-
-    if (currentMinutes >= reminderMinutes) {
-      _lastReminderTriggerDate = now;
-      final timeStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
-      await LiveWorkoutNotificationService.showMorningReminderNotification(
-        title: 'Nhắc nhở',
-        body: 'Sáng nay bạn chưa hoàn thành buổi chạy lúc $timeStr. Hãy dành ít phút chạy bộ nhé!',
-      );
-    }
+    _lastReminderTriggerDate = now;
+    final timeStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
+    await LiveWorkoutNotificationService.showMorningReminderNotification(
+      title: '⏰ Đã đến giờ chạy bộ ($timeStr)',
+      body: 'Hãy mang giày vào và bắt đầu buổi chạy hôm nay để duy trì sức khỏe nhé!',
+    );
   }
 
   /// Tải dữ liệu kết hợp Offline Cache & Supabase Cloud
