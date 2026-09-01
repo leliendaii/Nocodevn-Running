@@ -142,10 +142,10 @@ class SessionDetailScreen extends StatelessWidget {
                       Container(width: 1, height: 32, color: AppTheme.divider),
                       Expanded(
                         child: _buildCenteredMetaItem(
-                          icon: Icons.location_on_outlined,
-                          iconColor: AppTheme.textMuted,
-                          label: 'TỌA ĐỘ GPS',
-                          value: '${session.routePoints.length} điểm',
+                          icon: Icons.directions_walk_rounded,
+                          iconColor: AppTheme.secondaryNeon,
+                          label: 'SỐ BƯỚC',
+                          value: session.formattedTotalSteps,
                         ),
                       ),
                     ],

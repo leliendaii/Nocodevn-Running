@@ -15,6 +15,7 @@ class KmSplit {
   final int paceSeconds;      // Tổng số giây để chạy 1km (phục vụ so sánh)
   final int paceDeltaSeconds; // So sánh với KM trước (< 0 là nhanh hơn, > 0 là chậm hơn)
   final bool isBestSplit;     // KM chạy nhanh nhất buổi chạy 🔥
+  final int? rawSteps;        // Số bước chân
 
   const KmSplit({
     required this.kmIndex,
@@ -25,7 +26,29 @@ class KmSplit {
     required this.paceSeconds,
     this.paceDeltaSeconds = 0,
     this.isBestSplit = false,
+    this.rawSteps,
   });
+
+  /// Tính số bước chân chuẩn dựa trên cự ly, thời gian và nhịp bước Cadence tự nhiên
+  int get steps {
+    if (rawSteps != null && rawSteps! > 0) return rawSteps!;
+    if (distanceKm <= 0 || durationSeconds <= 0) return 0;
+    final double speedKmh = (distanceKm / durationSeconds) * 3600;
+    double cadence = 162.0; // Nhịp bước/phút tiêu chuẩn
+    if (speedKmh > 14.0) {
+      cadence = 175.0;
+    } else if (speedKmh > 12.0) {
+      cadence = 168.0;
+    } else if (speedKmh > 10.0) {
+      cadence = 162.0;
+    } else if (speedKmh > 8.0) {
+      cadence = 155.0;
+    } else {
+      cadence = 148.0;
+    }
+    final calcSteps = ((durationSeconds / 60.0) * cadence).round();
+    return calcSteps.clamp((distanceKm * 950).round(), (distanceKm * 1600).round());
+  }
 
   Map<String, dynamic> toJson() => {
     'kmIndex': kmIndex,
@@ -36,6 +59,7 @@ class KmSplit {
     'paceSeconds': paceSeconds,
     'paceDeltaSeconds': paceDeltaSeconds,
     'isBestSplit': isBestSplit,
+    'steps': steps,
   };
 
   factory KmSplit.fromJson(Map<String, dynamic> json) => KmSplit(
@@ -47,6 +71,7 @@ class KmSplit {
     paceSeconds: json['paceSeconds'] ?? 0,
     paceDeltaSeconds: json['paceDeltaSeconds'] ?? 0,
     isBestSplit: json['isBestSplit'] ?? false,
+    rawSteps: json['steps'] as int?,
   );
 }
 
@@ -100,6 +125,38 @@ class RunSession {
   /// Định dạng vận tốc trung bình (VD: 8.5)
   String get formattedAvgSpeed {
     return avgSpeedKmh.toStringAsFixed(1);
+  }
+
+  /// Tổng số bước chân tính theo chuẩn y khoa thể thao
+  int get totalSteps {
+    if (splits.isNotEmpty) {
+      return splits.fold(0, (sum, sp) => sum + sp.steps);
+    }
+    if (distanceKm <= 0 || durationSeconds <= 0) return 0;
+    final double speedKmh = (distanceKm / durationSeconds) * 3600;
+    double cadence = 162.0;
+    if (speedKmh > 14.0) {
+      cadence = 175.0;
+    } else if (speedKmh > 12.0) {
+      cadence = 168.0;
+    } else if (speedKmh > 10.0) {
+      cadence = 162.0;
+    } else if (speedKmh > 8.0) {
+      cadence = 155.0;
+    } else {
+      cadence = 148.0;
+    }
+    final calcSteps = ((durationSeconds / 60.0) * cadence).round();
+    return calcSteps.clamp((distanceKm * 950).round(), (distanceKm * 1600).round());
+  }
+
+  /// Định dạng số bước có dấu chấm (VD: 8.345 hoặc 4.520)
+  String get formattedTotalSteps {
+    final s = totalSteps;
+    return s.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
   }
 
   /// Định dạng thời gian chạy dạng HH:MM:SS hoặc MM:SS

@@ -27,11 +27,13 @@ class SplitsBreakdownCard extends StatelessWidget {
     double totalDistanceKm = 0.0;
     int totalDurationSec = 0;
     int totalCalories = 0;
+    int totalSteps = 0;
 
     for (final sp in splits) {
       totalDistanceKm += sp.distanceKm;
       totalDurationSec += sp.durationSeconds;
       totalCalories += sp.calories;
+      totalSteps += sp.steps;
 
       if (sp.paceSeconds > 0) {
         if (sp.paceSeconds < minPaceSec) minPaceSec = sp.paceSeconds;
@@ -68,7 +70,7 @@ class SplitsBreakdownCard extends StatelessWidget {
         children: [
           // Header khối
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -109,37 +111,45 @@ class SplitsBreakdownCard extends StatelessWidget {
           ),
           const Divider(color: AppTheme.divider, height: 1),
 
-          // Header các cột
+          // Header các cột (KM, PACE, BIỂU ĐỒ, BƯỚC, CALO)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: const [
                 SizedBox(
-                  width: 52,
+                  width: 44,
                   child: Text(
                     'KM',
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                   ),
                 ),
                 SizedBox(
-                  width: 80,
+                  width: 68,
                   child: Text(
                     'PACE',
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                   ),
                 ),
                 Expanded(
                   child: Text(
                     'BIỂU ĐỒ TỐC ĐỘ',
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                   ),
                 ),
                 SizedBox(
                   width: 48,
                   child: Text(
+                    'BƯỚC',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                  ),
+                ),
+                SizedBox(
+                  width: 40,
+                  child: Text(
                     'CALO',
                     textAlign: TextAlign.right,
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                   ),
                 ),
               ],
@@ -168,26 +178,26 @@ class SplitsBreakdownCard extends StatelessWidget {
                   : 1.0;
 
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 color: isBest ? AppTheme.primaryNeon.withValues(alpha: 0.08) : Colors.transparent,
                 child: Row(
                   children: [
                     // 1. Cột KM
                     SizedBox(
-                      width: 52,
+                      width: 44,
                       child: Row(
                         children: [
                           Text(
                             kmLabel,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w900,
                               color: isBest ? AppTheme.primaryNeon : AppTheme.textPrimary,
                             ),
                           ),
                           if (isBest) ...[
                             const SizedBox(width: 2),
-                            const Text('🔥', style: TextStyle(fontSize: 10)),
+                            const Text('🔥', style: TextStyle(fontSize: 9)),
                           ],
                         ],
                       ),
@@ -195,7 +205,7 @@ class SplitsBreakdownCard extends StatelessWidget {
 
                     // 2. Cột Pace
                     SizedBox(
-                      width: 80,
+                      width: 68,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -203,7 +213,7 @@ class SplitsBreakdownCard extends StatelessWidget {
                           Text(
                             '${sp.pace} /km',
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w900,
                               color: isBest ? AppTheme.primaryNeon : AppTheme.textPrimary,
                             ),
@@ -214,7 +224,7 @@ class SplitsBreakdownCard extends StatelessWidget {
                                   ? '▲ -${sp.paceDeltaSeconds.abs()}s'
                                   : '▼ +${sp.paceDeltaSeconds}s',
                               style: TextStyle(
-                                fontSize: 9.5,
+                                fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 color: sp.paceDeltaSeconds < 0 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                               ),
@@ -228,35 +238,49 @@ class SplitsBreakdownCard extends StatelessWidget {
                       child: Stack(
                         children: [
                           Container(
-                            height: 14,
+                            height: 12,
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E293B),
-                              borderRadius: BorderRadius.circular(7),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                           ),
                           FractionallySizedBox(
                             widthFactor: ratio,
                             child: Container(
-                              height: 14,
+                              height: 12,
                               decoration: BoxDecoration(
                                 color: isBest ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
-                                borderRadius: BorderRadius.circular(7),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
 
-                    // 4. Cột Calo (Chỉ hiển thị con số, KHÔNG có chữ kcal)
+                    // 4. Cột Số Bước (Trước cột Calo)
                     SizedBox(
                       width: 48,
+                      child: Text(
+                        '${sp.steps}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.secondaryNeon,
+                        ),
+                      ),
+                    ),
+
+                    // 5. Cột Calo (Chỉ hiển thị con số, KHÔNG có chữ kcal)
+                    SizedBox(
+                      width: 40,
                       child: Text(
                         '${sp.calories}',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w800,
                           color: AppTheme.textSecondary,
                         ),
@@ -273,7 +297,7 @@ class SplitsBreakdownCard extends StatelessWidget {
           // ==========================================
           const Divider(color: AppTheme.divider, height: 1),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: AppTheme.surface,
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
@@ -282,11 +306,11 @@ class SplitsBreakdownCard extends StatelessWidget {
               children: [
                 // 1. Tổng KM
                 SizedBox(
-                  width: 52,
+                  width: 44,
                   child: Text(
                     totalDistanceKm.toStringAsFixed(2),
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w900,
                       color: AppTheme.primaryNeon,
                     ),
@@ -295,11 +319,11 @@ class SplitsBreakdownCard extends StatelessWidget {
 
                 // 2. Pace trung bình
                 SizedBox(
-                  width: 80,
+                  width: 68,
                   child: Text(
                     '$totalAvgPace /km',
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w900,
                       color: AppTheme.secondaryNeon,
                     ),
@@ -312,23 +336,37 @@ class SplitsBreakdownCard extends StatelessWidget {
                     child: Text(
                       totalAvgSpeed,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: AppTheme.textPrimary,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
 
-                // 4. Tổng Calo (Không có chữ kcal)
+                // 4. Tổng Bước
                 SizedBox(
                   width: 48,
+                  child: Text(
+                    '$totalSteps',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.secondaryNeon,
+                    ),
+                  ),
+                ),
+
+                // 5. Tổng Calo (Không có chữ kcal)
+                SizedBox(
+                  width: 40,
                   child: Text(
                     '$totalCalories',
                     textAlign: TextAlign.right,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w900,
                       color: AppTheme.primaryNeon,
                     ),
