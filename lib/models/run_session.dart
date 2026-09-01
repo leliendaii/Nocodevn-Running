@@ -88,6 +88,20 @@ class RunSession {
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
+  /// Getter alias cho avgPace
+  String get pace => avgPace;
+
+  /// Vận tốc trung bình theo km/h
+  double get avgSpeedKmh {
+    if (durationSeconds <= 0) return 0.0;
+    return (distanceKm / durationSeconds) * 3600;
+  }
+
+  /// Định dạng vận tốc trung bình (VD: 8.5)
+  String get formattedAvgSpeed {
+    return avgSpeedKmh.toStringAsFixed(1);
+  }
+
   /// Định dạng thời gian chạy dạng HH:MM:SS hoặc MM:SS
   String get formattedDuration {
     final int hours = durationSeconds ~/ 3600;

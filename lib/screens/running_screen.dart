@@ -297,19 +297,19 @@ class _RunningScreenState extends State<RunningScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              // Ô NHẬP GHI CHÚ GỌN GÀNG
+              // Ô NHẬP TÊN BUỔI CHẠY GỌN GÀNG
               TextField(
                 controller: notesController,
-                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
                 decoration: const InputDecoration(
-                  labelText: 'Ghi chú buổi chạy',
-                  hintText: 'Cảm giác chạy, thời tiết...',
+                  labelText: 'Tên buổi chạy',
+                  hintText: 'Nhập tên buổi chạy...',
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   prefixIcon: Icon(
-                    Icons.note_alt_outlined,
+                    Icons.edit_note_rounded,
                     color: AppTheme.primaryNeon,
-                    size: 18,
+                    size: 20,
                   ),
                 ),
               ),

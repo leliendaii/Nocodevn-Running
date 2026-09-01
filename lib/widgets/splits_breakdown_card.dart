@@ -211,20 +211,8 @@ class SplitsBreakdownCard extends StatelessWidget {
                             child: Container(
                               height: 14,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isBest
-                                      ? [const Color(0xFFFF2A55), const Color(0xFFFF7A00)]
-                                      : [AppTheme.primaryNeon, AppTheme.secondaryNeon],
-                                ),
+                                color: isBest ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
                                 borderRadius: BorderRadius.circular(7),
-                                boxShadow: isBest
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFFFF2A55).withValues(alpha: 0.4),
-                                          blurRadius: 6,
-                                        ),
-                                      ]
-                                    : null,
                               ),
                             ),
                           ),

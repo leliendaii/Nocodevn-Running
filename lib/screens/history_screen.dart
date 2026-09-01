@@ -7,8 +7,7 @@ import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/top_sync_toast.dart';
-import '../widgets/splits_breakdown_card.dart';
-import 'route_flyover_3d_screen.dart';
+import 'session_detail_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -82,25 +81,18 @@ class HistoryScreen extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.surface,
-                                AppTheme.surfaceLight,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: AppTheme.surface,
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(color: AppTheme.divider),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              _buildStatItem('TỔNG KM', '${totalKm.toStringAsFixed(1)} km', AppTheme.primaryNeon),
+                              _buildSummaryStat('TỔNG KM', '${totalKm.toStringAsFixed(1)} km', AppTheme.primaryNeon),
                               Container(width: 1, height: 40, color: AppTheme.divider),
-                              _buildStatItem('BUỔI CHẠY', '${sessions.length}', AppTheme.secondaryNeon),
+                              _buildSummaryStat('BUỔI CHẠY', '${sessions.length}', AppTheme.secondaryNeon),
                               Container(width: 1, height: 40, color: AppTheme.divider),
-                              _buildStatItem('THỜI GIAN', '${hours}h ${minutes}p', AppTheme.accentOrange),
+                              _buildSummaryStat('THỜI GIAN', '${hours}h ${minutes}p', AppTheme.textPrimary),
                             ],
                           ),
                         ),
@@ -127,7 +119,7 @@ class HistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String label, String value, Color color) {
+  Widget _buildSummaryStat(String label, String value, Color color) {
     return Column(
       children: [
         Text(
@@ -162,16 +154,28 @@ class HistoryScreen extends StatelessWidget {
     }
     final isAdmin = running.isUserAdmin(session.userId);
 
+    // Tên buổi chạy
+    final sessionName = session.notes.trim().isNotEmpty
+        ? session.notes.trim()
+        : 'Buổi chạy ${DateFormat('dd/MM/yyyy').format(session.startTime)}';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => _showDetailBottomSheet(context, session),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SessionDetailScreen(session: session),
+            ),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header: Tên người chạy + Cự ly
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -204,6 +208,7 @@ class HistoryScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppTheme.primaryNeon.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
                     ),
                     child: Text(
                       '${session.formattedDistance} KM',
@@ -216,26 +221,39 @@ class HistoryScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              const Divider(height: 1, color: AppTheme.divider),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
+              // Tên buổi chạy
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSubMetric(Icons.timer_outlined, 'Thời gian', session.formattedDuration),
-                  _buildSubMetric(Icons.speed_rounded, 'Pace TB', '${session.avgPace} /km'),
-                  _buildSubMetric(Icons.local_fire_department_outlined, 'Calo', '${session.calories} kcal'),
+                  const Icon(Icons.edit_note_rounded, size: 16, color: AppTheme.secondaryNeon),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      sessionName,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              if (session.notes.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  '💬 ${session.notes}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppTheme.textSecondary),
-                ),
-              ],
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: AppTheme.divider),
+              const SizedBox(height: 12),
+              // Bảng 4 thông số ngắn gọn
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildCardStatItem('THỜI GIAN', session.formattedDuration),
+                  _buildCardStatItem('PACE', '${session.pace} /km', color: AppTheme.secondaryNeon),
+                  _buildCardStatItem('CALO', '${session.calories} kcal', color: AppTheme.primaryNeon),
+                  _buildCardStatItem('TỐC ĐỘ', '${session.formattedAvgSpeed} km/h'),
+                ],
+              ),
             ],
           ),
         ),
@@ -243,186 +261,26 @@ class HistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSubMetric(IconData icon, String label, String value) {
-    return Row(
+  Widget _buildCardStatItem(String label, String value, {Color color = AppTheme.textPrimary}) {
+    return Column(
       children: [
-        Icon(icon, size: 16, color: AppTheme.textMuted),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  void _showDetailBottomSheet(BuildContext context, RunSession session) {
-    final running = context.read<RunningProvider>();
-    final currentUser = context.read<AuthProvider>().currentUser;
-    final realName = running.getUserRealName(session.userId, session.userName);
-    String realAvatar = running.getUserRealAvatar(session.userId);
-    if (realAvatar.isEmpty && currentUser != null && currentUser.id == session.userId && currentUser.avatarUrl.isNotEmpty) {
-      realAvatar = currentUser.avatarUrl;
-    }
-    final isAdmin = running.isUserAdmin(session.userId);
-
-    // Xử lý an toàn thứ trong tuần trên mọi hệ điều hành (kể cả khi chưa load locale)
-    final weekdays = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
-    final weekdayName = weekdays[session.startTime.weekday - 1];
-    final formattedDate = '$weekdayName, ${DateFormat('dd/MM/yyyy HH:mm').format(session.startTime)}';
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTheme.divider,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Chi tiết buổi chạy',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${session.formattedDistance} KM',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.primaryNeon,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formattedDate,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Người chạy', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                            Row(
-                              children: [
-                                UserAvatar(
-                                  avatarUrl: realAvatar,
-                                  name: realName,
-                                  radius: 12,
-                                  isAdmin: isAdmin,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(realName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Divider(color: AppTheme.divider, height: 16),
-                        _buildDetailRow('Tổng thời gian', session.formattedDuration),
-                        const Divider(color: AppTheme.divider, height: 16),
-                        _buildDetailRow('Tốc độ trung bình', '${session.avgPace} phút/km'),
-                        const Divider(color: AppTheme.divider, height: 16),
-                        _buildDetailRow('Năng lượng tiêu thụ', '${session.calories} kcal'),
-                        if (session.notes.isNotEmpty) ...[
-                          const Divider(color: AppTheme.divider, height: 16),
-                          _buildDetailRow('Ghi chú', session.notes),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // BẢNG PHÂN TÍCH TỪNG KM (SPLITS BREAKDOWN)
-                  if (session.effectiveSplits.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    SplitsBreakdownCard(splits: session.effectiveSplits),
-                  ],
-
-                  const SizedBox(height: 16),
-                  // NÚT XEM MÔ PHỎNG 3D FLYOVER (Chỉ load video khi người dùng nhấn vào)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
-                      label: const Text(
-                        'VIDEO QUÁ TRÌNH',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.secondaryNeon,
-                        foregroundColor: Colors.white,
-                        elevation: 6,
-                        shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(ctx).pop(); // Đóng bottomsheet
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => RouteFlyover3DScreen(session: session),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9.5,
+            color: AppTheme.textMuted,
+            fontWeight: FontWeight.bold,
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
+        ),
       ],
     );
   }

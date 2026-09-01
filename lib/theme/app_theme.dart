@@ -31,7 +31,7 @@ class AppTheme {
         onSecondary: Colors.white,
         onSurface: textPrimary,
       ),
-      textTheme: GoogleFonts.outfitTextTheme(
+      textTheme: GoogleFonts.beVietnamProTextTheme(
         ThemeData.dark().textTheme,
       ).apply(
         bodyColor: textPrimary,

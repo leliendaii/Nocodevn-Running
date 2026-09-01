@@ -367,9 +367,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Chỉnh sửa Ghi chú
+                // Chỉnh sửa Tên buổi chạy
                 const Text(
-                  'Ghi chú bổ sung:',
+                  'Tên buổi chạy:',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 4),
@@ -378,8 +378,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   style: const TextStyle(fontSize: 12),
                   decoration: const InputDecoration(
                     isDense: true,
-                    hintText: 'Lý do chỉnh sửa...',
-                    prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.secondaryNeon, size: 18),
+                    hintText: 'Nhập tên buổi chạy...',
+                    prefixIcon: Icon(Icons.edit_note_rounded, color: AppTheme.secondaryNeon, size: 18),
                     contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                   ),
                 ),

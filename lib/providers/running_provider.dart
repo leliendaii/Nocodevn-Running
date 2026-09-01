@@ -1072,13 +1072,13 @@ class RunningProvider with ChangeNotifier {
     }
   }
 
-  // Quản trị viên xóa buổi chạy
-  void deleteRunSession(String sessionId) {
+  // Quản trị viên hoặc Người dùng xóa buổi chạy
+  Future<bool> deleteRunSession(String sessionId) async {
     _sessions.removeWhere((s) => s.id == sessionId);
-    LocalStorageService.cacheAllRunSessions(_sessions);
+    await LocalStorageService.cacheAllRunSessions(_sessions);
     notifyListeners();
 
-    SupabaseService.deleteRunSession(sessionId);
+    return await SupabaseService.deleteRunSession(sessionId);
   }
 
   // ==========================================================
@@ -1257,7 +1257,7 @@ class RunningProvider with ChangeNotifier {
     final list = (userId == null || userId.isEmpty)
         ? _sessions
         : getUserSessions(userId, email, username, name);
-    final history = list.fold(0, (sum, s) => sum + s.calories);
-    return history + (isRunning ? _calories : 0);
+    final history = list.fold(0.0, (sum, s) => sum + s.calories);
+    return history.toInt() + (isRunning ? _calories : 0);
   }
 }

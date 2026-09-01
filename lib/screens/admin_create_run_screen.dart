@@ -591,8 +591,8 @@ class _AdminCreateRunScreenState extends State<AdminCreateRunScreen> {
               ),
               const SizedBox(height: 18),
 
-              // 4. THẺ GHI CHÚ
-              _buildSectionTitle('4. GHI CHÚ & LÝ DO TẠO'),
+              // 4. THẺ TÊN BUỔI CHẠY
+              _buildSectionTitle('4. TÊN BUỔI CHẠY'),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -606,8 +606,8 @@ class _AdminCreateRunScreenState extends State<AdminCreateRunScreen> {
                   maxLines: 2,
                   style: const TextStyle(fontSize: 13),
                   decoration: const InputDecoration(
-                    hintText: 'Nhập ghi chú bổ sung (VD: Bổ sung giải chạy offline, phê duyệt thành tích...)',
-                    prefixIcon: Icon(Icons.note_alt_outlined, color: AppTheme.secondaryNeon, size: 20),
+                    hintText: 'Nhập tên buổi chạy (VD: Giải chạy Offline, Chạy bộ công viên...)',
+                    prefixIcon: Icon(Icons.edit_note_rounded, color: AppTheme.secondaryNeon, size: 22),
                   ),
                 ),
               ),
