@@ -368,7 +368,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
                 borderRadius: BorderRadius.circular(24),
                 side: const BorderSide(
                   color: Colors.white,
-                  width: 2.0,
+                  width: 1.5,
                 ),
               ),
             ),
