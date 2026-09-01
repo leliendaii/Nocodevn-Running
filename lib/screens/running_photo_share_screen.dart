@@ -30,6 +30,14 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   int _selectedTemplate = 0; // 0: Tối giản, 1: Bản đồ, 2: Huy hiệu
   bool _isExporting = false;
 
+  // Cấu hình bật/tắt các thông số ghép vào ảnh
+  bool _showLogo = true;
+  bool _showDate = true;
+  bool _showDistance = true;
+  bool _showDuration = true;
+  bool _showPace = true;
+  bool _showCalories = true;
+
   /// Chọn ảnh từ máy ảnh hoặc thư viện
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -125,7 +133,165 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     );
   }
 
-  /// Render ảnh preview thành file ảnh PNG độ nét cao
+  /// Hiển thị Modal tuỳ chỉnh bật/tắt các thông số ghép vào ảnh
+  void _showOverlaySettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.divider,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'TUỲ CHỈNH THÔNG SỐ ẢNH',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _showLogo = true;
+                            _showDate = true;
+                            _showDistance = true;
+                            _showDuration = true;
+                            _showPace = true;
+                            _showCalories = true;
+                          });
+                          setModalState(() {});
+                        },
+                        child: const Text(
+                          'Mặc định',
+                          style: TextStyle(
+                            color: AppTheme.secondaryNeon,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSettingSwitch(
+                    title: 'Logo ứng dụng',
+                    icon: Icons.directions_run_rounded,
+                    value: _showLogo,
+                    onChanged: (val) {
+                      setState(() => _showLogo = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Ngày chạy',
+                    icon: Icons.calendar_today_rounded,
+                    value: _showDate,
+                    onChanged: (val) {
+                      setState(() => _showDate = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Cự ly (KM)',
+                    icon: Icons.straighten_rounded,
+                    value: _showDistance,
+                    onChanged: (val) {
+                      setState(() => _showDistance = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Thời gian chạy',
+                    icon: Icons.timer_rounded,
+                    value: _showDuration,
+                    onChanged: (val) {
+                      setState(() => _showDuration = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Nhịp Pace (/km)',
+                    icon: Icons.speed_rounded,
+                    value: _showPace,
+                    onChanged: (val) {
+                      setState(() => _showPace = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Lượng Calo (kcal)',
+                    icon: Icons.local_fire_department_rounded,
+                    value: _showCalories,
+                    onChanged: (val) {
+                      setState(() => _showCalories = val);
+                      setModalState(() {});
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSettingSwitch({
+    required String title,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: value ? AppTheme.primaryNeon : AppTheme.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: value ? AppTheme.textPrimary : AppTheme.textMuted,
+              ),
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeThumbColor: AppTheme.primaryNeon,
+            activeTrackColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
   Future<File?> _renderImageFile() async {
     try {
       final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
@@ -212,9 +378,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
         title: const Text('Tạo ảnh check-in'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_a_photo_rounded, color: AppTheme.secondaryNeon),
-            tooltip: 'Đổi ảnh',
-            onPressed: _showImageSourceSheet,
+            icon: const Icon(Icons.tune_rounded, color: AppTheme.textPrimary),
+            tooltip: 'Tuỳ chỉnh thông số',
+            onPressed: _showOverlaySettingsSheet,
           ),
         ],
       ),
@@ -492,98 +658,97 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
         return _buildMinimalTemplate();
     }
   }
-
-  // ==========================================
-  // TEMPLATE 1: TỐI GIẢN (MINIMAL STATS)
-  // ==========================================
   Widget _buildMinimalTemplate() {
     final s = widget.session;
-    final dateStr = DateFormat('dd/MM/yyyy • HH:mm').format(s.startTime);
+    final dateStr = DateFormat('dd/MM/yyyy').format(s.startTime);
+
+    final bottomStats = <Widget>[];
+    if (_showDuration) {
+      bottomStats.add(_buildMiniStat('THỜI GIAN', s.formattedDuration));
+    }
+    if (_showPace) {
+      if (bottomStats.isNotEmpty) bottomStats.add(_buildDivider());
+      bottomStats.add(_buildMiniStat('PACE', '${s.formattedPace} /km'));
+    }
+    if (_showCalories) {
+      if (bottomStats.isNotEmpty) bottomStats.add(_buildDivider());
+      bottomStats.add(_buildMiniStat('CALO', '${s.calories} kcal'));
+    }
 
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo & Tên ứng dụng ở góc trên
+          // Logo & Ngày ở góc trên (chỉ có logo, không có chữ)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryNeon,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.directions_run_rounded, size: 16, color: Colors.white),
+              if (_showLogo)
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryNeon,
+                    borderRadius: BorderRadius.circular(9),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'NOCODEVN RUNNING',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                      color: Colors.white,
-                    ),
+                  child: const Icon(
+                    Icons.directions_run_rounded,
+                    size: 18,
+                    color: Colors.white,
                   ),
-                ],
-              ),
-              Text(
-                dateStr,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+                )
+              else
+                const SizedBox.shrink(),
+              if (_showDate)
+                Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
             ],
           ),
 
           const Spacer(),
 
           // Thông số Cự ly Khổng lồ
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                s.distanceKm.toStringAsFixed(2),
-                style: const TextStyle(
-                  fontSize: 54,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -1.0,
-                  height: 1.0,
+          if (_showDistance)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  s.distanceKm.toStringAsFixed(2),
+                  style: const TextStyle(
+                    fontSize: 54,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -1.0,
+                    height: 1.0,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'KM',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.primaryNeon,
-                  letterSpacing: 1.0,
+                const SizedBox(width: 8),
+                const Text(
+                  'KM',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.primaryNeon,
+                    letterSpacing: 1.0,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          const SizedBox(height: 12),
-
-          // Bộ 3 thông số: Thời gian, Pace, Calo
-          Row(
-            children: [
-              _buildMiniStat('THỜI GIAN', s.formattedDuration),
-              _buildDivider(),
-              _buildMiniStat('PACE', '${s.formattedPace} /km'),
-              _buildDivider(),
-              _buildMiniStat('CALO', '${s.calories} kcal'),
-            ],
-          ),
+          if (bottomStats.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(children: bottomStats),
+          ],
         ],
       ),
     );
@@ -594,25 +759,54 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   // ==========================================
   Widget _buildMapTemplate() {
     final s = widget.session;
+    final dateStr = DateFormat('dd/MM/yyyy').format(s.startTime);
+
+    final stats = <Widget>[];
+    if (_showDistance) {
+      stats.add(_buildCompactStat('${s.distanceKm.toStringAsFixed(2)} KM', 'Quãng đường', AppTheme.primaryNeon));
+    }
+    if (_showDuration) {
+      stats.add(_buildCompactStat(s.formattedDuration, 'Thời gian', Colors.white));
+    }
+    if (_showPace) {
+      stats.add(_buildCompactStat(s.formattedPace, 'Pace TB', AppTheme.secondaryNeon));
+    }
+    if (_showCalories) {
+      stats.add(_buildCompactStat('${s.calories}', 'Calo', AppTheme.accentOrange));
+    }
 
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Logo top
+          // Logo & Ngày góc trên
           Row(
-            children: const [
-              Icon(Icons.route_rounded, color: AppTheme.secondaryNeon, size: 18),
-              SizedBox(width: 6),
-              Text(
-                'BẢN ĐỒ LỘ TRÌNH',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.secondaryNeon,
-                  letterSpacing: 1.0,
-                ),
-              ),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (_showLogo)
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondaryNeon.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5)),
+                  ),
+                  child: const Icon(Icons.route_rounded, color: AppTheme.secondaryNeon, size: 18),
+                )
+              else
+                const SizedBox.shrink(),
+              if (_showDate)
+                Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
             ],
           ),
 
@@ -631,30 +825,26 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
           ),
 
           // Thẻ thông số đáy
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5), width: 1.2),
+          if (stats.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5), width: 1.2),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: stats,
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildCompactStat('${s.distanceKm.toStringAsFixed(2)} KM', 'Quãng đường', AppTheme.primaryNeon),
-                _buildCompactStat(s.formattedDuration, 'Thời gian', Colors.white),
-                _buildCompactStat(s.formattedPace, 'Pace TB', AppTheme.secondaryNeon),
-                _buildCompactStat('${s.calories}', 'Calo', AppTheme.accentOrange),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
   // ==========================================
-  // TEMPLATE 3: STORY BADGE (HUY HIỆU THỂ THAO PRO)
+  // TEMPLATE 3: STORY BADGE (HUY HIỆU THỂ THAO)
   // ==========================================
   Widget _buildBadgeTemplate() {
     final s = widget.session;
@@ -684,82 +874,101 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.workspace_premium_rounded, color: AppTheme.primaryNeon, size: 20),
-                        SizedBox(width: 6),
-                        Text(
-                          'NOCODEVN RUNNING',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.0,
-                            color: AppTheme.primaryNeon,
+                if (_showLogo || _showDate) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (_showLogo)
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryNeon.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
                           ),
+                          child: const Icon(Icons.workspace_premium_rounded, color: AppTheme.primaryNeon, size: 20),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      if (_showDate)
+                        Text(
+                          dateStr,
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
                         ),
-                      ],
-                    ),
-                    Text(
-                      dateStr,
-                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const Divider(color: AppTheme.divider, height: 20),
+                    ],
+                  ),
+                  const Divider(color: AppTheme.divider, height: 20),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Column(
-                      children: [
-                        Text(
-                          s.distanceKm.toStringAsFixed(2),
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                    if (_showDistance)
+                      Column(
+                        children: [
+                          Text(
+                            s.distanceKm.toStringAsFixed(2),
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        const Text(
-                          'KM',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          s.formattedPace,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.secondaryNeon,
+                          const Text(
+                            'KM',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                           ),
-                        ),
-                        const Text(
-                          'PACE',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          s.formattedDuration,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                        ],
+                      ),
+                    if (_showPace)
+                      Column(
+                        children: [
+                          Text(
+                            s.formattedPace,
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.secondaryNeon,
+                            ),
                           ),
-                        ),
-                        const Text(
-                          'THỜI GIAN',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
+                          const Text(
+                            'PACE',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    if (_showDuration)
+                      Column(
+                        children: [
+                          Text(
+                            s.formattedDuration,
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Text(
+                            'THỜI GIAN',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    if (_showCalories)
+                      Column(
+                        children: [
+                          Text(
+                            '${s.calories}',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.accentOrange,
+                            ),
+                          ),
+                          const Text(
+                            'CALO',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ],
