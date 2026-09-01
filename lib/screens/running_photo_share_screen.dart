@@ -32,12 +32,28 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
 
   // Cấu hình bật/tắt các thông số ghép vào ảnh
   bool _showLogo = true;
+  bool _showTime = false; // Bật sẽ hiển thị giờ chạy (HH:mm) trước ngày
   bool _showDate = true;
   bool _showDistance = true;
   bool _showDuration = true;
   bool _showPace = true;
   bool _showCalories = true;
   bool _showSteps = true;
+
+  /// Định dạng chuỗi Thời gian (Giờ - Ngày) theo tuỳ chọn bật/tắt của người dùng
+  String _formatDateTime(DateTime dt) {
+    final timeStr = DateFormat('HH:mm').format(dt);
+    final dateStr = DateFormat('dd/MM/yyyy').format(dt);
+
+    if (_showTime && _showDate) {
+      return '$timeStr - $dateStr';
+    } else if (_showTime) {
+      return timeStr;
+    } else if (_showDate) {
+      return dateStr;
+    }
+    return '';
+  }
 
   /// Chọn ảnh từ máy ảnh hoặc thư viện
   Future<void> _pickImage(ImageSource source) async {
@@ -178,6 +194,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                         onPressed: () {
                           setState(() {
                             _showLogo = true;
+                            _showTime = false;
                             _showDate = true;
                             _showDistance = true;
                             _showDuration = true;
@@ -209,7 +226,16 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                     },
                   ),
                   _buildSettingSwitch(
-                    title: 'Ngày chạy',
+                    title: 'Giờ chạy (Time)',
+                    icon: Icons.access_time_rounded,
+                    value: _showTime,
+                    onChanged: (val) {
+                      setState(() => _showTime = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Ngày chạy (Date)',
                     icon: Icons.calendar_today_rounded,
                     value: _showDate,
                     onChanged: (val) {
@@ -683,7 +709,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   }
   Widget _buildMinimalTemplate() {
     final s = widget.session;
-    final dateStr = DateFormat('dd/MM/yyyy').format(s.startTime);
+    final dateTimeStr = _formatDateTime(s.startTime);
 
     final bottomStats = <Widget>[];
     if (_showDuration) {
@@ -719,9 +745,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 )
               else
                 const SizedBox.shrink(),
-              if (_showDate)
+              if (dateTimeStr.isNotEmpty)
                 Text(
-                  dateStr,
+                  dateTimeStr,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.white.withValues(alpha: 0.85),
@@ -779,7 +805,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   // ==========================================
   Widget _buildMapTemplate() {
     final s = widget.session;
-    final dateStr = DateFormat('dd/MM/yyyy').format(s.startTime);
+    final dateTimeStr = _formatDateTime(s.startTime);
 
     final stats = <Widget>[];
     if (_showDistance) {
@@ -815,9 +841,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 )
               else
                 const SizedBox.shrink(),
-              if (_showDate)
+              if (dateTimeStr.isNotEmpty)
                 Text(
-                  dateStr,
+                  dateTimeStr,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.white.withValues(alpha: 0.85),
@@ -868,8 +894,8 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   // ==========================================
   Widget _buildBadgeTemplate() {
     final s = widget.session;
-    final dateStr = DateFormat('dd/MM/yyyy').format(s.startTime);
-    final showTop = _showLogo || _showDate;
+    final dateTimeStr = _formatDateTime(s.startTime);
+    final showTop = _showLogo || dateTimeStr.isNotEmpty;
 
     // Danh sách các thông số phụ đi kèm
     final subStats = <Widget>[];
@@ -923,14 +949,14 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                         )
                       else
                         const SizedBox.shrink(),
-                      if (_showDate)
+                      if (dateTimeStr.isNotEmpty)
                         Text(
-                          dateStr,
+                          dateTimeStr,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             color: Colors.white.withValues(alpha: 0.75),
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
+                            letterSpacing: 0.2,
                           ),
                         ),
                     ],
