@@ -232,6 +232,8 @@ class LocalStorageService {
         'calories': session.calories,
         'notes': session.notes,
         'route_points': session.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
+        'pause_points': session.pausePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
+        'splits': session.splits.map((sp) => sp.toJson()).toList(),
       };
 
       // Tránh trùng lặp
@@ -262,6 +264,24 @@ class LocalStorageService {
           }
         }
 
+        final List<RunPoint> pausePoints = [];
+        if (item['pause_points'] is List) {
+          for (final pt in item['pause_points']) {
+            if (pt is Map && pt['x'] != null && pt['y'] != null) {
+              pausePoints.add(RunPoint((pt['x'] as num).toDouble(), (pt['y'] as num).toDouble()));
+            }
+          }
+        }
+
+        final List<KmSplit> splits = [];
+        if (item['splits'] is List) {
+          for (final sp in item['splits']) {
+            if (sp is Map) {
+              splits.add(KmSplit.fromJson(Map<String, dynamic>.from(sp)));
+            }
+          }
+        }
+
         sessions.add(
           RunSession(
             id: item['id'].toString(),
@@ -274,6 +294,8 @@ class LocalStorageService {
             calories: (item['calories'] as num?)?.toInt() ?? 0,
             notes: item['notes'] ?? '',
             routePoints: routePoints,
+            pausePoints: pausePoints,
+            splits: splits,
           ),
         );
       }
@@ -297,7 +319,7 @@ class LocalStorageService {
     }
   }
 
-  /// Cache toàn bộ lịch sử chạy bộ vào máy (bao gồm cả tọa độ GPS route_points)
+  /// Cache toàn bộ lịch sử chạy bộ vào máy (bao gồm cả tọa độ GPS route_points & splits)
   static Future<void> cacheAllRunSessions(List<RunSession> sessions) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -313,6 +335,7 @@ class LocalStorageService {
         'notes': s.notes,
         'route_points': s.routePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
         'pause_points': s.pausePoints.map((p) => {'x': p.x, 'y': p.y}).toList(),
+        'splits': s.splits.map((sp) => sp.toJson()).toList(),
       }).toList();
 
       await prefs.setString(_keyCachedSessions, jsonEncode(list));
@@ -321,7 +344,7 @@ class LocalStorageService {
     }
   }
 
-  /// Tải lịch sử chạy bộ từ cache khi chưa có mạng (Khôi phục đầy đủ tọa độ GPS)
+  /// Tải lịch sử chạy bộ từ cache khi chưa có mạng (Khôi phục đầy đủ tọa độ GPS & splits)
   static Future<List<RunSession>> loadCachedRunSessions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -354,6 +377,15 @@ class LocalStorageService {
           }
         }
 
+        final List<KmSplit> splits = [];
+        if (item['splits'] is List) {
+          for (final sp in item['splits']) {
+            if (sp is Map) {
+              splits.add(KmSplit.fromJson(Map<String, dynamic>.from(sp)));
+            }
+          }
+        }
+
         sessions.add(
           RunSession(
             id: id,
@@ -367,6 +399,7 @@ class LocalStorageService {
             notes: item['notes'] ?? '',
             routePoints: routePoints,
             pausePoints: pausePoints,
+            splits: splits,
           ),
         );
       }

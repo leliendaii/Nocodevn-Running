@@ -7,6 +7,7 @@ import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/top_sync_toast.dart';
+import '../widgets/splits_breakdown_card.dart';
 import 'route_flyover_3d_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -283,120 +284,132 @@ class HistoryScreen extends StatelessWidget {
       ),
       builder: (ctx) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.divider,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Chi tiết buổi chạy',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      '${session.formattedDistance} KM',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.primaryNeon,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.divider,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  formattedDate,
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceLight,
-                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Column(
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Người chạy', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                          Row(
-                            children: [
-                              UserAvatar(
-                                avatarUrl: realAvatar,
-                                name: realName,
-                                radius: 12,
-                                isAdmin: isAdmin,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(realName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ],
-                          ),
-                        ],
+                      const Text(
+                        'Chi tiết buổi chạy',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      const Divider(color: AppTheme.divider, height: 16),
-                      _buildDetailRow('Tổng thời gian', session.formattedDuration),
-                      const Divider(color: AppTheme.divider, height: 16),
-                      _buildDetailRow('Tốc độ trung bình', '${session.avgPace} phút/km'),
-                      const Divider(color: AppTheme.divider, height: 16),
-                      _buildDetailRow('Năng lượng tiêu thụ', '${session.calories} kcal'),
-                      if (session.notes.isNotEmpty) ...[
-                        const Divider(color: AppTheme.divider, height: 16),
-                        _buildDetailRow('Ghi chú', session.notes),
-                      ],
+                      Text(
+                        '${session.formattedDistance} KM',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primaryNeon,
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                // NÚT XEM MÔ PHỎNG 3D FLYOVER (Chỉ load video khi người dùng nhấn vào)
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
-                    label: const Text(
-                      'VIDEO QUÁ TRÌNH',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondaryNeon,
-                      foregroundColor: Colors.white,
-                      elevation: 6,
-                      shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(ctx).pop(); // Đóng bottomsheet
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => RouteFlyover3DScreen(session: session),
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 4),
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Người chạy', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                            Row(
+                              children: [
+                                UserAvatar(
+                                  avatarUrl: realAvatar,
+                                  name: realName,
+                                  radius: 12,
+                                  isAdmin: isAdmin,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(realName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const Divider(color: AppTheme.divider, height: 16),
+                        _buildDetailRow('Tổng thời gian', session.formattedDuration),
+                        const Divider(color: AppTheme.divider, height: 16),
+                        _buildDetailRow('Tốc độ trung bình', '${session.avgPace} phút/km'),
+                        const Divider(color: AppTheme.divider, height: 16),
+                        _buildDetailRow('Năng lượng tiêu thụ', '${session.calories} kcal'),
+                        if (session.notes.isNotEmpty) ...[
+                          const Divider(color: AppTheme.divider, height: 16),
+                          _buildDetailRow('Ghi chú', session.notes),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  // BẢNG PHÂN TÍCH TỪNG KM (SPLITS BREAKDOWN)
+                  if (session.effectiveSplits.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SplitsBreakdownCard(splits: session.effectiveSplits),
+                  ],
+
+                  const SizedBox(height: 16),
+                  // NÚT XEM MÔ PHỎNG 3D FLYOVER (Chỉ load video khi người dùng nhấn vào)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
+                      label: const Text(
+                        'VIDEO QUÁ TRÌNH',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.secondaryNeon,
+                        foregroundColor: Colors.white,
+                        elevation: 6,
+                        shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(ctx).pop(); // Đóng bottomsheet
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RouteFlyover3DScreen(session: session),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );

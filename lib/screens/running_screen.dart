@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
+import '../models/run_session.dart';
 import '../services/voice_coach_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/splits_breakdown_card.dart';
 
 class RunningScreen extends StatefulWidget {
   const RunningScreen({super.key});
@@ -877,6 +879,114 @@ class _RunningScreenState extends State<RunningScreen>
                           ),
                         ),
                       ],
+                    ),
+
+                    // 4. Thanh Từng KM Trực Tiếp (Live Splits Bar)
+                    Selector<RunningProvider, (List<KmSplit>, bool)>(
+                      selector: (_, p) => (p.currentSplits, p.isRunning || p.isPaused),
+                      builder: (context, data, _) {
+                        final splits = data.$1;
+                        final isActive = data.$2;
+                        if (!isActive || splits.isEmpty) return const SizedBox.shrink();
+
+                        final lastSplit = splits.last;
+                        return Container(
+                          margin: const EdgeInsets.only(top: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryNeon.withValues(alpha: 0.1),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.flag_rounded, color: AppTheme.primaryNeon, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'KM ${lastSplit.kmIndex}: ${lastSplit.pace}/km',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  if (lastSplit.isBestSplit) ...[
+                                    const SizedBox(width: 4),
+                                    const Text('🔥', style: TextStyle(fontSize: 11)),
+                                  ],
+                                ],
+                              ),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    useRootNavigator: true,
+                                    isScrollControlled: true,
+                                    backgroundColor: AppTheme.surface,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                    ),
+                                    builder: (ctx) => SafeArea(
+                                      child: Container(
+                                        constraints: BoxConstraints(
+                                          maxHeight: MediaQuery.of(context).size.height * 0.75,
+                                        ),
+                                        child: SingleChildScrollView(
+                                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Center(
+                                                child: Container(
+                                                  width: 36,
+                                                  height: 4,
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.divider,
+                                                    borderRadius: BorderRadius.circular(2),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              SplitsBreakdownCard(splits: splits),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'Xem ${splits.length} KM',
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.primaryNeon,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      const Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.primaryNeon),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

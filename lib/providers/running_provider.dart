@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/calorie_calculator.dart';
 import '../services/gps_compression_service.dart';
+import '../services/gps_kalman_filter.dart';
 import '../services/live_workout_notification_service.dart';
 
 enum TrackingState { idle, running, paused, finished }
@@ -41,7 +42,22 @@ class RunningProvider with ChangeNotifier {
   DateTime? _lastPositionTime;
   StreamSubscription<Position>? _positionStream;
 
+  // BỘ LỌC KALMAN 3 LỚP & TỰ ĐỘNG TẠM DỪNG THÔNG MINH
+  final GpsKalmanFilter _kalmanFilter = GpsKalmanFilter();
+  String _smoothRollingPace = '0:00';
+  bool _autoPauseEnabled = true;
+  bool _isAutoPausedByFilter = false;
+
+  // PHÂN TÍCH TỪNG KM (SPLITS / LAP BREAKDOWN)
+  final List<KmSplit> _currentSplits = [];
+  int _lastLapTimeSeconds = 0;
+  int _lastLapCalories = 0;
+
   List<RunPoint> get pausePoints => List.unmodifiable(_pausePoints);
+  List<KmSplit> get currentSplits => List.unmodifiable(_currentSplits);
+  bool get autoPauseEnabled => _autoPauseEnabled;
+  bool get isAutoPausedByFilter => _isAutoPausedByFilter;
+  String get instantPace => _smoothRollingPace != '0:00' ? _smoothRollingPace : currentPace;
 
   // Cấu hình Khung giờ chạy & Tự động kết thúc (Chống quên) - Theo từng User
   String? _activeUserId;
@@ -350,6 +366,11 @@ class RunningProvider with ChangeNotifier {
   int get reminderHour => _reminderHour;
   int get reminderMinute => _reminderMinute;
 
+  void setAutoPauseEnabled(bool enabled) {
+    _autoPauseEnabled = enabled;
+    notifyListeners();
+  }
+
   /// Vận tốc trung bình cả buổi (km/h)
   double get currentSpeedKmh {
     if (_distanceKm <= 0.005 || _durationSeconds <= 0) return 0.0;
@@ -453,7 +474,7 @@ class RunningProvider with ChangeNotifier {
     }
   }
 
-  // Bắt đầu chạy đo GPS thực tế & Bộ lọc nhiễu chính xác (Zero Jitter & Anti-Drift)
+  /// Bắt đầu chạy đo GPS thực tế & Bộ lọc nhiễu Kalman 3 Lớp (Zero Jitter & Anti-Drift)
   Future<void> startTracking([String? userId]) async {
     if (userId != null && userId.isNotEmpty) {
       _activeUserId = userId;
@@ -463,10 +484,17 @@ class RunningProvider with ChangeNotifier {
     _distanceKm = 0.0;
     _calories = 0;
     _instantSpeedKmh = 0.0;
+    _smoothRollingPace = '0:00';
+    _isAutoPausedByFilter = false;
     _runStartTime = DateTime.now();
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
     _currentRoute.clear();
+    _pausePoints.clear();
+    _currentSplits.clear();
+    _lastLapTimeSeconds = 0;
+    _lastLapCalories = 0;
+    _kalmanFilter.reset();
     _lastPosition = null;
     _lastPositionTime = null;
     _lastMilestoneKm = 0;
@@ -484,7 +512,7 @@ class RunningProvider with ChangeNotifier {
     // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_state == TrackingState.running) {
+      if (_state == TrackingState.running && !_isAutoPausedByFilter) {
         _updateDurationFromWallClock();
         notifyListeners();
 
@@ -559,15 +587,16 @@ class RunningProvider with ChangeNotifier {
           );
         }
 
-        // 1. Lấy ngay vị trí xuất phát tức thì tại thời điểm bấm bắt đầu (Gò Vấp / Điểm thật)
+        // 1. Lấy ngay vị trí xuất phát tức thì tại thời điểm bấm bắt đầu
         try {
           Geolocator.getCurrentPosition(
             locationSettings: locationSettings,
           ).then((initialPos) {
             if (_state == TrackingState.running && _currentRoute.isEmpty) {
+              final result = _kalmanFilter.processPosition(initialPos);
               _lastPosition = initialPos;
               _lastPositionTime = DateTime.now();
-              _currentRoute.add(RunPoint(initialPos.longitude, initialPos.latitude));
+              _currentRoute.add(RunPoint(result.longitude, result.latitude));
               saveActiveCheckpointNow();
               notifyListeners();
             }
@@ -578,85 +607,62 @@ class RunningProvider with ChangeNotifier {
           debugPrint('Lỗi khởi tạo GPS ban đầu: $e');
         }
 
-        // 2. Lắng nghe dòng tọa độ di chuyển liên tục
+        // 2. Lắng nghe dòng tọa độ di chuyển liên tục qua Bộ lọc Kalman 3 Lớp
         _positionStream?.cancel();
         _positionStream = Geolocator.getPositionStream(
           locationSettings: locationSettings,
         ).listen((Position position) {
           if (_state != TrackingState.running) return;
 
-          // Lọc bỏ tọa độ quá nhiễu (> 30m) để tránh sai số quá lớn
-          if (position.accuracy > 30.0) {
-            return;
-          }
-
           final now = DateTime.now();
           _updateDurationFromWallClock();
 
-          // Lấy vận tốc tức thời từ phần cứng GPS (m/s)
-          final double hwSpeedMps = (position.speed >= 0.0 && position.speedAccuracy <= 5.0)
-              ? position.speed
-              : -1.0;
+          // XỬ LÝ QUA BỘ LỌC KALMAN 3 LỚP (Lọc chính xác, triệt tiêu rung lắc & tính Rolling Pace)
+          final FilteredGpsResult result = _kalmanFilter.processPosition(position);
 
-          if (_lastPosition != null) {
-            final double distanceInMeters = Geolocator.distanceBetween(
-              _lastPosition!.latitude,
-              _lastPosition!.longitude,
-              position.latitude,
-              position.longitude,
-            );
+          _instantSpeedKmh = result.speedKmh;
+          if (result.rollingPace != '0:00') {
+            _smoothRollingPace = result.rollingPace;
+          }
 
-            final double timeDeltaSec = _lastPositionTime != null
-                ? (now.difference(_lastPositionTime!).inMilliseconds / 1000.0).clamp(0.1, 60.0)
-                : 1.0;
-
-            final double calcSpeedMps = distanceInMeters / timeDeltaSec;
-            final double effectiveSpeedMps = (hwSpeedMps >= 0.0) ? hwSpeedMps : calcSpeedMps;
-            final double effectiveSpeedKmh = effectiveSpeedMps * 3.6;
-
-            // BỘ LỌC CHUẨN STRAVA / GARMIN:
-            // 1. Kiểm tra nhảy bất thường (tốc độ > 55 km/h)
-            final bool isAbnormalJump = (calcSpeedMps > 15.3); // > 55 km/h
-
-            // 2. Kiểm tra đứng yên / rung lắc vi mô (< 1.2m và tốc độ < 0.8 km/h)
-            final bool isStationaryDrift = (distanceInMeters < 1.2 && effectiveSpeedKmh < 0.8) || (distanceInMeters < 0.6);
-
-            // 3. Cập nhật vận tốc tức thời thời gian thực:
-            if (isStationaryDrift) {
-              _instantSpeedKmh = 0.0;
-            } else if (!isAbnormalJump) {
-              _instantSpeedKmh = effectiveSpeedKmh.clamp(0.0, 45.0);
-            }
-
-            // 4. Ghi nhận di chuyển hợp lệ:
-            if (!isAbnormalJump && !isStationaryDrift) {
-              _distanceKm += distanceInMeters / 1000.0;
-              _calories = CalorieCalculator.calculate(
-                distanceKm: _distanceKm,
-                durationSeconds: _durationSeconds,
-              );
-              _currentRoute.add(RunPoint(position.longitude, position.latitude));
-              _lastPosition = position;
-              _lastPositionTime = now;
-
-              // Kiểm tra mốc KM (1.0km, 2.0km...) để rung thông báo
-              final int currentKm = _distanceKm.floor();
-              if (currentKm > _lastMilestoneKm && currentKm > 0) {
-                _lastMilestoneKm = currentKm;
-                onKilometerMilestone?.call(currentKm, currentPace, _durationSeconds);
+          // Xử lý Tự động tạm dừng thông minh (Smart Auto-Pause)
+          if (_autoPauseEnabled) {
+            if (_kalmanFilter.isAutoPaused && !_isAutoPausedByFilter) {
+              _isAutoPausedByFilter = true;
+              _pauseStartTime = now;
+              _pausePoints.add(RunPoint(result.latitude, result.longitude));
+            } else if (!_kalmanFilter.isAutoPaused && _isAutoPausedByFilter) {
+              _isAutoPausedByFilter = false;
+              if (_pauseStartTime != null) {
+                _totalPausedSeconds += now.difference(_pauseStartTime!).inSeconds;
+                _pauseStartTime = null;
               }
-            } else {
-              // Dù là dừng lại hay nhảy GPS, luôn đồng bộ lại mốc vị trí mới nhất
-              // ĐẢM BẢO TUYỆT ĐỐI KHÔNG BAO GIỜ BỊ TREO TỌA ĐỘ HAY ĐỨNG ĐẾM KM!
-              _lastPosition = position;
-              _lastPositionTime = now;
             }
-          } else {
-            // Tọa độ đầu tiên hợp lệ khi vừa bấm chạy
-            _currentRoute.add(RunPoint(position.longitude, position.latitude));
+          }
+
+          // Ghi nhận di chuyển hợp lệ
+          if (result.isValidMovement && result.distanceDeltaMeters > 0.0 && !_isAutoPausedByFilter) {
+            _distanceKm += result.distanceDeltaMeters / 1000.0;
+            _calories = CalorieCalculator.calculate(
+              distanceKm: _distanceKm,
+              durationSeconds: _durationSeconds,
+            );
+            _currentRoute.add(RunPoint(result.longitude, result.latitude));
             _lastPosition = position;
             _lastPositionTime = now;
-            _instantSpeedKmh = (hwSpeedMps >= 0.2) ? (hwSpeedMps * 3.6) : 0.0;
+
+            // Kiểm tra và ghi nhận bảng phân tích từng KM (Lap Split)
+            _checkAndRecordSplit(_distanceKm, _durationSeconds, _calories);
+
+            // Kiểm tra mốc KM (1.0km, 2.0km...) để rung thông báo & phát giọng nói
+            final int currentKm = _distanceKm.floor();
+            if (currentKm > _lastMilestoneKm && currentKm > 0) {
+              _lastMilestoneKm = currentKm;
+              onKilometerMilestone?.call(currentKm, currentPace, _durationSeconds);
+            }
+          } else {
+            _lastPosition = position;
+            _lastPositionTime = now;
           }
 
           notifyListeners();
@@ -667,6 +673,112 @@ class RunningProvider with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Kiểm tra và tự động chốt Lap Split khi vừa chạm mốc mỗi 1.0 KM
+  void _checkAndRecordSplit(double currentDist, int currentDuration, int currentCalories) {
+    final int currentFullKm = currentDist.floor();
+    if (currentFullKm > _currentSplits.length && currentFullKm > 0) {
+      final int newLapIndex = _currentSplits.length + 1;
+      final int lapDuration = (currentDuration - _lastLapTimeSeconds).clamp(1, 999999);
+      final int lapCalories = (currentCalories - _lastLapCalories).clamp(1, 999999);
+      final int splitPaceSec = lapDuration; // vì cự ly chẵn 1.0 km
+      final int min = splitPaceSec ~/ 60;
+      final int sec = splitPaceSec % 60;
+      final String paceStr = '$min:${sec.toString().padLeft(2, '0')}';
+
+      int delta = 0;
+      if (_currentSplits.isNotEmpty) {
+        delta = splitPaceSec - _currentSplits.last.paceSeconds;
+      }
+
+      final split = KmSplit(
+        kmIndex: newLapIndex,
+        distanceKm: 1.0,
+        durationSeconds: lapDuration,
+        pace: paceStr,
+        calories: lapCalories > 0 ? lapCalories : 65,
+        paceSeconds: splitPaceSec,
+        paceDeltaSeconds: delta,
+      );
+
+      _currentSplits.add(split);
+      _lastLapTimeSeconds = currentDuration;
+      _lastLapCalories = currentCalories;
+
+      // Cập nhật lại huy hiệu KM nhanh nhất (Best Split 🔥)
+      int minPace = 999999;
+      int bestIdx = 0;
+      for (int i = 0; i < _currentSplits.length; i++) {
+        if (_currentSplits[i].paceSeconds < minPace) {
+          minPace = _currentSplits[i].paceSeconds;
+          bestIdx = i;
+        }
+      }
+      for (int i = 0; i < _currentSplits.length; i++) {
+        final sp = _currentSplits[i];
+        _currentSplits[i] = KmSplit(
+          kmIndex: sp.kmIndex,
+          distanceKm: sp.distanceKm,
+          durationSeconds: sp.durationSeconds,
+          pace: sp.pace,
+          calories: sp.calories,
+          paceSeconds: sp.paceSeconds,
+          paceDeltaSeconds: sp.paceDeltaSeconds,
+          isBestSplit: i == bestIdx,
+        );
+      }
+    }
+  }
+
+  /// Hoàn thiện danh sách Splits đầy đủ bao gồm cả chặng lẻ cuối cùng khi kết thúc buổi chạy
+  List<KmSplit> _finalizeSplits() {
+    final List<KmSplit> result = List.from(_currentSplits);
+    final int totalFullKm = _distanceKm.floor();
+    final double remKm = _distanceKm - totalFullKm;
+
+    if (remKm >= 0.05) {
+      final int remDuration = (_durationSeconds - _lastLapTimeSeconds).clamp(1, 999999);
+      final int remCalories = (_calories - _lastLapCalories).clamp(1, 999999);
+      final int remPaceSec = remKm > 0 ? (remDuration / remKm).round() : 0;
+      final int min = remPaceSec ~/ 60;
+      final int sec = remPaceSec % 60;
+      final String paceStr = '$min:${sec.toString().padLeft(2, '0')}';
+
+      int delta = 0;
+      if (result.isNotEmpty) {
+        delta = remPaceSec - result.last.paceSeconds;
+      }
+
+      result.add(KmSplit(
+        kmIndex: totalFullKm + 1,
+        distanceKm: double.parse(remKm.toStringAsFixed(2)),
+        durationSeconds: remDuration,
+        pace: paceStr,
+        calories: remCalories > 0 ? remCalories : (65 * remKm).round(),
+        paceSeconds: remPaceSec,
+        paceDeltaSeconds: delta,
+      ));
+    }
+
+    // Nếu chưa có split nào (ví dụ chạy < 1.0 km)
+    if (result.isEmpty && _distanceKm >= 0.1 && _durationSeconds > 0) {
+      final int paceSec = (_durationSeconds / _distanceKm).round();
+      final int min = paceSec ~/ 60;
+      final int sec = paceSec % 60;
+      final String paceStr = '$min:${sec.toString().padLeft(2, '0')}';
+      result.add(KmSplit(
+        kmIndex: 1,
+        distanceKm: double.parse(_distanceKm.toStringAsFixed(2)),
+        durationSeconds: _durationSeconds,
+        pace: paceStr,
+        calories: _calories,
+        paceSeconds: paceSec,
+        isBestSplit: true,
+      ));
+    }
+
+    return result;
   }
 
   // Tạm dừng chạy (Chỉ ghi nhận cột mốc dừng khi user chủ động bấm Tạm dừng)
@@ -750,11 +862,14 @@ class RunningProvider with ChangeNotifier {
     _lastPosition = null;
     _lastPositionTime = null;
     _instantSpeedKmh = 0.0;
+    _smoothRollingPace = '0:00';
+    _isAutoPausedByFilter = false;
 
     // Hủy thông báo chạy ngầm khi đã hoàn thành buổi chạy
     LiveWorkoutNotificationService.cancelWorkoutNotification();
 
     final compressedRoute = GpsCompressionService.compress(_currentRoute);
+    final finalSplits = _finalizeSplits();
 
     final RunSession newSession = RunSession(
       id: 'run_${DateTime.now().millisecondsSinceEpoch}',
@@ -768,6 +883,7 @@ class RunningProvider with ChangeNotifier {
       notes: effectiveNotes,
       routePoints: compressedRoute,
       pausePoints: List.from(_pausePoints),
+      splits: finalSplits,
     );
 
     _sessions.insert(0, newSession);
@@ -780,6 +896,10 @@ class RunningProvider with ChangeNotifier {
     _instantSpeedKmh = 0.0;
     _currentRoute.clear();
     _pausePoints.clear();
+    _currentSplits.clear();
+    _lastLapTimeSeconds = 0;
+    _lastLapCalories = 0;
+    _kalmanFilter.reset();
     _runStartTime = null;
     _pauseStartTime = null;
     _totalPausedSeconds = 0;
