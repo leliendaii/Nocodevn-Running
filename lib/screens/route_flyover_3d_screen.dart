@@ -1584,7 +1584,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
     final double chaseScale = (overviewScale * 1.45).clamp(0.35, 1.85); // Zoom Theo dõi vừa vặn
     final double startScale = (overviewScale * 1.70).clamp(0.45, 2.40); // Zoom cận cảnh điểm BẮT ĐẦU
-    final double wideOverviewScale = overviewScale * 0.90; // Zoom nhỏ lại 1 tí để thấy hết toàn bộ quãng đường
+    final double endOverviewScale = (overviewScale * 1.16).clamp(0.28, 2.10); // Zoom to lên 1 tí ở cuối video toàn cảnh
 
     double camX;
     double camY;
@@ -1672,18 +1672,18 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camY = routeCenterY;
         camScale = overviewScale;
       } else if (progress < 0.85) {
-        // 5. Sau 0.75s: Zoom nhỏ lại 1 tí thôi để xem được hết quãng đường đã chạy (~1.5s)
+        // 5. Sau 0.75s: Zoom to lên 1 tí để thấy rõ ràng toàn bộ quãng đường đã chạy (~1.5s)
         flightProgress = 1.0;
         final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.75) / 0.10).clamp(0.0, 1.0));
         camX = routeCenterX;
         camY = routeCenterY;
-        camScale = ui.lerpDouble(overviewScale, wideOverviewScale, tOverview)!;
+        camScale = ui.lerpDouble(overviewScale, endOverviewScale, tOverview)!;
       } else {
         // 6. Để yên toàn cảnh tầm 2s và kết thúc (TĨNH 100%, KHÔNG CÓ HIỆU ỨNG RUNG LẮC)
         flightProgress = 1.0;
         camX = routeCenterX;
         camY = routeCenterY;
-        camScale = wideOverviewScale;
+        camScale = endOverviewScale;
       }
     }
 
