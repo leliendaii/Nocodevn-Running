@@ -1610,20 +1610,39 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 1.20);
     // GÓC QUAY RỘNG HƠN HỢP LÝ BAO QUÁT (Nhìn rõ người chạy, đường phố xung quanh 500-600m):
-    final double chaseScale = (overviewScale * 2.0).clamp(0.68, 0.85);
+    final double chaseScale = (overviewScale * 2.1).clamp(0.72, 0.88);
+    // GÓC NGHIÊNG 3D THẬT CHUẨN THỂ THAO (46 độ nhìn từ sau lưng hướng về phía trước):
+    final double maxPitch = 46.0 * math.pi / 180.0;
+    final double perspectiveD = 0.0010; // Hệ số viễn cảnh 3D an toàn, không biến dạng
 
     // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
     // - Phase 1 [0.00 - 0.08]: Bao quát toàn cảnh vùng chạy 2D ban đầu
-    // - Phase 2 [0.08 - 0.18]: Zoom mượt về điểm xuất phát, nghiêng dần góc 3D thể thao nhìn từ sau hướng lên trước
-    // - Phase 3 [0.18 - 0.72]: Chạy bám theo người chạy (BẢN ĐỒ GIỮ NGUYÊN HƯỚNG, KHÔNG XOAY LẮC)
-    // - Phase 4 [0.72 - 0.78]: Về đích dừng 1s
+    // - Phase 2 [0.08 - 0.18]: Zoom mượt về sau điểm xuất phát, ngả góc 3D thể thao
+    // - Phase 3 [0.18 - 0.72]: Chạy theo dõi 3D (Camera đặt sau định vị, định vị đi trước, camera quay theo hướng chạy)
+    // - Phase 4 [0.72 - 0.78]: Về đích dừng 1s (giữ nguyên góc nhìn sau đích)
     // - Phase 5 [0.78 - 0.88]: Zoom nhỏ lại mượt mà ra toàn cảnh lộ trình
-    // - Phase 6 [0.88 - 1.00]: Toàn cảnh lơ lửng nhẹ nhàng + hiện bảng tổng kết
+    // - Phase 6 [0.88 - 1.00]: Toàn cảnh tĩnh GIỮ NGUYÊN (KHÔNG rung lắc) + hiện bảng tổng kết
     double camX;
     double camY;
     double camScale;
-    double verticalTiltRatio; // 1.0 = phẳng 2D, 0.74 = góc nghiêng 3D thể thao nhìn từ sau ra trước
+    double camPitch;
+    double camAngle;
     double flightProgress;
+
+    // Tính toán góc camera xuất phát mượt mà
+    final double startHeading = sampledHeadings.first;
+    final int startAheadIdx = math.min(12, sampledPositions.length - 1);
+    final double startAheadHeading = sampledHeadings[startAheadIdx];
+    final double startSmoothHeading = _lerpAngle(startHeading, startAheadHeading, 0.40);
+    final double targetStartAngle = startSmoothHeading + math.pi / 2;
+    final double startCamX = startPinPixel.dx - math.cos(startSmoothHeading) * (48.0 / chaseScale);
+    final double startCamY = startPinPixel.dy - math.sin(startSmoothHeading) * (48.0 / chaseScale);
+
+    // Tính toán góc camera về đích
+    final double lastHeading = sampledHeadings.last;
+    final double targetFinishAngle = lastHeading + math.pi / 2;
+    final double finishCamX = finishPinPixel.dx - math.cos(lastHeading) * (48.0 / chaseScale);
+    final double finishCamY = finishPinPixel.dy - math.sin(lastHeading) * (48.0 / chaseScale);
 
     if (progress < 0.08) {
       // Phase 1: Toàn cảnh bao quát ban đầu
@@ -1631,17 +1650,19 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camX = routeCenterX;
       camY = routeCenterY;
       camScale = overviewScale;
-      verticalTiltRatio = 1.0;
+      camPitch = 0.0;
+      camAngle = 0.0;
     } else if (progress < 0.18) {
-      // Phase 2: Lướt zoom về điểm bắt đầu & ngả góc nhìn 3D từ sau hướng lên trước
+      // Phase 2: Lướt zoom về sau điểm bắt đầu & ngả góc nhìn 3D
       flightProgress = 0.0;
       final double tTransit = Curves.easeInOutCubic.transform(((progress - 0.08) / 0.10).clamp(0.0, 1.0));
-      camX = ui.lerpDouble(routeCenterX, startPinPixel.dx, tTransit)!;
-      camY = ui.lerpDouble(routeCenterY, startPinPixel.dy, tTransit)!;
+      camX = ui.lerpDouble(routeCenterX, startCamX, tTransit)!;
+      camY = ui.lerpDouble(routeCenterY, startCamY, tTransit)!;
       camScale = ui.lerpDouble(overviewScale, chaseScale, tTransit)!;
-      verticalTiltRatio = ui.lerpDouble(1.0, isFlycamMode ? 0.74 : 1.0, tTransit)!;
+      camPitch = ui.lerpDouble(0.0, isFlycamMode ? maxPitch : 0.0, tTransit)!;
+      camAngle = _lerpAngle(0.0, isFlycamMode ? targetStartAngle : 0.0, tTransit);
     } else if (progress < 0.72) {
-      // Phase 3: Bám theo người chạy (Bản đồ GIỮ NGUYÊN HƯỚNG, góc nhìn 3D từ sau ra trước ổn định)
+      // Phase 3: Chạy theo dõi 3D - Camera sau lưng định vị, định vị đi trước, camera quay theo hướng chạy
       flightProgress = ((progress - 0.18) / 0.54).clamp(0.0, 1.0);
 
       final double fIndex = (sampledPositions.length - 1) * flightProgress;
@@ -1650,57 +1671,73 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       final double subFrac = fIndex - baseIdx;
 
       final Offset currentPos = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
+      final double curHeading = _lerpAngle(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac);
+
+      // Tính toán hướng camera mượt mà đón đầu góc cua
+      final int lookAheadIdx = math.min(baseIdx + 14, sampledPositions.length - 1);
+      final double aheadHeading = sampledHeadings[lookAheadIdx];
+      final double smoothCamHeading = _lerpAngle(curHeading, aheadHeading, 0.40);
+
+      // Camera đặt sau lưng con trỏ định vị (định vị đi trước, camera đi sau)
+      final double dBehind = (48.0 / chaseScale).clamp(38.0, 62.0);
+      final double chaseCamX = currentPos.dx - math.cos(smoothCamHeading) * dBehind;
+      final double chaseCamY = currentPos.dy - math.sin(smoothCamHeading) * dBehind;
 
       if (isFlycamMode) {
-        camX = currentPos.dx;
-        camY = currentPos.dy;
+        camX = chaseCamX;
+        camY = chaseCamY;
         camScale = chaseScale;
-        verticalTiltRatio = 0.74;
+        camPitch = maxPitch;
+        // Camera xoay theo hướng chạy (định vị luôn hướng thẳng lên phía trước màn hình)
+        camAngle = smoothCamHeading + math.pi / 2;
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
-        verticalTiltRatio = 1.0;
+        camPitch = 0.0;
+        camAngle = 0.0;
       }
     } else if (progress < 0.78) {
-      // Phase 4: Về đích giữ nguyên góc nhìn 1s
+      // Phase 4: Về đích giữ nguyên góc nhìn 3D 1s
       flightProgress = 1.0;
       if (isFlycamMode) {
-        camX = finishPinPixel.dx;
-        camY = finishPinPixel.dy;
+        camX = finishCamX;
+        camY = finishCamY;
         camScale = chaseScale;
-        verticalTiltRatio = 0.74;
+        camPitch = maxPitch;
+        camAngle = targetFinishAngle;
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
-        verticalTiltRatio = 1.0;
+        camPitch = 0.0;
+        camAngle = 0.0;
       }
     } else if (progress < 0.88) {
       // Phase 5: Zoom nhỏ lại mượt mà ra toàn cảnh lộ trình
       flightProgress = 1.0;
       final double tOut = Curves.easeInOutCubic.transform(((progress - 0.78) / 0.10).clamp(0.0, 1.0));
       if (isFlycamMode) {
-        camX = ui.lerpDouble(finishPinPixel.dx, routeCenterX, tOut)!;
-        camY = ui.lerpDouble(finishPinPixel.dy, routeCenterY, tOut)!;
+        camX = ui.lerpDouble(finishCamX, routeCenterX, tOut)!;
+        camY = ui.lerpDouble(finishCamY, routeCenterY, tOut)!;
         camScale = ui.lerpDouble(chaseScale, overviewScale, tOut)!;
-        verticalTiltRatio = ui.lerpDouble(0.74, 1.0, tOut)!;
+        camPitch = ui.lerpDouble(maxPitch, 0.0, tOut)!;
+        camAngle = _lerpAngle(targetFinishAngle, 0.0, tOut);
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
-        verticalTiltRatio = 1.0;
+        camPitch = 0.0;
+        camAngle = 0.0;
       }
     } else {
-      // Phase 6: Toàn cảnh lơ lửng nhẹ nhàng + hiện bảng tổng kết
+      // Phase 6 [0.88 - 1.00]: Cuối video GIỮ NGUYÊN TĨNH, KHÔNG RUNG LẮC, hiện bảng tổng kết
       flightProgress = 1.0;
-      final double tFloat = ((progress - 0.88) / 0.12).clamp(0.0, 1.0);
-      final double floatX = math.sin(tFloat * math.pi * 2) * (spanW * 0.015);
-      final double floatY = math.cos(tFloat * math.pi * 2) * (spanH * 0.012);
-      camX = routeCenterX + floatX;
-      camY = routeCenterY + floatY;
+      camX = routeCenterX;
+      camY = routeCenterY;
       camScale = overviewScale;
-      verticalTiltRatio = 1.0;
+      camPitch = 0.0;
+      camAngle = 0.0;
     }
 
     final double currentDist = totalLength * flightProgress;
@@ -1715,9 +1752,9 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
     // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM
     final double effectiveCamScale = camScale * userScaleMultiplier;
-    final double strokeBase = (4.6 / effectiveCamScale).clamp(3.0, 6.2);
-    final double strokeCore = (1.8 / effectiveCamScale).clamp(1.2, 2.8);
-    final double strokeShadow = (7.2 / effectiveCamScale).clamp(5.0, 10.0);
+    final double strokeBase = (4.5 / effectiveCamScale).clamp(3.0, 6.2);
+    final double strokeCore = (1.6 / effectiveCamScale).clamp(1.2, 2.6);
+    final double strokeShadow = (7.0 / effectiveCamScale).clamp(5.0, 9.8);
 
     final Paint fullPathPaint = Paint()
       ..isAntiAlias = true
@@ -1751,22 +1788,36 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // 4. MA TRẬN BIẾN ĐỔI BẢN ĐỒ (BẢN ĐỒ GIỮ NGUYÊN HƯỚNG BẮC - NAM, GÓC NHÌN 3D TỪ DƯỚI HƯỚNG LÊN)
+    // 4. MA TRẬN 3D CHUẨN THỂ THAO (CAMERA SAU LƯNG ĐỊNH VỊ, ĐỊNH VỊ ĐI TRƯỚC VÀ HƯỚNG LÊN TRÊN)
     final double screenCenterX = size.width / 2 + userPanOffset.dx;
-    // Điểm đặt người chạy: khi theo dõi 3D, người chạy ở 62% màn hình (1/3 dưới)
-    final double runnerScreenY = (size.height * (verticalTiltRatio < 0.95 ? 0.62 : 0.50)) + userPanOffset.dy;
+    // Điểm đặt mắt nhìn: khi ở 3D theo dõi, camera lùi sau nên điểm nhìn ở 68% màn hình
+    final double runnerScreenY = (size.height * (camPitch > 0.05 ? 0.68 : 0.50)) + userPanOffset.dy;
 
     canvas.save();
-    canvas.translate(screenCenterX, runnerScreenY);
-    // Foreshortening dọc theo trục Y tạo độ nghiêng 3D từ sau hướng lên trước chuẩn xác, không biến dạng vector
-    canvas.scale(effectiveCamScale, effectiveCamScale * verticalTiltRatio);
-    canvas.translate(-camX, -camY);
+    if (camPitch > 0.05) {
+      final Matrix4 matrix = Matrix4.identity();
+      matrix.translateByDouble(screenCenterX, runnerScreenY, 0.0, 1.0);
+      matrix.setEntry(3, 2, perspectiveD);
+      matrix.rotateX(camPitch);
+      if (camAngle.abs() > 0.001) {
+        matrix.rotateZ(-camAngle);
+      }
+      matrix.scaleByDouble(effectiveCamScale, effectiveCamScale, 1.0, 1.0);
+      matrix.translateByDouble(-camX, -camY, 0.0, 1.0);
+      canvas.transform(matrix.storage);
+    } else {
+      canvas.translate(screenCenterX, runnerScreenY);
+      if (camAngle.abs() > 0.001) {
+        canvas.rotate(-camAngle);
+      }
+      canvas.scale(effectiveCamScale, effectiveCamScale);
+      canvas.translate(-camX, -camY);
+    }
 
-    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN 100% TOÀN MÀN HÌNH
+    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN 100% TOÀN MÀN HÌNH (KHÔNG BAO GIỜ THIẾU GÓC)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (((size.width / 2) / effectiveCamScale) / tileSize).ceil() + 3;
-    final int tileRadiusY = (((size.height / 2) / (effectiveCamScale * verticalTiltRatio)) / tileSize).ceil() + 3;
+    final int tileRadius = camPitch > 0.05 ? 9 : 5;
 
     final Color mapBgColor = mapType == 'satellite'
         ? const Color(0xFF0F172A)
@@ -1774,15 +1825,15 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
             ? const Color(0xFFE2E8F0)
             : const Color(0xFFF1F5F9);
     final totalMapRect = Rect.fromLTRB(
-      (centerTileX - tileRadiusX) * tileSize,
-      (centerTileY - tileRadiusY) * tileSize,
-      (centerTileX + tileRadiusX + 1) * tileSize,
-      (centerTileY + tileRadiusY + 1) * tileSize,
+      (centerTileX - tileRadius) * tileSize,
+      (centerTileY - tileRadius) * tileSize,
+      (centerTileX + tileRadius + 1) * tileSize,
+      (centerTileY + tileRadius + 1) * tileSize,
     );
     canvas.drawRect(totalMapRect, Paint()..color = mapBgColor);
 
-    for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
-      for (int dy = -tileRadiusY; dy <= tileRadiusY; dy++) {
+    for (int dx = -tileRadius; dx <= tileRadius; dx++) {
+      for (int dy = -tileRadius; dy <= tileRadius; dy++) {
         final tx = centerTileX + dx;
         final ty = centerTileY + dy;
         final key = '$mapType/$zoom/$tx/$ty';
@@ -1798,15 +1849,26 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       }
     }
 
-    // 6. VẼ TOÀN BỘ LỘ TRÌNH ĐƯỜNG CHẠY NỀN MỜ (ĐỂ NGƯỜI XEM THẤY CUNG ĐƯỜNG)
+    // 6. VẼ TOÀN BỘ LỘ TRÌNH ĐƯỜNG CHẠY NỀN MỜ (ĐỂ NGƯỜI XEM THẤY CUNG ĐƯỜNG PHÍA TRƯỚC)
     canvas.drawPath(fullPath, fullPathPaint);
 
-    // 7. VẼ ĐƯỜNG CHẠY HOÀN THÀNH MÀU CAM STRAVA RỰC RỠ (KHÔNG BAO GIỜ BỊ BIẾN DẠNG)
+    // 7. VẼ ĐƯỜNG CHẠY HOÀN THÀNH MÀU CAM STRAVA RỰC RỠ (TRIỆT TIÊU 100% HIỆN TƯỢNG BIẾN DẠNG)
     if (currentDist > 1.0) {
-      final Path activePath = pathMetric.extractPath(0.0, currentDist);
-      canvas.drawPath(activePath, shadowPaint);
-      canvas.drawPath(activePath, activePathPaint);
-      canvas.drawPath(activePath, coreHighlightPaint);
+      if (camPitch > 0.05) {
+        // Trong chế độ theo dõi 3D: chỉ vẽ vệt chạy nhìn thấy được (tối đa 450px sau lưng người chạy)
+        // để loại trừ các điểm quá xa sau lưng camera, triệt tiêu 100% hiện tượng biến dạng Skia
+        final double startVisibleDist = math.max(0.0, currentDist - (450.0 / effectiveCamScale));
+        final Path activePath = pathMetric.extractPath(startVisibleDist, currentDist);
+        canvas.drawPath(activePath, shadowPaint);
+        canvas.drawPath(activePath, activePathPaint);
+        canvas.drawPath(activePath, coreHighlightPaint);
+      } else {
+        // Trong toàn cảnh: vẽ toàn bộ vệt chạy từ xuất phát đến hiện tại
+        final Path activePath = pathMetric.extractPath(0.0, currentDist);
+        canvas.drawPath(activePath, shadowPaint);
+        canvas.drawPath(activePath, activePathPaint);
+        canvas.drawPath(activePath, coreHighlightPaint);
+      }
     }
 
     // 8. VẼ CÁC CỘT MỐC KM
@@ -1816,8 +1878,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
       canvas.save();
       canvas.translate(ms.pixel.dx, ms.pixel.dy);
-      // Bù lại tỉ lệ Y để các cột mốc luôn giữ hình dạng tròn đều
-      canvas.scale(1.0, 1.0 / verticalTiltRatio);
 
       if (isPassed) {
         canvas.drawCircle(Offset.zero, 8.5, Paint()..color = Colors.white..isAntiAlias = true);
@@ -1845,7 +1905,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     // Start Pin: Vòng tròn màu xanh lục neon nhỏ gọn
     canvas.save();
     canvas.translate(startPinPixel.dx, startPinPixel.dy);
-    canvas.scale(1.0, 1.0 / verticalTiltRatio);
     canvas.drawCircle(Offset.zero, 12, Paint()..color = const Color(0xFF10B981).withValues(alpha: 0.35));
     canvas.drawCircle(Offset.zero, 8.5, Paint()..color = Colors.white);
     canvas.drawCircle(Offset.zero, 6.5, Paint()..color = const Color(0xFF10B981));
@@ -1855,7 +1914,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     // Finish Pin: Hình tròn màu đỏ neon
     canvas.save();
     canvas.translate(finishPinPixel.dx, finishPinPixel.dy);
-    canvas.scale(1.0, 1.0 / verticalTiltRatio);
     if (flightProgress >= 0.99) {
       final double rippleT = ((progress - 0.72) * 6) % 1.0;
       canvas.drawCircle(
@@ -1873,10 +1931,9 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, 2.5, Paint()..color = Colors.white);
     canvas.restore();
 
-    // 10. VẼ ICON ĐỊNH VỊ THỂ THAO 3D NỔI BẬT (LUÔN HIỆN RÕ Ở TRUNG TÂM MÀN HÌNH)
+    // 10. VẼ ICON ĐỊNH VỊ THỂ THAO 3D NỔI BẬT (LUÔN CHẠY PHÍA TRƯỚC CAMERA)
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
-    canvas.scale(1.0, 1.0 / verticalTiltRatio);
 
     // Vòng sóng radar phát xung nhịp nhàng
     final double pulse = (progress * 14.0) % 1.0;
@@ -1923,11 +1980,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
     canvas.restore(); // Kết thúc vẽ Icon
 
-    canvas.restore(); // Kết thúc ma trận bản đồ
+    canvas.restore(); // Kết thúc ma trận bản đồ 3D
 
     // 11. BẢNG THÔNG SỐ HUD TRÊN ĐẦU (GIAO DIỆN KÍNH TRONG SUỐT STRAVA)
-    if (verticalTiltRatio < 0.95) {
-      final double hudOpacity = ((1.0 - verticalTiltRatio) / (1.0 - 0.74)).clamp(0.0, 1.0);
+    if (camPitch > 0.10) {
+      final double hudOpacity = (camPitch / maxPitch).clamp(0.0, 1.0);
       final double curDist = distanceKm * flightProgress;
       final int curCal = (calories * flightProgress).round();
 
