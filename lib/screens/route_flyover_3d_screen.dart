@@ -852,6 +852,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       userPanOffset: _userPanOffset,
       mapType: _selectedMapType,
       onTileRequested: (z, x, y) {},
+      distanceKm: _effectiveDistanceKm,
+      pace: _effectivePace,
+      durationSec: _effectiveDurationSec,
+      calories: _effectiveCalories,
     );
 
     // 1. Vẽ bản đồ 3D và lộ trình đường chạy trên khung hình 9:16
@@ -1147,6 +1151,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                   onTileRequested: (z, x, y) {
                                     MapTileCacheService.getTile(z, x, y, mapType: _selectedMapType);
                                   },
+                                  distanceKm: _effectiveDistanceKm,
+                                  pace: _effectivePace,
+                                  durationSec: _effectiveDurationSec,
+                                  calories: _effectiveCalories,
                                 ),
                                 size: Size.infinite,
                               );
@@ -1546,6 +1554,10 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
   final Offset userPanOffset;
   final String mapType;
   final Function(int z, int x, int y) onTileRequested;
+  final double distanceKm;
+  final String pace;
+  final int durationSec;
+  final int calories;
 
   static const double tileSize = 256.0;
 
@@ -1577,6 +1589,10 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     this.userPanOffset = Offset.zero,
     this.mapType = 'terrain',
     required this.onTileRequested,
+    this.distanceKm = 0.0,
+    this.pace = '0:00',
+    this.durationSec = 0,
+    this.calories = 0,
   });
 
   static double _lerpAngle(double a, double b, double t) {
@@ -1593,18 +1609,21 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
-    final double chaseScale = (overviewScale * 1.55).clamp(0.45, 2.20); // Zoom bám cận cảnh thấy rõ từng khối nhà, địa hình
+    final double chaseScale = (overviewScale * 1.65).clamp(0.45, 2.30); // Zoom bám cận cảnh thấy rõ nhà cửa, địa hình
+    final double maxPitch = 58.0 * math.pi / 180.0; // 58 độ nghiêng 3D chân thực chuẩn Strava
+    final double perspectiveD = 0.0022; // Hệ số viễn cảnh perspective chuẩn Strava
 
     // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
-    // - Phase 1 [0.00 - 0.08]: Bao quát toàn bộ vùng chạy ban đầu
-    // - Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & đổi góc quay về sau lưng cái định vị
-    // - Phase 3 [0.18 - 0.72]: Chạy bám sau lưng định vị, tự động ôm cua mượt mà theo góc rẽ
-    // - Phase 4 [0.72 - 0.78]: Chạy đến đích thì đợi 1s (giữ nguyên góc nhìn đích)
+    // - Phase 1 [0.00 - 0.08]: Bao quát toàn bộ vùng chạy ban đầu (Strava Screenshot 1)
+    // - Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & đổi góc quay 3D ngả về sau định vị, bầu trời mở ra
+    // - Phase 3 [0.18 - 0.72]: Chạy bám sau lưng định vị 3D chuẩn Strava (Strava Screenshot 2)
+    // - Phase 4 [0.72 - 0.78]: Chạy đến đích thì đợi 1s (giữ nguyên góc nhìn 3D đích)
     // - Phase 5 [0.78 - 0.88]: Zoom nhỏ lại mượt mà để thấy toàn bộ quãng đường chạy
     // - Phase 6 [0.88 - 1.00]: Toàn cảnh lơ lửng nhẹ nhàng + hiện bảng thông số số to gấp đôi
     double camX;
     double camY;
     double camScale;
+    double camPitch;
     double camAngle;
     double flightProgress;
 
@@ -1615,22 +1634,24 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetFinishAngle = lastHeading + math.pi / 2;
 
     if (progress < 0.08) {
-      // 1. Phase 1 [0.00 - 0.08]: Bao quát toàn cảnh vùng chạy
+      // 1. Phase 1 [0.00 - 0.08]: Bao quát toàn cảnh vùng chạy (Strava Screenshot 1)
       flightProgress = 0.0;
       camX = routeCenterX;
       camY = routeCenterY;
       camScale = overviewScale;
+      camPitch = 0.0;
       camAngle = 0.0;
     } else if (progress < 0.18) {
-      // 2. Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & Đổi góc quay về sau cái định vị
+      // 2. Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & ngả góc 3D chuẩn Strava
       flightProgress = 0.0;
       final double tTransit = Curves.easeInOutCubic.transform(((progress - 0.08) / 0.10).clamp(0.0, 1.0));
       camX = ui.lerpDouble(routeCenterX, startPinPixel.dx, tTransit)!;
       camY = ui.lerpDouble(routeCenterY, startPinPixel.dy, tTransit)!;
       camScale = ui.lerpDouble(overviewScale, chaseScale, tTransit)!;
+      camPitch = ui.lerpDouble(0.0, isFlycamMode ? maxPitch : 0.0, tTransit)!;
       camAngle = _lerpAngle(0.0, isFlycamMode ? targetStartAngle : 0.0, tTransit);
     } else if (progress < 0.72) {
-      // 3. Phase 3 [0.18 - 0.72]: Chạy lộ trình theo dõi sát sau lưng định vị (chú ý góc cua, rẽ xoay mượt mà)
+      // 3. Phase 3 [0.18 - 0.72]: Chạy lộ trình theo dõi 3D chuẩn Strava (Strava Screenshot 2)
       flightProgress = ((progress - 0.18) / 0.54).clamp(0.0, 1.0);
 
       final double fIndex = (sampledPositions.length - 1) * flightProgress;
@@ -1645,11 +1666,13 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camX = currentPos.dx;
         camY = currentPos.dy;
         camScale = chaseScale;
+        camPitch = maxPitch;
         camAngle = curHeading + math.pi / 2;
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
+        camPitch = 0.0;
         camAngle = 0.0;
       }
     } else if (progress < 0.78) {
@@ -1659,11 +1682,13 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camX = finishPinPixel.dx;
         camY = finishPinPixel.dy;
         camScale = chaseScale;
+        camPitch = maxPitch;
         camAngle = targetFinishAngle;
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
+        camPitch = 0.0;
         camAngle = 0.0;
       }
     } else if (progress < 0.88) {
@@ -1674,11 +1699,13 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camX = ui.lerpDouble(finishPinPixel.dx, routeCenterX, tOut)!;
         camY = ui.lerpDouble(finishPinPixel.dy, routeCenterY, tOut)!;
         camScale = ui.lerpDouble(chaseScale, overviewScale, tOut)!;
+        camPitch = ui.lerpDouble(maxPitch, 0.0, tOut)!;
         camAngle = _lerpAngle(targetFinishAngle, 0.0, tOut);
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
+        camPitch = 0.0;
         camAngle = 0.0;
       }
     } else {
@@ -1690,6 +1717,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camX = routeCenterX + floatX;
       camY = routeCenterY + floatY;
       camScale = overviewScale;
+      camPitch = 0.0;
       camAngle = 0.0;
     }
 
@@ -1701,7 +1729,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double subFrac = fIndex - baseIdx;
 
     final Offset currentPixel = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
-    final double runnerHeading = _lerpAngle(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac);
     final double outroT = ((progress - 0.85) / 0.15).clamp(0.0, 1.0);
 
     // 3. ĐỘ DÀY NÉT VẼ TỰ ĐỘNG NỘI SUY THEO TỈ LỆ ZOOM (KÈM ZOOM TAY)
@@ -1729,7 +1756,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final Paint activePathPaint = Paint()
       ..isAntiAlias = true
       ..color = const Color(0xFFFC5200) // Strava Athletic Orange-Red
-      ..strokeWidth = strokeBase
+      ..strokeWidth = strokeBase * 1.1
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
@@ -1742,29 +1769,62 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // 4. MA TRẬN CAMERA CHUYÊN NGHIỆP: XOAY THEO HƯỚNG CHẠY & PHỦ KÍN 100% MÀN HÌNH
+    // 4. MA TRẬN PHỐI CẢNH 3D STRAVA VỚI ĐƯỜNG CHÂN TRỜI VÀ BẦU TRỜI XANH
     final double screenCenterX = size.width / 2 + userPanOffset.dx;
-    // Khi đang theo dõi: định vị ở khoảng 62% màn hình (1/3 dưới), cung đường vươn dài lên phía trên
-    final double targetCenterRatio = isFlycamMode && (progress >= 0.08 && progress < 0.88) ? 0.62 : 0.52;
-    final double screenCenterY = (size.height * targetCenterRatio) + userPanOffset.dy;
+    // Điểm đặt người chạy: khi ở 3D bám đuôi, người chạy ở 1/3 dưới màn hình (Y = 68%)
+    final double runnerScreenY = (size.height * (camPitch > 0.05 ? 0.68 : 0.52)) + userPanOffset.dy;
 
-    canvas.save();
-    canvas.translate(screenCenterX, screenCenterY);
-    if (camAngle.abs() > 0.001) {
-      canvas.rotate(-camAngle);
+    // Tính toán vị trí chân trời (Horizon) chính xác chuẩn Strava
+    final double horizonY = camPitch > 0.05
+        ? (runnerScreenY - (1.0 / (perspectiveD * math.tan(camPitch)))).clamp(size.height * 0.22, size.height * 0.45)
+        : -50.0;
+
+    // A. VẼ BẦU TRỜI XANH STRAVA KHI Ở CHẾ ĐỘ 3D (Strava Screenshot 2)
+    if (camPitch > 0.05) {
+      final skyGradient = ui.Gradient.linear(
+        const Offset(0, 0),
+        Offset(0, horizonY + 30),
+        [
+          const Color(0xFF1B3B6F), // Xanh thẫm đỉnh bầu trời
+          const Color(0xFF2C5E9E), // Xanh da trời Strava
+          const Color(0xFF5B8EB9), // Xanh lam nhạt
+          const Color(0xFFA8C5DA), // Sương mù khí quyển chân trời
+        ],
+        [0.0, 0.40, 0.78, 1.0],
+      );
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, horizonY + 35), Paint()..shader = skyGradient);
     }
-    canvas.scale(effectiveCamScale, effectiveCamScale);
-    canvas.translate(-camX, -camY);
 
-    // 5. VẼ MAP TILES PHỦ KÍN 100% MÀN HÌNH (TÍNH TOÁN BÁN KÍNH THEO ĐƯỜNG CHÉO MÀN HÌNH)
+    // B. VẼ ĐỊA HÌNH MẶT ĐẤT 3D (GIỚI HẠN TỪ ĐƯỜNG CHÂN TRỜI TRỞ XUỐNG)
+    canvas.save();
+    if (camPitch > 0.05) {
+      canvas.clipRect(Rect.fromLTWH(0, horizonY, size.width, size.height - horizonY));
+      final Matrix4 matrix = Matrix4.identity();
+      matrix.translateByDouble(screenCenterX, runnerScreenY, 0.0, 1.0);
+      matrix.setEntry(3, 2, perspectiveD);
+      matrix.rotateX(camPitch);
+      if (camAngle.abs() > 0.001) {
+        matrix.rotateZ(-camAngle);
+      }
+      matrix.scaleByDouble(effectiveCamScale, effectiveCamScale, 1.0, 1.0);
+      matrix.translateByDouble(-camX, -camY, 0.0, 1.0);
+      canvas.transform(matrix.storage);
+    } else {
+      canvas.translate(screenCenterX, runnerScreenY);
+      if (camAngle.abs() > 0.001) {
+        canvas.rotate(-camAngle);
+      }
+      canvas.scale(effectiveCamScale, effectiveCamScale);
+      canvas.translate(-camX, -camY);
+    }
+
+    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN TOÀN BỘ BỀ MẶT ĐỊA HÌNH
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
+    final int tileRadius = camPitch > 0.05
+        ? 8
+        : (((math.sqrt(size.width * size.width + size.height * size.height) / 2) / effectiveCamScale) / tileSize).ceil().clamp(3, 9);
 
-    // Bán kính đủ bao phủ trọn vẹn toàn bộ đường chéo màn hình khi xoay góc bất kỳ
-    final double screenDiag = math.sqrt(size.width * size.width + size.height * size.height);
-    final int tileRadius = (((screenDiag / 2) / effectiveCamScale) / tileSize).ceil().clamp(3, 9);
-
-    // Nền đồng nhất liền mạch cho bản đồ trong tích tắc đang tải
     final Color mapBgColor = mapType == 'satellite'
         ? const Color(0xFF0B0F19)
         : mapType == 'terrain'
@@ -1870,69 +1930,94 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, 2.5, Paint()..color = Colors.white);
     canvas.restore();
 
-    // 10. VẼ CON TRỎ ĐỊNH VỊ GPS THỂ THAO NIKE/APPLE ATHLETIC BEACON
+    // 10. VẼ CON TRỎ ĐỊNH VỊ CHUẨN STRAVA (VÒNG TRÒN CAM VIỀN TRẮNG RỰC RỠ)
     canvas.save();
     canvas.translate(currentPixel.dx, currentPixel.dy);
 
     final double pulse = (progress * 18.0) % 1.0;
     canvas.drawCircle(
       Offset.zero,
-      12 + pulse * 24,
+      12 + pulse * 22,
       Paint()
         ..isAntiAlias = true
-        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.40 * (1.0 - pulse) * (1.0 - outroT))
+        ..color = const Color(0xFFFC5200).withValues(alpha: 0.35 * (1.0 - pulse) * (1.0 - outroT))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2,
+        ..strokeWidth = 2.0,
     );
 
-    // Đèn pha dẫn đường
-    canvas.save();
-    canvas.rotate(runnerHeading);
-
-    final beamPath = Path()
-      ..moveTo(0, 0)
-      ..lineTo(48, -20)
-      ..lineTo(48, 20)
-      ..close();
-
-    final beamPaint = Paint()
-      ..isAntiAlias = true
-      ..shader = ui.Gradient.linear(
-        const Offset(0, 0),
-        const Offset(48, 0),
-        [
-          const Color(0xFF00E5FF).withValues(alpha: 0.50 * (1.0 - outroT)),
-          const Color(0xFF00E5FF).withValues(alpha: 0.0),
-        ],
-      );
-    canvas.drawPath(beamPath, beamPaint);
-
-    // Vành đai phát sáng
-    canvas.drawCircle(Offset.zero, 13, Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.6));
-    canvas.drawCircle(
-      Offset.zero,
-      13,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..color = const Color(0xFF00E5FF),
-    );
-
-    // Mũi tên định hướng
-    final navArrow = Path()
-      ..moveTo(9, 0)
-      ..lineTo(-5, -6)
-      ..lineTo(-2, 0)
-      ..lineTo(-5, 6)
-      ..close();
-
-    canvas.drawPath(navArrow, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset.zero, 2.5, Paint()..color = const Color(0xFF00E5FF));
+    // Vòng tròn định vị Strava (Cam viền trắng đậm nét)
+    canvas.drawCircle(Offset.zero, 11, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset.zero, 9, Paint()..color = const Color(0xFFFC5200));
+    canvas.drawCircle(Offset.zero, 3.5, Paint()..color = Colors.white);
 
     canvas.restore();
-    canvas.restore();
 
-    canvas.restore();
+    canvas.restore(); // Kết thúc vẽ mặt đất 3D
+
+    // C. VẼ SƯƠNG MÙ KHÍ QUYỂN CHÂN TRỜI (Atmospheric Haze at Horizon)
+    if (camPitch > 0.05) {
+      final hazePaint = Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, horizonY - 12),
+          Offset(0, horizonY + 28),
+          [
+            const Color(0x00A8C5DA),
+            const Color(0xEEA8C5DA),
+            const Color(0x00A8C5DA),
+          ],
+        );
+      canvas.drawRect(Rect.fromLTWH(0, horizonY - 12, size.width, 40), hazePaint);
+    }
+
+    // D. VẼ THÔNG SỐ TRÊN BẦU TRỜI CHUẨN STRAVA (Strava Screenshot 2)
+    if (camPitch > 0.12) {
+      final double skyStatsOpacity = ((camPitch - 0.12) / (maxPitch - 0.12)).clamp(0.0, 1.0);
+      final double curDist = distanceKm * flightProgress;
+      final int curCal = (calories * flightProgress).round();
+      final double startY = (size.height * 0.12).clamp(70.0, horizonY - 75);
+
+      if (horizonY > startY + 60) {
+        final double colW = size.width / 3;
+        final double lblY = startY + 10;
+        final double valY = startY + 34;
+        final double subY = startY + 58;
+
+        void drawSkyText(String text, Offset center, double fs, FontWeight fw, Color col, {double maxWidth = 120.0}) {
+          final pb = ui.ParagraphBuilder(
+            ui.ParagraphStyle(textAlign: TextAlign.center, fontSize: fs, fontWeight: fw),
+          )
+            ..pushStyle(ui.TextStyle(
+              color: col,
+              fontSize: fs,
+              fontWeight: fw,
+              shadows: [
+                ui.Shadow(color: Colors.black.withValues(alpha: 0.5 * skyStatsOpacity), blurRadius: 4, offset: const Offset(0, 1)),
+              ],
+            ))
+            ..addText(text);
+          final p = pb.build()..layout(ui.ParagraphConstraints(width: maxWidth));
+          canvas.drawParagraph(p, Offset(center.dx - maxWidth / 2, center.dy - p.height / 2));
+        }
+
+        final Color labelColor = const Color(0xFFE2E8F0).withValues(alpha: skyStatsOpacity * 0.90);
+        final Color valueColor = Colors.white.withValues(alpha: skyStatsOpacity);
+
+        // Cột 1: Nhịp độ
+        drawSkyText('Nhịp độ', Offset(colW * 0.5, lblY), 11.5, FontWeight.w600, labelColor, maxWidth: colW);
+        drawSkyText(pace, Offset(colW * 0.5, valY), 24.0, FontWeight.w900, valueColor, maxWidth: colW);
+        drawSkyText('/km', Offset(colW * 0.5, subY), 11.5, FontWeight.w700, labelColor, maxWidth: colW);
+
+        // Cột 2: Năng lượng (Calo)
+        drawSkyText('Năng lượng', Offset(colW * 1.5, lblY), 11.5, FontWeight.w600, labelColor, maxWidth: colW);
+        drawSkyText('$curCal', Offset(colW * 1.5, valY), 24.0, FontWeight.w900, valueColor, maxWidth: colW);
+        drawSkyText('kcal', Offset(colW * 1.5, subY), 11.5, FontWeight.w700, labelColor, maxWidth: colW);
+
+        // Cột 3: Quãng đường
+        drawSkyText('Quãng đường', Offset(colW * 2.5, lblY), 11.5, FontWeight.w600, labelColor, maxWidth: colW);
+        drawSkyText(curDist.toStringAsFixed(1).replaceAll('.', ','), Offset(colW * 2.5, valY), 24.0, FontWeight.w900, valueColor, maxWidth: colW);
+        drawSkyText('km', Offset(colW * 2.5, subY), 11.5, FontWeight.w700, labelColor, maxWidth: colW);
+      }
+    }
   }
 
   @override
