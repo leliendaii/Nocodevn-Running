@@ -122,14 +122,17 @@ class LiveWorkoutNotificationService {
     try {
       if (!_isInitialized) await initialize();
 
-      final int min = durationSeconds ~/ 60;
+      final int hours = durationSeconds ~/ 3600;
+      final int min = (durationSeconds % 3600) ~/ 60;
       final int sec = durationSeconds % 60;
-      final String timeStr = '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+      final String timeStr = hours > 0
+          ? '${hours.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}'
+          : '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
       final String kmStr = distanceKm.toStringAsFixed(2);
 
       final String title = isPaused
-          ? 'TẠM DỪNG: $kmStr km'
-          : 'ĐANG CHẠY: $kmStr km';
+          ? 'TẠM DỪNG: $kmStr KM'
+          : 'ĐANG CHẠY: $kmStr KM';
 
       final String body = '$timeStr  •  $pace /km  •  $calories kcal';
 
@@ -139,15 +142,15 @@ class LiveWorkoutNotificationService {
         channelDescription: 'Hiển thị thông số chạy bộ thời gian thực',
         importance: Importance.low,
         priority: Priority.high,
-        icon: '@mipmap/launcher_icon',
+        icon: '@mipmap/ic_launcher',
         ongoing: true, // Ghim trên thanh thông báo không bị vuốt mất khi đang chạy
         autoCancel: false,
         onlyAlertOnce: true, // Không rung chuông mỗi giây
-        showWhen: true,
+        showWhen: false,
         styleInformation: BigTextStyleInformation(
-          'Thời gian: $timeStr\nPace: $pace /km\nCalo: $calories kcal',
+          '⏱️ Thời gian: $timeStr\n⚡ Pace: $pace /km\n🔥 Calo: $calories kcal',
           contentTitle: title,
-          summaryText: isPaused ? 'Tạm dừng buổi chạy' : 'Đang theo dõi',
+          summaryText: isPaused ? 'Tạm dừng buổi chạy' : 'Đang theo dõi trực tiếp',
         ),
       );
 

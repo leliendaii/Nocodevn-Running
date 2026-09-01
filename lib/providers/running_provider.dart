@@ -522,16 +522,14 @@ class RunningProvider with ChangeNotifier {
         _updateDurationFromWallClock();
         notifyListeners();
 
-        // Cập nhật thông số trực tiếp ra Trung tâm thông báo & Màn hình khóa mỗi 2 giây
-        if (_durationSeconds % 2 == 0) {
-          LiveWorkoutNotificationService.updateWorkoutNotification(
-            distanceKm: _distanceKm,
-            durationSeconds: _durationSeconds,
-            pace: currentPace,
-            calories: _calories,
-            isPaused: false,
-          );
-        }
+        // Cập nhật thông số trực tiếp ra Trung tâm thông báo & Màn hình khóa mỗi giây (Đúng từng giây, km, calo như trong app)
+        LiveWorkoutNotificationService.updateWorkoutNotification(
+          distanceKm: _distanceKm,
+          durationSeconds: _durationSeconds,
+          pace: instantPace,
+          calories: _calories,
+          isPaused: false,
+        );
       }
     });
 
