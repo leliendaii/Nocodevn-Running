@@ -9,25 +9,116 @@ import '../widgets/user_avatar.dart';
 import '../widgets/top_sync_toast.dart';
 import 'session_detail_screen.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  final ScrollController _scrollController = ScrollController();
+  static const int _pageSize = 15;
+  int _displayedCount = _pageSize;
+  bool _isLoadingMore = false;
+  bool _showScrollToTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // 1. Ẩn/Hiện nút Lên đầu trang
+    final showTop = _scrollController.hasClients && _scrollController.offset > 350;
+    if (showTop != _showScrollToTop) {
+      setState(() => _showScrollToTop = showTop);
+    }
+
+    // 2. Tự động tải thêm khi cuộn gần đáy
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final running = context.read<RunningProvider>();
+    final currentUser = context.read<AuthProvider>().currentUser;
+    final totalSessions = currentUser != null
+        ? running.getUserSessions(currentUser.id, currentUser.email, currentUser.username, currentUser.name)
+        : running.allSessions;
+
+    if (_isLoadingMore || _displayedCount >= totalSessions.length) return;
+
+    setState(() => _isLoadingMore = true);
+
+    // Độ trễ nhẹ tạo hiệu ứng cuộn mượt mà
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (mounted) {
+      setState(() {
+        _displayedCount = (_displayedCount + _pageSize).clamp(0, totalSessions.length);
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final running = context.watch<RunningProvider>();
     final currentUser = context.watch<AuthProvider>().currentUser;
-    final sessions = currentUser != null
+    final allUserSessions = currentUser != null
         ? running.getUserSessions(currentUser.id, currentUser.email, currentUser.username, currentUser.name)
         : running.allSessions;
-    final double totalKm = sessions.fold(0.0, (sum, s) => sum + s.distanceKm);
-    final int totalSeconds = sessions.fold(0, (sum, s) => sum + s.durationSeconds);
+
+    final double totalKm = allUserSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
+    final int totalSeconds = allUserSessions.fold(0, (sum, s) => sum + s.durationSeconds);
     final int hours = totalSeconds ~/ 3600;
     final int minutes = (totalSeconds % 3600) ~/ 60;
+
+    // Danh sách đã phân trang (Load More)
+    final visibleCount = _displayedCount.clamp(0, allUserSessions.length);
+    final visibleSessions = allUserSessions.take(visibleCount).toList();
+    final hasMore = visibleCount < allUserSessions.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('LỊCH SỬ CHẠY BỘ'),
       ),
+      floatingActionButton: _showScrollToTop
+          ? FloatingActionButton.extended(
+              onPressed: _scrollToTop,
+              backgroundColor: AppTheme.primaryNeon,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              icon: const Icon(Icons.arrow_upward_rounded, size: 20),
+              label: const Text(
+                'LÊN ĐẦU',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            )
+          : null,
       body: SafeArea(
         child: RefreshIndicator(
           color: AppTheme.primaryNeon,
@@ -38,6 +129,10 @@ class HistoryScreen extends StatelessWidget {
               context.read<RunningProvider>().refreshAllData(),
               context.read<AuthProvider>().checkUserStillExistsOnServer(),
             ]);
+            if (!mounted) return;
+            setState(() {
+              _displayedCount = _pageSize; // Reset về trang 1
+            });
             if (context.mounted) {
               TopSyncToast.show(
                 context,
@@ -46,7 +141,7 @@ class HistoryScreen extends StatelessWidget {
               );
             }
           },
-          child: sessions.isEmpty
+          child: allUserSessions.isEmpty
               ? ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
@@ -72,6 +167,7 @@ class HistoryScreen extends StatelessWidget {
                   ],
                 )
               : CustomScrollView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     // Thẻ tổng quan đầu trang
@@ -90,7 +186,7 @@ class HistoryScreen extends StatelessWidget {
                             children: [
                               _buildSummaryStat('TỔNG KM', '${totalKm.toStringAsFixed(1)} km', AppTheme.primaryNeon),
                               Container(width: 1, height: 40, color: AppTheme.divider),
-                              _buildSummaryStat('BUỔI CHẠY', '${sessions.length}', AppTheme.secondaryNeon),
+                              _buildSummaryStat('BUỔI CHẠY', '${allUserSessions.length}', AppTheme.secondaryNeon),
                               Container(width: 1, height: 40, color: AppTheme.divider),
                               _buildSummaryStat('THỜI GIAN', '${hours}h ${minutes}p', AppTheme.textPrimary),
                             ],
@@ -99,16 +195,68 @@ class HistoryScreen extends StatelessWidget {
                       ),
                     ),
 
-                    // Danh sách các buổi chạy
+                    // Danh sách các buổi chạy có phân trang (15 items / lần)
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            final session = sessions[index];
+                            final session = visibleSessions[index];
                             return _buildSessionCard(context, session);
                           },
-                          childCount: sessions.length,
+                          childCount: visibleSessions.length,
+                        ),
+                      ),
+                    ),
+
+                    // Footer báo trạng thái: Đang tải thêm hoặc Đã xem hết
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                        child: Column(
+                          children: [
+                            if (_isLoadingMore) ...[
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppTheme.primaryNeon,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Đang tải thêm buổi chạy...',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: AppTheme.textSecondary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else if (!hasMore && allUserSessions.length > _pageSize) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceLight,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppTheme.divider),
+                                ),
+                                child: Text(
+                                  '🏁 Bạn đã xem hết tất cả ${allUserSessions.length} buổi chạy',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textMuted,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
