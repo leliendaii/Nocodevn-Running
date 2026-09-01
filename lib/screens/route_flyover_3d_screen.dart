@@ -143,7 +143,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
     // CHỌN GÓC QUAY ĐIỆN ẢNH (KEY ANGLES - LIA MÁY ÍT, KHÓA GÓC CỐ ĐỊNH THEO TỪNG CUNG ĐƯỜNG):
     // Giữ góc quay cố định khi chạy trên đường thẳng / khúc cong nhẹ (< 30 độ).
-    // Chỉ lia máy êm ái, trễ chậm khi rẽ qua góc cua lớn (> 30 độ) rồi khóa góc tiếp.
+    // Chỉ lia máy cực chậm (chậm gấp 4-5 lần), êm ái khi rẽ qua khúc cua lớn (> 30 độ) rồi khóa góc tiếp.
     final List<double> keyAngles = List.filled(sampleCount, 0.0);
     double lockedAngle = _sampledHeadings.first;
     keyAngles[0] = lockedAngle;
@@ -153,20 +153,20 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       final double diff = (targetHeading - lockedAngle) % (2 * math.pi);
       final double shortestDiff = (2 * diff) % (2 * math.pi) - diff;
 
-      // Chỉ cập nhật góc quay khi khúc cua lớn hơn 32 độ (~0.56 rad)
-      if (shortestDiff.abs() > 0.56) {
-        lockedAngle = lockedAngle + shortestDiff * 0.018;
+      // Chuyển góc chậm gấp 4-5 lần (hệ số 0.0038 thay vì 0.018), êm ái tự nhiên
+      if (shortestDiff.abs() > 0.52) {
+        lockedAngle = lockedAngle + shortestDiff * 0.0038;
       }
       keyAngles[i] = lockedAngle;
     }
 
-    // Làm mượt tiếp các đoạn chuyển góc bằng Gaussian để chuyển tiếp mềm mại như Flycam chuyên nghiệp
-    const int angleWindow = 45;
+    // Làm mượt tiếp các đoạn chuyển góc bằng Gaussian window rộng (120 samples) siêu êm dịu
+    const int angleWindow = 120;
     _smoothedCamAngles = List.generate(sampleCount, (i) {
       double sinSum = 0, cosSum = 0;
       for (int w = -angleWindow; w <= angleWindow; w++) {
         final idx = (i + w).clamp(0, sampleCount - 1);
-        final double weight = math.exp(-(w * w) / (2 * 18.0 * 18.0));
+        final double weight = math.exp(-(w * w) / (2 * 50.0 * 50.0));
         sinSum += math.sin(keyAngles[idx]) * weight;
         cosSum += math.cos(keyAngles[idx]) * weight;
       }
@@ -1825,15 +1825,76 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       }
     }
 
-    // 6. VẼ TOÀN BỘ LỘ TRÌNH ĐƯỜNG CHẠY NỀN MỜ (ĐỂ NGƯỜI XEM THẤY CUNG ĐƯỜNG PHÍA TRƯỚC)
-    canvas.drawPath(fullPath, fullPathPaint);
+    // Hàm cắt ranh giới an toàn 3D: loại bỏ các điểm sau lưng camera (W' <= 0)
+    // Triệt tiêu 100% hiện tượng Skia lật ngược hình nón tạo thành mảng đa giác màu cam che màn hình
+    Path buildSafeClippedPath(List<Offset> points, int startIdx, int endIdx) {
+      final path = Path();
+      if (points.isEmpty || endIdx <= startIdx) return path;
 
-    // 7. VẼ ĐƯỜNG CHẠY HOÀN THÀNH MÀU CAM STRAVA (LUÔN HIỆN ĐẦY ĐỦ TOÀN BỘ ĐƯỜNG ĐÃ CHẠY QUA, KHÔNG BAO GIỜ BỊ MẤT)
+      final double sinA = math.sin(-camAngle);
+      final double cosA = math.cos(-camAngle);
+
+      bool isDrawing = false;
+      Offset? prevPt;
+      double prevRy = 0.0;
+
+      for (int i = startIdx; i <= endIdx && i < points.length; i++) {
+        final pt = points[i];
+        final double dx = (pt.dx - camX) * effectiveCamScale;
+        final double dy = (pt.dy - camY) * effectiveCamScale;
+        final double ry = dx * sinA + dy * cosA;
+
+        // Điểm an toàn là điểm có W' >= 0.20 trong không gian 3D (ry >= -220.0px, nằm ngoài đáy màn hình)
+        final bool isSafe = ry >= -220.0;
+
+        if (isSafe) {
+          if (!isDrawing) {
+            if (prevPt != null) {
+              // Cắt ranh giới an toàn tại ry = -220.0 để đường vẽ mượt mà, liền mạch từ mép đáy
+              final double denom = ry - prevRy;
+              final double tClip = denom.abs() > 0.001 ? ((-220.0 - prevRy) / denom).clamp(0.0, 1.0) : 0.0;
+              final clipPt = Offset.lerp(prevPt, pt, tClip)!;
+              path.moveTo(clipPt.dx, clipPt.dy);
+              path.lineTo(pt.dx, pt.dy);
+            } else {
+              path.moveTo(pt.dx, pt.dy);
+            }
+            isDrawing = true;
+          } else {
+            path.lineTo(pt.dx, pt.dy);
+          }
+        } else {
+          if (isDrawing && prevPt != null) {
+            // Cắt ranh giới an toàn khi rời khỏi tầm nhìn
+            final double denom = ry - prevRy;
+            final double tClip = denom.abs() > 0.001 ? ((-220.0 - prevRy) / denom).clamp(0.0, 1.0) : 1.0;
+            final clipPt = Offset.lerp(prevPt, pt, tClip)!;
+            path.lineTo(clipPt.dx, clipPt.dy);
+          }
+          isDrawing = false;
+        }
+
+        prevPt = pt;
+        prevRy = ry;
+      }
+      return path;
+    }
+
+    // 6. VẼ TOÀN BỘ LỘ TRÌNH ĐƯỜNG CHẠY NỀN MỜ (ĐỂ NGƯỜI XEM THẤY CUNG ĐƯỜNG PHÍA TRƯỚC)
+    final Path safeFullPath = camPitch > 0.05
+        ? buildSafeClippedPath(sampledPositions, 0, sampledPositions.length - 1)
+        : fullPath;
+    canvas.drawPath(safeFullPath, fullPathPaint);
+
+    // 7. VẼ ĐƯỜNG CHẠY HOÀN THÀNH MÀU CAM STRAVA RỰC RỠ (KHÔNG MẤT ĐƯỜNG CHẠY, TRIỆT TIÊU 100% LỖI MẢNG CAM BIẾN DẠNG)
     if (currentDist > 1.0) {
-      final Path activePath = pathMetric.extractPath(0.0, currentDist);
-      canvas.drawPath(activePath, shadowPaint);
-      canvas.drawPath(activePath, activePathPaint);
-      canvas.drawPath(activePath, coreHighlightPaint);
+      final int activeEndIdx = ((sampledPositions.length - 1) * flightProgress.clamp(0.0, 1.0)).round();
+      final Path safeActivePath = camPitch > 0.05
+          ? buildSafeClippedPath(sampledPositions, 0, activeEndIdx)
+          : pathMetric.extractPath(0.0, currentDist);
+      canvas.drawPath(safeActivePath, shadowPaint);
+      canvas.drawPath(safeActivePath, activePathPaint);
+      canvas.drawPath(safeActivePath, coreHighlightPaint);
     }
 
     // 8. VẼ CÁC CỘT MỐC KM
