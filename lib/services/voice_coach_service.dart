@@ -111,4 +111,10 @@ class VoiceCoachService {
     final message = 'Kết thúc. Bạn đã chạy tổng $kmStr ki-lô-mét trong vòng $timeStr, tiêu hao $calories calo, pace $paceStr mỗi ki-lô-mét.';
     speak(message);
   }
+
+  /// 6. Nhắc nhở giờ chạy bộ: "Chào [tên], đã đến giờ chạy rồi. Cùng xỏ giày và bứt phá hôm nay nhé!"
+  static void speakReminder([String? userName]) {
+    final name = (userName != null && userName.trim().isNotEmpty) ? userName.trim() : 'bạn';
+    speak('Chào $name, đã đến giờ chạy rồi. Cùng xỏ giày và bứt phá hôm nay nhé!');
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'voice_coach_service.dart';
 import 'web_notification_stub.dart'
     if (dart.library.html) 'web_notification_web.dart';
 
@@ -43,7 +44,14 @@ class LiveWorkoutNotificationService {
         iOS: iosSettings,
       );
 
-      await _notifications.initialize(initSettings);
+      await _notifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          if (response.id == _reminderNotificationId || response.payload == 'reminder') {
+            VoiceCoachService.speakReminder();
+          }
+        },
+      );
 
       // Tạo các Channel trên Android với cấu hình chuẩn
       final androidImplementation = _notifications.resolvePlatformSpecificImplementation<
@@ -232,6 +240,7 @@ class LiveWorkoutNotificationService {
         title,
         body,
         details,
+        payload: 'reminder',
       );
     } catch (e) {
       debugPrint('Lỗi hiển thị thông báo nhắc nhở: $e');
@@ -303,6 +312,7 @@ class LiveWorkoutNotificationService {
           body,
           scheduledDate,
           details,
+          payload: 'reminder',
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
@@ -316,6 +326,7 @@ class LiveWorkoutNotificationService {
           body,
           scheduledDate,
           details,
+          payload: 'reminder',
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,

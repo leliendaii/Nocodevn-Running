@@ -204,7 +204,7 @@ class RunningProvider with ChangeNotifier {
         hour: _reminderHour,
         minute: _reminderMinute,
         title: '⏰ Đã đến $timeStr rồi, $effectiveName ơi!',
-        body: 'Đã đến $timeStr! $effectiveName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
+        body: 'Chào $effectiveName, đã đến giờ chạy rồi. Cùng xỏ giày và bứt phá hôm nay nhé! 🔥🏃‍♂️',
       );
     } else {
       LiveWorkoutNotificationService.cancelDailyReminder();
@@ -269,7 +269,7 @@ class RunningProvider with ChangeNotifier {
         hour: hour,
         minute: minute,
         title: '⏰ Đã đến $timeStr rồi, $effectiveName ơi!',
-        body: 'Đã đến $timeStr! $effectiveName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
+        body: 'Chào $effectiveName, đã đến giờ chạy rồi. Cùng xỏ giày và bứt phá hôm nay nhé! 🔥🏃‍♂️',
       );
     } else {
       await LiveWorkoutNotificationService.cancelDailyReminder();

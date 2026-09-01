@@ -82,8 +82,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         LocalStorageService.saveLastReminderNotificationDate(userId, todayKey);
         LiveWorkoutNotificationService.showMorningReminderNotification(
           title: '⏰ Đã đến $timeStr rồi, $userName ơi!',
-          body: 'Đã đến $timeStr! $userName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
+          body: 'Chào $userName, đã đến giờ chạy rồi. Cùng xỏ giày và bứt phá hôm nay nhé! 🔥🏃‍♂️',
         );
+        VoiceCoachService.speakReminder(userName);
       }
 
       // 2. Nếu đang mở app -> Hiện sẵn popup nhắc nhở rung nhẹ nhẹ (chỉ hiện 1 lần/ngày)

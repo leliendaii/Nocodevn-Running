@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../services/voice_coach_service.dart';
 import '../../theme/app_theme.dart';
 
 class AnimatedReminderDialog extends StatefulWidget {
@@ -65,8 +66,9 @@ class _AnimatedReminderDialogState extends State<AnimatedReminderDialog>
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 4),
     ]).animate(CurvedAnimation(parent: _animController, curve: Curves.easeInOut));
 
-    // Rung nhẹ haptic feedback trên điện thoại khi mở popup
+    // Rung nhẹ haptic feedback và Voice Coach phát âm thanh nhắc nhở
     HapticFeedback.vibrate();
+    VoiceCoachService.speakReminder(widget.userName);
   }
 
   @override
@@ -174,13 +176,13 @@ class _AnimatedReminderDialogState extends State<AnimatedReminderDialog>
 
             // Lời nhắn nhắc nhở truyền cảm hứng
             Text(
-              'Đã đến ${widget.timeStr} rồi, $effectiveName ơi!\nHãy mang giày lên và bắt đầu chạy ngay thôi nào, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
+              'Chào $effectiveName, đã đến giờ chạy rồi.\nCùng xỏ giày và bứt phá hôm nay nhé! 🔥🏃‍♂️',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 13.5,
+                fontSize: 14,
                 color: AppTheme.textPrimary,
                 height: 1.45,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
 
