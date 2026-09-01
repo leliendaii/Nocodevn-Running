@@ -2,21 +2,40 @@ import 'package:flutter/material.dart';
 import '../../models/run_session.dart';
 import '../../theme/app_theme.dart';
 
-/// Template 2: Bản Đồ GPS (Route Overlay)
-class MapTemplateWidget extends StatelessWidget {
+/// Khối Lộ Trình GPS Neon Art
+class MapRouteBlock extends StatelessWidget {
+  final List<RunPoint> routePoints;
+
+  const MapRouteBlock({
+    super.key,
+    required this.routePoints,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (routePoints.length < 2) return const SizedBox.shrink();
+
+    return SizedBox(
+      width: 240,
+      height: 200,
+      child: CustomPaint(
+        painter: GpsRouteOverlayPainter(routePoints),
+      ),
+    );
+  }
+}
+
+/// Khối Thông Số Đáy Dạng Thẻ Bo Tròn Của Bản Đồ
+class MapStatsBlock extends StatelessWidget {
   final RunSession session;
-  final String dateTimeStr;
-  final bool showLogo;
   final bool showDistance;
   final bool showDuration;
   final bool showPace;
   final bool showCalories;
 
-  const MapTemplateWidget({
+  const MapStatsBlock({
     super.key,
     required this.session,
-    required this.dateTimeStr,
-    required this.showLogo,
     required this.showDistance,
     required this.showDuration,
     required this.showPace,
@@ -39,69 +58,22 @@ class MapTemplateWidget extends StatelessWidget {
       stats.add(_buildCompactStat('${session.calories}', 'Calo', AppTheme.accentOrange));
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
+    if (stats.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5), width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Logo & Ngày góc trên
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (showLogo)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 32,
-                    height: 32,
-                    fit: BoxFit.contain,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-              if (dateTimeStr.isNotEmpty)
-                Text(
-                  dateTimeStr,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-            ],
-          ),
-
-          // Vùng vẽ line GPS Art thu nhỏ
-          Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: 1.2,
-                child: session.routePoints.length >= 2
-                    ? CustomPaint(
-                        painter: GpsRouteOverlayPainter(session.routePoints),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ),
-
-          // Thẻ thông số đáy
-          if (stats.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5), width: 1.2),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: stats,
-              ),
-            ),
+          for (int i = 0; i < stats.length; i++) ...[
+            if (i > 0) const SizedBox(width: 16),
+            stats[i],
+          ],
         ],
       ),
     );
@@ -196,7 +168,7 @@ class GpsRouteOverlayPainter extends CustomPainter {
 
     canvas.drawPath(path, linePaint);
 
-    // Vẽ điểm bắt đầu (Xanh lá) & Kết thúc (Cam Neon)
+    // Vẽ điểm bắt đầu (Xanh lá) & Kết thúc (Đỏ neon)
     final startPt = Offset(
       padding + ((routePoints.first.x - minX) / rangeX) * drawW,
       padding + (1.0 - ((routePoints.first.y - minY) / rangeY)) * drawH,

@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
+import '../widgets/photo_share/draggable_sticker.dart';
 import '../widgets/photo_share/minimal_template_widget.dart';
 import '../widgets/photo_share/map_template_widget.dart';
 import '../widgets/photo_share/badge_template_widget.dart';
@@ -32,7 +33,35 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   File? _selectedImage;
   int _selectedTemplate = 0; // 0: Tối giản, 1: Bản đồ, 2: Huy hiệu
   bool _isExporting = false;
-  Offset _badgeOffset = Offset.zero; // Toạ độ kéo thả tự do của thẻ thông số
+
+  // Quản lý khối đang được chọn & Toạ độ / Tỷ lệ thu phóng riêng biệt của từng khối
+  String? _selectedStickerId;
+  final StickerTransform _headerTransform = StickerTransform();
+  final StickerTransform _distanceTransform = StickerTransform();
+  final StickerTransform _statsTransform = StickerTransform();
+  final StickerTransform _mapRouteTransform = StickerTransform();
+  final StickerTransform _mapStatsTransform = StickerTransform();
+  final StickerTransform _badgeTransform = StickerTransform();
+
+  bool get _hasAnyStickerModified =>
+      _headerTransform.offset != Offset.zero || _headerTransform.scale != 1.0 ||
+      _distanceTransform.offset != Offset.zero || _distanceTransform.scale != 1.0 ||
+      _statsTransform.offset != Offset.zero || _statsTransform.scale != 1.0 ||
+      _mapRouteTransform.offset != Offset.zero || _mapRouteTransform.scale != 1.0 ||
+      _mapStatsTransform.offset != Offset.zero || _mapStatsTransform.scale != 1.0 ||
+      _badgeTransform.offset != Offset.zero || _badgeTransform.scale != 1.0;
+
+  void _resetAllStickers() {
+    setState(() {
+      _headerTransform.reset();
+      _distanceTransform.reset();
+      _statsTransform.reset();
+      _mapRouteTransform.reset();
+      _mapStatsTransform.reset();
+      _badgeTransform.reset();
+      _selectedStickerId = null;
+    });
+  }
 
   // Cấu hình bật/tắt các thông số ghép vào ảnh
   bool _showLogo = true;
@@ -212,8 +241,8 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                                 _showPace = true;
                                 _showCalories = true;
                                 _showSteps = true;
-                                _badgeOffset = Offset.zero;
                               });
+                              _resetAllStickers();
                               setModalState(() {});
                             },
                             child: const Text(
@@ -308,7 +337,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Vị trí thẻ thông số',
+                                'Vị trí & Kích thước khối',
                                 style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
@@ -317,7 +346,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Kéo thả tự do bất kỳ đâu trên ảnh',
+                                'Chạm khối để kéo thả hoặc chỉnh to nhỏ',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.textMuted,
@@ -327,12 +356,12 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                           ),
                           TextButton.icon(
                             onPressed: () {
-                              setState(() => _badgeOffset = Offset.zero);
+                              _resetAllStickers();
                               setModalState(() {});
                             },
                             icon: const Icon(Icons.restart_alt_rounded, size: 16, color: AppTheme.secondaryNeon),
                             label: const Text(
-                              'Đặt lại vị trí',
+                              'Đặt lại tất cả',
                               style: TextStyle(
                                 color: AppTheme.secondaryNeon,
                                 fontSize: 12,
@@ -387,6 +416,12 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   }
   Future<File?> _renderImageFile() async {
     try {
+      // Tắt chọn khối để ẩn viền xanh và thanh công cụ khi xuất ảnh
+      if (_selectedStickerId != null) {
+        setState(() => _selectedStickerId = null);
+        await Future.delayed(const Duration(milliseconds: 60));
+      }
+
       final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return null;
 
@@ -537,18 +572,8 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                               ),
                             ),
 
-                            // 3. Lớp đồ họa thể thao có thể KÉO THẢ (Drag & Drop) tự do khắp màn hình
-                            GestureDetector(
-                              onPanUpdate: (details) {
-                                setState(() {
-                                  _badgeOffset += details.delta;
-                                });
-                              },
-                              child: Transform.translate(
-                                offset: _badgeOffset,
-                                child: _buildTemplateOverlay(),
-                              ),
-                            ),
+                            // 3. Các lớp khối đồ họa thể thao ĐỘC LẬP (Mỗi khối kéo thả & thu phóng riêng)
+                            ..._buildTemplateLayers(),
 
                             // 4. Nút đổi ảnh nhanh ở góc trên bên phải
                             Positioned(
@@ -559,7 +584,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.6),
+                                    color: Colors.black.withValues(alpha: 0.65),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                                   ),
@@ -582,18 +607,24 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                               ),
                             ),
 
-                            // 5. Nút phục hồi vị trí gốc nhanh nếu đã kéo lệch
-                            if (_badgeOffset != Offset.zero)
+                            // 5. Nút phục hồi vị trí gốc nhanh nếu có bất kỳ khối nào bị kéo lệch hoặc đổi kích thước
+                            if (_hasAnyStickerModified)
                               Positioned(
                                 top: 12,
                                 left: 12,
                                 child: GestureDetector(
-                                  onTap: () => setState(() => _badgeOffset = Offset.zero),
+                                  onTap: _resetAllStickers,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.secondaryNeon.withValues(alpha: 0.85),
+                                      color: AppTheme.secondaryNeon.withValues(alpha: 0.9),
                                       borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.3),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
                                     ),
                                     child: const Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -622,20 +653,20 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               ),
             ),
 
-            // Gợi ý tính năng kéo thả
+            // Gợi ý tính năng kéo thả & thu phóng từng khối
             const Padding(
-              padding: EdgeInsets.only(top: 2, bottom: 4),
+              padding: EdgeInsets.only(top: 3, bottom: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.touch_app_outlined, size: 12.5, color: AppTheme.textMuted),
-                  SizedBox(width: 4),
+                  Icon(Icons.touch_app_outlined, size: 12.5, color: AppTheme.secondaryNeon),
+                  SizedBox(width: 5),
                   Text(
-                    'Chạm giữ & kéo để di chuyển vị trí thẻ thông số',
+                    'Chạm từng khối để kéo di chuyển hoặc chỉnh to nhỏ (+/-)',
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppTheme.textMuted,
-                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -794,44 +825,197 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     );
   }
 
-  /// Lớp đồ họa đè lên ảnh theo từng Template (Đã tách thành các Widget component độc lập)
-  Widget _buildTemplateOverlay() {
+  /// Danh sách các khối đồ họa thể thao độc lập có thể kéo thả & thu phóng riêng biệt
+  List<Widget> _buildTemplateLayers() {
     final s = widget.session;
     final dateTimeStr = _formatDateTime(s.startTime);
+    final layers = <Widget>[];
 
-    switch (_selectedTemplate) {
-      case 1:
-        return MapTemplateWidget(
-          session: s,
-          dateTimeStr: dateTimeStr,
-          showLogo: _showLogo,
-          showDistance: _showDistance,
-          showDuration: _showDuration,
-          showPace: _showPace,
-          showCalories: _showCalories,
+    // Khối 1: Logo & Thời gian (Dùng chung cho cả Mẫu Tối giản & Bản đồ)
+    if (_selectedTemplate == 0 || _selectedTemplate == 1) {
+      if (_showLogo || dateTimeStr.isNotEmpty) {
+        layers.add(
+          Positioned(
+            top: 20,
+            left: 18,
+            right: 18,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: DraggableSticker(
+                id: 'header',
+                label: 'Logo & Thời gian',
+                transform: _headerTransform,
+                isSelected: _selectedStickerId == 'header',
+                onSelect: () => setState(() => _selectedStickerId = 'header'),
+                onDeselect: () => setState(() => _selectedStickerId = null),
+                onReset: () => setState(() => _headerTransform.reset()),
+                onPositionChanged: (delta) => setState(() => _headerTransform.offset += delta),
+                onScaleChanged: (scale) => setState(() => _headerTransform.scale = scale),
+                child: PhotoShareHeaderBlock(
+                  showLogo: _showLogo,
+                  dateTimeStr: dateTimeStr,
+                ),
+              ),
+            ),
+          ),
         );
-      case 2:
-        return BadgeTemplateWidget(
-          session: s,
-          dateTimeStr: dateTimeStr,
-          showLogo: _showLogo,
-          showDistance: _showDistance,
-          showDuration: _showDuration,
-          showPace: _showPace,
-          showCalories: _showCalories,
-          showSteps: _showSteps,
-        );
-      case 0:
-      default:
-        return MinimalTemplateWidget(
-          session: s,
-          dateTimeStr: dateTimeStr,
-          showLogo: _showLogo,
-          showDistance: _showDistance,
-          showDuration: _showDuration,
-          showPace: _showPace,
-          showCalories: _showCalories,
-        );
+      }
     }
+
+    if (_selectedTemplate == 0) {
+      // ==========================================
+      // MẪU 1: TỐI GIẢN (MINIMAL)
+      // ==========================================
+
+      // Khối 2: Cự ly số khổng lồ (Distance Block)
+      if (_showDistance) {
+        layers.add(
+          Positioned(
+            bottom: 74,
+            left: 18,
+            child: DraggableSticker(
+              id: 'distance',
+              label: 'Cự ly chính',
+              transform: _distanceTransform,
+              isSelected: _selectedStickerId == 'distance',
+              onSelect: () => setState(() => _selectedStickerId = 'distance'),
+              onDeselect: () => setState(() => _selectedStickerId = null),
+              onReset: () => setState(() => _distanceTransform.reset()),
+              onPositionChanged: (delta) => setState(() => _distanceTransform.offset += delta),
+              onScaleChanged: (scale) => setState(() => _distanceTransform.scale = scale),
+              child: MinimalDistanceBlock(
+                distanceKm: s.distanceKm,
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Khối 3: Hàng thông số phụ (Thời gian, Pace, Calo)
+      if (_showDuration || _showPace || _showCalories) {
+        layers.add(
+          Positioned(
+            bottom: 20,
+            left: 18,
+            right: 18,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: DraggableSticker(
+                id: 'stats',
+                label: 'Thông số chạy',
+                transform: _statsTransform,
+                isSelected: _selectedStickerId == 'stats',
+                onSelect: () => setState(() => _selectedStickerId = 'stats'),
+                onDeselect: () => setState(() => _selectedStickerId = null),
+                onReset: () => setState(() => _statsTransform.reset()),
+                onPositionChanged: (delta) => setState(() => _statsTransform.offset += delta),
+                onScaleChanged: (scale) => setState(() => _statsTransform.scale = scale),
+                child: MinimalStatsBlock(
+                  session: s,
+                  showDuration: _showDuration,
+                  showPace: _showPace,
+                  showCalories: _showCalories,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    } else if (_selectedTemplate == 1) {
+      // ==========================================
+      // MẪU 2: BẢN ĐỒ GPS (ROUTE OVERLAY)
+      // ==========================================
+
+      // Khối 2: Đường vẽ chạy GPS Neon Art
+      if (s.routePoints.length >= 2) {
+        layers.add(
+          Positioned.fill(
+            child: Center(
+              child: DraggableSticker(
+                id: 'map_route',
+                label: 'Lộ trình GPS',
+                transform: _mapRouteTransform,
+                isSelected: _selectedStickerId == 'map_route',
+                onSelect: () => setState(() => _selectedStickerId = 'map_route'),
+                onDeselect: () => setState(() => _selectedStickerId = null),
+                onReset: () => setState(() => _mapRouteTransform.reset()),
+                onPositionChanged: (delta) => setState(() => _mapRouteTransform.offset += delta),
+                onScaleChanged: (scale) => setState(() => _mapRouteTransform.scale = scale),
+                child: MapRouteBlock(
+                  routePoints: s.routePoints,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Khối 3: Thẻ thông số đáy bo tròn
+      if (_showDistance || _showDuration || _showPace || _showCalories) {
+        layers.add(
+          Positioned(
+            bottom: 20,
+            left: 16,
+            right: 16,
+            child: Center(
+              child: DraggableSticker(
+                id: 'map_stats',
+                label: 'Thẻ thông số bản đồ',
+                transform: _mapStatsTransform,
+                isSelected: _selectedStickerId == 'map_stats',
+                onSelect: () => setState(() => _selectedStickerId = 'map_stats'),
+                onDeselect: () => setState(() => _selectedStickerId = null),
+                onReset: () => setState(() => _mapStatsTransform.reset()),
+                onPositionChanged: (delta) => setState(() => _mapStatsTransform.offset += delta),
+                onScaleChanged: (scale) => setState(() => _mapStatsTransform.scale = scale),
+                child: MapStatsBlock(
+                  session: s,
+                  showDistance: _showDistance,
+                  showDuration: _showDuration,
+                  showPace: _showPace,
+                  showCalories: _showCalories,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    } else if (_selectedTemplate == 2) {
+      // ==========================================
+      // MẪU 3: HUY HIỆU THỂ THAO (STORY BADGE)
+      // ==========================================
+      layers.add(
+        Positioned(
+          bottom: 20,
+          left: 16,
+          right: 16,
+          child: Center(
+            child: DraggableSticker(
+              id: 'badge',
+              label: 'Thẻ Huy hiệu',
+              transform: _badgeTransform,
+              isSelected: _selectedStickerId == 'badge',
+              onSelect: () => setState(() => _selectedStickerId = 'badge'),
+              onDeselect: () => setState(() => _selectedStickerId = null),
+              onReset: () => setState(() => _badgeTransform.reset()),
+              onPositionChanged: (delta) => setState(() => _badgeTransform.offset += delta),
+              onScaleChanged: (scale) => setState(() => _badgeTransform.scale = scale),
+              child: BadgeCardBlock(
+                session: s,
+                dateTimeStr: dateTimeStr,
+                showLogo: _showLogo,
+                showDistance: _showDistance,
+                showDuration: _showDuration,
+                showPace: _showPace,
+                showCalories: _showCalories,
+                showSteps: _showSteps,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return layers;
   }
 }
