@@ -11,6 +11,9 @@ import 'package:share_plus/share_plus.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
+import '../widgets/photo_share/minimal_template_widget.dart';
+import '../widgets/photo_share/map_template_widget.dart';
+import '../widgets/photo_share/badge_template_widget.dart';
 
 /// Màn hình Tạo ảnh Check-in Sống ảo Thể thao (Running Photo Overlay & Share)
 class RunningPhotoShareScreen extends StatefulWidget {
@@ -29,6 +32,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   File? _selectedImage;
   int _selectedTemplate = 0; // 0: Tối giản, 1: Bản đồ, 2: Huy hiệu
   bool _isExporting = false;
+  Offset _badgeOffset = Offset.zero; // Toạ độ kéo thả tự do của thẻ thông số
 
   // Cấu hình bật/tắt các thông số ghép vào ảnh
   bool _showLogo = true;
@@ -208,6 +212,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                                 _showPace = true;
                                 _showCalories = true;
                                 _showSteps = true;
+                                _badgeOffset = Offset.zero;
                               });
                               setModalState(() {});
                             },
@@ -294,6 +299,48 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                           setState(() => _showSteps = val);
                           setModalState(() {});
                         },
+                      ),
+                      const Divider(color: AppTheme.divider, height: 22),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Vị trí thẻ thông số',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Kéo thả tự do bất kỳ đâu trên ảnh',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() => _badgeOffset = Offset.zero);
+                              setModalState(() {});
+                            },
+                            icon: const Icon(Icons.restart_alt_rounded, size: 16, color: AppTheme.secondaryNeon),
+                            label: const Text(
+                              'Đặt lại vị trí',
+                              style: TextStyle(
+                                color: AppTheme.secondaryNeon,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -459,14 +506,17 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            // 1. Ảnh nền (Ảnh user chọn hoặc Nền thể thao mặc định)
+                            // 1. Ảnh nền (Ảnh user chọn hoặc Nền chạy bộ marathon mặc định siêu nét)
                             if (_selectedImage != null)
                               Image.file(
                                 _selectedImage!,
                                 fit: BoxFit.cover,
                               )
                             else
-                              _buildDefaultSportsBackground(),
+                              Image.asset(
+                                'assets/images/default_running_bg.jpg',
+                                fit: BoxFit.cover,
+                              ),
 
                             // 2. Dải Gradient bảo vệ chữ luôn nổi bật
                             Positioned.fill(
@@ -487,14 +537,108 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                               ),
                             ),
 
-                            // 3. Lớp đồ họa thể thao theo Template được chọn
-                            _buildTemplateOverlay(),
+                            // 3. Lớp đồ họa thể thao có thể KÉO THẢ (Drag & Drop) tự do khắp màn hình
+                            GestureDetector(
+                              onPanUpdate: (details) {
+                                setState(() {
+                                  _badgeOffset += details.delta;
+                                });
+                              },
+                              child: Transform.translate(
+                                offset: _badgeOffset,
+                                child: _buildTemplateOverlay(),
+                              ),
+                            ),
+
+                            // 4. Nút đổi ảnh nhanh ở góc trên bên phải
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: GestureDetector(
+                                onTap: _showImageSourceSheet,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.photo_camera_rounded, size: 13, color: Colors.white),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Đổi ảnh',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // 5. Nút phục hồi vị trí gốc nhanh nếu đã kéo lệch
+                            if (_badgeOffset != Offset.zero)
+                              Positioned(
+                                top: 12,
+                                left: 12,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _badgeOffset = Offset.zero),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.secondaryNeon.withValues(alpha: 0.85),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.restart_alt_rounded, size: 13, color: Colors.black),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Vị trí gốc',
+                                          style: TextStyle(
+                                            color: Colors.black,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
                     ),
                   ),
                 ),
+              ),
+            ),
+
+            // Gợi ý tính năng kéo thả
+            const Padding(
+              padding: EdgeInsets.only(top: 2, bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.touch_app_outlined, size: 12.5, color: AppTheme.textMuted),
+                  SizedBox(width: 4),
+                  Text(
+                    'Chạm giữ & kéo để di chuyển vị trí thẻ thông số',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -650,575 +794,44 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     );
   }
 
-  /// Nền thể thao mặc định nếu người dùng chưa chụp ảnh
-  Widget _buildDefaultSportsBackground() {
-    return GestureDetector(
-      onTap: _showImageSourceSheet,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F111E),
-              Color(0xFF1E2139),
-              Color(0xFF0D0E15),
-            ],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.12),
-                  border: Border.all(
-                    color: AppTheme.primaryNeon.withValues(alpha: 0.35),
-                    width: 1.5,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.add_photo_alternate_rounded,
-                  size: 40,
-                  color: AppTheme.primaryNeon,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Chạm để chọn hoặc chụp ảnh',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Lớp đồ họa đè lên ảnh theo từng Template
+  /// Lớp đồ họa đè lên ảnh theo từng Template (Đã tách thành các Widget component độc lập)
   Widget _buildTemplateOverlay() {
+    final s = widget.session;
+    final dateTimeStr = _formatDateTime(s.startTime);
+
     switch (_selectedTemplate) {
       case 1:
-        return _buildMapTemplate();
+        return MapTemplateWidget(
+          session: s,
+          dateTimeStr: dateTimeStr,
+          showLogo: _showLogo,
+          showDistance: _showDistance,
+          showDuration: _showDuration,
+          showPace: _showPace,
+          showCalories: _showCalories,
+        );
       case 2:
-        return _buildBadgeTemplate();
+        return BadgeTemplateWidget(
+          session: s,
+          dateTimeStr: dateTimeStr,
+          showLogo: _showLogo,
+          showDistance: _showDistance,
+          showDuration: _showDuration,
+          showPace: _showPace,
+          showCalories: _showCalories,
+          showSteps: _showSteps,
+        );
       case 0:
       default:
-        return _buildMinimalTemplate();
+        return MinimalTemplateWidget(
+          session: s,
+          dateTimeStr: dateTimeStr,
+          showLogo: _showLogo,
+          showDistance: _showDistance,
+          showDuration: _showDuration,
+          showPace: _showPace,
+          showCalories: _showCalories,
+        );
     }
   }
-  Widget _buildMinimalTemplate() {
-    final s = widget.session;
-    final dateTimeStr = _formatDateTime(s.startTime);
-
-    final bottomStats = <Widget>[];
-    if (_showDuration) {
-      bottomStats.add(_buildMiniStat('THỜI GIAN', s.formattedDuration));
-    }
-    if (_showPace) {
-      if (bottomStats.isNotEmpty) bottomStats.add(_buildDivider());
-      bottomStats.add(_buildMiniStat('PACE', '${s.formattedPace} /km'));
-    }
-    if (_showCalories) {
-      if (bottomStats.isNotEmpty) bottomStats.add(_buildDivider());
-      bottomStats.add(_buildMiniStat('CALO', '${s.calories} kcal'));
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo & Ngày ở góc trên (chỉ có logo, không có chữ)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (_showLogo)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 32,
-                    height: 32,
-                    fit: BoxFit.contain,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-              if (dateTimeStr.isNotEmpty)
-                Text(
-                  dateTimeStr,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-            ],
-          ),
-
-          const Spacer(),
-
-          // Thông số Cự ly Khổng lồ
-          if (_showDistance)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  s.distanceKm.toStringAsFixed(2),
-                  style: const TextStyle(
-                    fontSize: 54,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -1.0,
-                    height: 1.0,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'KM',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.primaryNeon,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-              ],
-            ),
-
-          if (bottomStats.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(children: bottomStats),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // TEMPLATE 2: BẢN ĐỒ GPS (ROUTE OVERLAY)
-  // ==========================================
-  Widget _buildMapTemplate() {
-    final s = widget.session;
-    final dateTimeStr = _formatDateTime(s.startTime);
-
-    final stats = <Widget>[];
-    if (_showDistance) {
-      stats.add(_buildCompactStat('${s.distanceKm.toStringAsFixed(2)} KM', 'Quãng đường', AppTheme.primaryNeon));
-    }
-    if (_showDuration) {
-      stats.add(_buildCompactStat(s.formattedDuration, 'Thời gian', Colors.white));
-    }
-    if (_showPace) {
-      stats.add(_buildCompactStat(s.formattedPace, 'Pace TB', AppTheme.secondaryNeon));
-    }
-    if (_showCalories) {
-      stats.add(_buildCompactStat('${s.calories}', 'Calo', AppTheme.accentOrange));
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Logo & Ngày góc trên
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (_showLogo)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 32,
-                    height: 32,
-                    fit: BoxFit.contain,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-              if (dateTimeStr.isNotEmpty)
-                Text(
-                  dateTimeStr,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-            ],
-          ),
-
-          // Vùng vẽ line GPS Art thu nhỏ
-          Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: 1.2,
-                child: s.routePoints.length >= 2
-                    ? CustomPaint(
-                        painter: _GpsRouteOverlayPainter(s.routePoints),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ),
-
-          // Thẻ thông số đáy
-          if (stats.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5), width: 1.2),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: stats,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // TEMPLATE 3: STORY BADGE (HUY HIỆU THỂ THAO)
-  // ==========================================
-  Widget _buildBadgeTemplate() {
-    final s = widget.session;
-    final dateTimeStr = _formatDateTime(s.startTime);
-    final showTop = _showLogo || dateTimeStr.isNotEmpty;
-
-    // Danh sách các thông số phụ đi kèm
-    final subStats = <Widget>[];
-    if (_showDuration) {
-      subStats.add(_buildBadgeInlineStat(Icons.timer_outlined, s.formattedDuration, Colors.white));
-    }
-    if (_showPace) {
-      subStats.add(_buildBadgeInlineStat(Icons.speed_rounded, '${s.formattedPace}/km', AppTheme.secondaryNeon));
-    }
-    if (_showCalories) {
-      subStats.add(_buildBadgeInlineStat(Icons.local_fire_department_rounded, '${s.calories} kcal', AppTheme.accentOrange));
-    }
-    if (_showSteps) {
-      subStats.add(_buildBadgeInlineStat(Icons.directions_walk_rounded, '${s.totalSteps} bước', const Color(0xFF00E5FF)));
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        children: [
-          const Spacer(),
-
-          // Thẻ Huy Hiệu Thể Thao Tinh Gọn (Không box-shadow)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppTheme.primaryNeon.withValues(alpha: 0.6),
-                width: 1.2,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Dòng Header: Chỉ có Logo App bên trái và Ngày chạy bên phải (đã bỏ text Huy hiệu hoàn thành)
-                if (showTop) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      if (_showLogo)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                          ),
-                        )
-                      else
-                        const SizedBox.shrink(),
-                      if (dateTimeStr.isNotEmpty)
-                        Text(
-                          dateTimeStr,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                    ],
-                  ),
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 7),
-                    height: 0.8,
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                ],
-
-                // 2. Nội dung: Cự ly chính bên trái + Các thông số phụ căng đều 2 bên
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Cột trái: Cự ly nổi bật
-                    if (_showDistance) ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            s.distanceKm.toStringAsFixed(2),
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                              height: 1.0,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'KM',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.primaryNeon,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-
-                    // Vạch ngăn cách dọc
-                    if (_showDistance && subStats.isNotEmpty) ...[
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 10),
-                        height: 26,
-                        width: 1,
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ],
-
-                    // Cột phải: Các thông số phụ xếp thành lưới 2 cột căng đều 2 bên
-                    if (subStats.isNotEmpty)
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (int i = 0; i < subStats.length; i += 2) ...[
-                              if (i > 0) const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Expanded(child: subStats[i]),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: (i + 1 < subStats.length)
-                                        ? subStats[i + 1]
-                                        : const SizedBox.shrink(),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBadgeInlineStat(IconData icon, String value, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12.5, color: color),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white.withValues(alpha: 0.95),
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniStat(String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withValues(alpha: 0.7),
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactStat(String value, String label, Color color) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9.5,
-            color: AppTheme.textMuted,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(
-      width: 1,
-      height: 24,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      color: Colors.white.withValues(alpha: 0.25),
-    );
-  }
-}
-
-/// CustomPainter vẽ đường chạy GPS Neon Art trên ảnh
-class _GpsRouteOverlayPainter extends CustomPainter {
-  final List<RunPoint> routePoints;
-
-  _GpsRouteOverlayPainter(this.routePoints);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (routePoints.length < 2) return;
-
-    double minX = routePoints.first.x;
-    double maxX = routePoints.first.x;
-    double minY = routePoints.first.y;
-    double maxY = routePoints.first.y;
-
-    for (final p in routePoints) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-
-    final double rangeX = (maxX - minX == 0) ? 0.0001 : maxX - minX;
-    final double rangeY = (maxY - minY == 0) ? 0.0001 : maxY - minY;
-
-    final double padding = size.width * 0.1;
-    final double drawW = size.width - padding * 2;
-    final double drawH = size.height - padding * 2;
-
-    final path = Path();
-    for (int i = 0; i < routePoints.length; i++) {
-      final p = routePoints[i];
-      final double dx = padding + ((p.x - minX) / rangeX) * drawW;
-      final double dy = padding + (1.0 - ((p.y - minY) / rangeY)) * drawH;
-
-      if (i == 0) {
-        path.moveTo(dx, dy);
-      } else {
-        path.lineTo(dx, dy);
-      }
-    }
-
-    // Vẽ bóng phát sáng neon (Glow effect)
-    final glowPaint = Paint()
-      ..color = AppTheme.secondaryNeon.withValues(alpha: 0.4)
-      ..strokeWidth = 10.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawPath(path, glowPaint);
-
-    // Vẽ đường line chính Neon
-    final linePaint = Paint()
-      ..color = AppTheme.secondaryNeon
-      ..strokeWidth = 4.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(path, linePaint);
-
-    // Điểm bắt đầu (Chấm xanh lá)
-    final startP = routePoints.first;
-    final double startDx = padding + ((startP.x - minX) / rangeX) * drawW;
-    final double startDy = padding + (1.0 - ((startP.y - minY) / rangeY)) * drawH;
-    final startDot = Paint()..color = const Color(0xFF10B981);
-    canvas.drawCircle(Offset(startDx, startDy), 6, startDot);
-
-    // Điểm kết thúc (Chấm đỏ neon)
-    final endP = routePoints.last;
-    final double endDx = padding + ((endP.x - minX) / rangeX) * drawW;
-    final double endDy = padding + (1.0 - ((endP.y - minY) / rangeY)) * drawH;
-    final endDot = Paint()..color = AppTheme.primaryNeon;
-    canvas.drawCircle(Offset(endDx, endDy), 6, endDot);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
