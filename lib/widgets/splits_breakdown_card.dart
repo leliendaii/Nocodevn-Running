@@ -21,10 +21,18 @@ class SplitsBreakdownCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // Tìm pace nhanh nhất (giây nhỏ nhất) và chậm nhất để vẽ thanh bar tỷ lệ
+    // 1. Tìm pace nhanh nhất & chậm nhất để scale thanh bar
     int minPaceSec = 999999;
     int maxPaceSec = 0;
+    double totalDistanceKm = 0.0;
+    int totalDurationSec = 0;
+    int totalCalories = 0;
+
     for (final sp in splits) {
+      totalDistanceKm += sp.distanceKm;
+      totalDurationSec += sp.durationSeconds;
+      totalCalories += sp.calories;
+
       if (sp.paceSeconds > 0) {
         if (sp.paceSeconds < minPaceSec) minPaceSec = sp.paceSeconds;
         if (sp.paceSeconds > maxPaceSec) maxPaceSec = sp.paceSeconds;
@@ -32,6 +40,21 @@ class SplitsBreakdownCard extends StatelessWidget {
     }
     if (minPaceSec == 999999) minPaceSec = 300;
     if (maxPaceSec <= minPaceSec) maxPaceSec = minPaceSec + 60;
+
+    // 2. Tính Pace và Tốc độ trung bình tổng
+    String totalAvgPace = '0:00';
+    if (totalDistanceKm > 0 && totalDurationSec > 0) {
+      final double p = (totalDurationSec / 60.0) / totalDistanceKm;
+      final int min = p.floor();
+      final int sec = ((p - min) * 60).round();
+      totalAvgPace = '$min:${sec.toString().padLeft(2, '0')}';
+    }
+
+    String totalAvgSpeed = '0.0 km/h';
+    if (totalDurationSec > 0) {
+      final double speed = (totalDistanceKm / totalDurationSec) * 3600;
+      totalAvgSpeed = '${speed.toStringAsFixed(1)} km/h';
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -43,7 +66,7 @@ class SplitsBreakdownCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tiêu đề khối
+          // Header khối
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
@@ -92,14 +115,14 @@ class SplitsBreakdownCard extends StatelessWidget {
             child: Row(
               children: const [
                 SizedBox(
-                  width: 48,
+                  width: 52,
                   child: Text(
                     'KM',
                     style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                   ),
                 ),
                 SizedBox(
-                  width: 76,
+                  width: 80,
                   child: Text(
                     'PACE',
                     style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
@@ -112,7 +135,7 @@ class SplitsBreakdownCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(
-                  width: 52,
+                  width: 48,
                   child: Text(
                     'CALO',
                     textAlign: TextAlign.right,
@@ -134,27 +157,32 @@ class SplitsBreakdownCard extends StatelessWidget {
               final sp = splits[index];
               final isBest = sp.isBestSplit;
 
-              // Tỉ lệ độ dài thanh Bar (Pace càng nhanh/nhỏ thì thanh càng dài và đẹp)
+              // Định dạng số KM: Chặng lẻ hiển thị 2 chữ số thập phân (0.51, 0.12), không có chữ 'k'
+              final String kmLabel = sp.distanceKm < 1.0
+                  ? sp.distanceKm.toStringAsFixed(2)
+                  : '${sp.kmIndex}';
+
+              // Tỉ lệ độ dài thanh Bar
               final double ratio = maxPaceSec > minPaceSec
                   ? (1.0 - ((sp.paceSeconds - minPaceSec) / (maxPaceSec - minPaceSec))).clamp(0.25, 1.0)
                   : 1.0;
 
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                color: isBest ? const Color(0xFFFF2A55).withValues(alpha: 0.08) : Colors.transparent,
+                color: isBest ? AppTheme.primaryNeon.withValues(alpha: 0.08) : Colors.transparent,
                 child: Row(
                   children: [
-                    // 1. Cột KM (Số thứ tự chặng)
+                    // 1. Cột KM
                     SizedBox(
-                      width: 48,
+                      width: 52,
                       child: Row(
                         children: [
                           Text(
-                            sp.distanceKm < 1.0 ? '${sp.distanceKm}k' : '${sp.kmIndex}',
+                            kmLabel,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
-                              color: isBest ? const Color(0xFFFF2A55) : AppTheme.textPrimary,
+                              color: isBest ? AppTheme.primaryNeon : AppTheme.textPrimary,
                             ),
                           ),
                           if (isBest) ...[
@@ -167,7 +195,7 @@ class SplitsBreakdownCard extends StatelessWidget {
 
                     // 2. Cột Pace
                     SizedBox(
-                      width: 76,
+                      width: 80,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -177,7 +205,7 @@ class SplitsBreakdownCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w900,
-                              color: isBest ? const Color(0xFFFF2A55) : AppTheme.textPrimary,
+                              color: isBest ? AppTheme.primaryNeon : AppTheme.textPrimary,
                             ),
                           ),
                           if (sp.paceDeltaSeconds != 0)
@@ -221,14 +249,14 @@ class SplitsBreakdownCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
 
-                    // 4. Cột Calo
+                    // 4. Cột Calo (Chỉ hiển thị con số, KHÔNG có chữ kcal)
                     SizedBox(
-                      width: 52,
+                      width: 48,
                       child: Text(
-                        '${sp.calories} kcal',
+                        '${sp.calories}',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                           color: AppTheme.textSecondary,
                         ),
@@ -238,6 +266,76 @@ class SplitsBreakdownCard extends StatelessWidget {
                 ),
               );
             },
+          ),
+
+          // ==========================================
+          // DÒNG TỔNG KẾT TOÀN CHẶNG Ở CUỐI
+          // ==========================================
+          const Divider(color: AppTheme.divider, height: 1),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            ),
+            child: Row(
+              children: [
+                // 1. Tổng KM
+                SizedBox(
+                  width: 52,
+                  child: Text(
+                    totalDistanceKm.toStringAsFixed(2),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.primaryNeon,
+                    ),
+                  ),
+                ),
+
+                // 2. Pace trung bình
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    '$totalAvgPace /km',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.secondaryNeon,
+                    ),
+                  ),
+                ),
+
+                // 3. Tốc độ trung bình
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      totalAvgSpeed,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // 4. Tổng Calo (Không có chữ kcal)
+                SizedBox(
+                  width: 48,
+                  child: Text(
+                    '$totalCalories',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.primaryNeon,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

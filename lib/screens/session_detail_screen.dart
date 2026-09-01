@@ -70,83 +70,83 @@ class SessionDetailScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ==========================================
-            // 1. THẺ THÔNG TIN BUỔI CHẠY (GỘP GỌN GÀNG, KHÔNG DƯ THỪA)
+            // 1. THẺ THÔNG TIN BUỔI CHẠY (CĂN GIỮA TOÀN BỘ)
             // ==========================================
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: AppTheme.divider),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Hàng tiêu đề: Tên buổi chạy + Ngày chạy
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          sessionDisplayName,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.textPrimary,
-                            height: 1.3,
-                          ),
-                        ),
+                  // Tên buổi chạy căn giữa nổi bật
+                  Text(
+                    sessionDisplayName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textPrimary,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Badge Ngày chạy căn giữa
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.divider),
+                    ),
+                    child: Text(
+                      dateFormat.format(session.startTime),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.secondaryNeon,
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceLight,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.divider),
-                        ),
-                        child: Text(
-                          dateFormat.format(session.startTime),
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.secondaryNeon,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 14),
                   const Divider(color: AppTheme.divider, height: 1),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // Hàng thông tin thời gian & GPS gộp chung
+                  // 3 thông số Bắt đầu - Kết thúc - Tọa độ GPS (Căn giữa hoàn hảo)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildHeaderMetaItem(
-                        icon: Icons.play_circle_outline_rounded,
-                        iconColor: AppTheme.secondaryNeon,
-                        label: 'BẮT ĐẦU',
-                        value: startTimeStr,
+                      Expanded(
+                        child: _buildCenteredMetaItem(
+                          icon: Icons.play_circle_outline_rounded,
+                          iconColor: AppTheme.secondaryNeon,
+                          label: 'BẮT ĐẦU',
+                          value: startTimeStr,
+                        ),
                       ),
-                      Container(width: 1, height: 28, color: AppTheme.divider),
-                      _buildHeaderMetaItem(
-                        icon: Icons.flag_outlined,
-                        iconColor: AppTheme.primaryNeon,
-                        label: 'KẾT THÚC',
-                        value: endTimeStr,
+                      Container(width: 1, height: 32, color: AppTheme.divider),
+                      Expanded(
+                        child: _buildCenteredMetaItem(
+                          icon: Icons.flag_outlined,
+                          iconColor: AppTheme.primaryNeon,
+                          label: 'KẾT THÚC',
+                          value: endTimeStr,
+                        ),
                       ),
-                      Container(width: 1, height: 28, color: AppTheme.divider),
-                      _buildHeaderMetaItem(
-                        icon: Icons.location_on_outlined,
-                        iconColor: AppTheme.textMuted,
-                        label: 'TỌA ĐỘ GPS',
-                        value: '${session.routePoints.length} điểm',
+                      Container(width: 1, height: 32, color: AppTheme.divider),
+                      Expanded(
+                        child: _buildCenteredMetaItem(
+                          icon: Icons.location_on_outlined,
+                          iconColor: AppTheme.textMuted,
+                          label: 'TỌA ĐỘ GPS',
+                          value: '${session.routePoints.length} điểm',
+                        ),
                       ),
                     ],
                   ),
@@ -156,21 +156,23 @@ class SessionDetailScreen extends StatelessWidget {
             const SizedBox(height: 14),
 
             // ==========================================
-            // 2. BẢNG CHỈ SỐ THỐNG KÊ (2 MÀU ĐỎ & XANH - GỌN GÀNG)
+            // 2. BẢNG CHỈ SỐ THỐNG KÊ (CĂN GIỮA TOÀN BỘ, 2 MÀU ĐỎ & XANH)
             // ==========================================
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: AppTheme.divider),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // CỰ LY CHÍNH
                   const Text(
                     'TỔNG QUÃNG ĐƯỜNG',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w900,
@@ -208,11 +210,11 @@ class SessionDetailScreen extends StatelessWidget {
                   const Divider(color: AppTheme.divider, height: 1),
                   const SizedBox(height: 16),
 
-                  // LƯỚI 4 CHỈ SỐ PHỤ ĐỐI XỨNG
+                  // LƯỚI 4 CHỈ SỐ PHỤ ĐỐI XỨNG (CĂN GIỮA)
                   Row(
                     children: [
                       Expanded(
-                        child: _buildStatBox(
+                        child: _buildCenteredStatBox(
                           icon: Icons.timer_outlined,
                           iconColor: AppTheme.secondaryNeon,
                           label: 'THỜI GIAN',
@@ -222,7 +224,7 @@ class SessionDetailScreen extends StatelessWidget {
                       ),
                       Container(width: 1, height: 50, color: AppTheme.divider),
                       Expanded(
-                        child: _buildStatBox(
+                        child: _buildCenteredStatBox(
                           icon: Icons.speed_rounded,
                           iconColor: AppTheme.secondaryNeon,
                           label: 'PACE TRUNG BÌNH',
@@ -232,13 +234,13 @@ class SessionDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   const Divider(color: AppTheme.divider, height: 1),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Expanded(
-                        child: _buildStatBox(
+                        child: _buildCenteredStatBox(
                           icon: Icons.local_fire_department_rounded,
                           iconColor: AppTheme.primaryNeon,
                           label: 'CALO TIÊU THỤ',
@@ -248,7 +250,7 @@ class SessionDetailScreen extends StatelessWidget {
                       ),
                       Container(width: 1, height: 50, color: AppTheme.divider),
                       Expanded(
-                        child: _buildStatBox(
+                        child: _buildCenteredStatBox(
                           icon: Icons.bolt_rounded,
                           iconColor: AppTheme.secondaryNeon,
                           label: 'TỐC ĐỘ TRUNG BÌNH',
@@ -310,19 +312,20 @@ class SessionDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderMetaItem({
+  Widget _buildCenteredMetaItem({
     required IconData icon,
     required Color iconColor,
     required String label,
     required String value,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: iconColor),
+            Icon(icon, size: 13, color: iconColor),
             const SizedBox(width: 4),
             Text(
               label,
@@ -335,11 +338,12 @@ class SessionDetailScreen extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Text(
           value,
+          textAlign: TextAlign.center,
           style: const TextStyle(
-            fontSize: 12,
+            fontSize: 12.5,
             fontWeight: FontWeight.w800,
             color: AppTheme.textPrimary,
           ),
@@ -348,43 +352,42 @@ class SessionDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatBox({
+  Widget _buildCenteredStatBox({
     required IconData icon,
     required Color iconColor,
     required String label,
     required String value,
     required Color valueColor,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: iconColor),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textMuted,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: iconColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textMuted,
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: valueColor,
             ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: valueColor,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

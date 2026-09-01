@@ -800,11 +800,9 @@ class RunningProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tạo tên ghi chú mặc định theo chuẩn: "Buổi chạy [DD/MM/YYYY]" hoặc "Buổi chạy [DD/MM/YYYY] #2"
+  /// Tạo tên buổi chạy mặc định tự nhiên: "Buổi chạy Sáng", "Buổi chạy Chiều #2"...
   String generateDefaultRunNote(String userId, [DateTime? runDate]) {
     final date = runDate ?? DateTime.now();
-    final dateStr = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-
     final userRuns = getUserSessions(userId);
     final runsToday = userRuns.where((s) {
       return s.startTime.year == date.year &&
@@ -813,10 +811,20 @@ class RunningProvider with ChangeNotifier {
     }).toList();
 
     final int countToday = runsToday.length;
+    final int hour = date.hour;
+    String timeOfDay = 'Sáng';
+    if (hour >= 11 && hour < 14) {
+      timeOfDay = 'Trưa';
+    } else if (hour >= 14 && hour < 18) {
+      timeOfDay = 'Chiều';
+    } else if (hour >= 18) {
+      timeOfDay = 'Tối';
+    }
+
     if (countToday == 0) {
-      return 'Buổi chạy [$dateStr]';
+      return 'Buổi chạy $timeOfDay';
     } else {
-      return 'Buổi chạy [$dateStr] #${countToday + 1}';
+      return 'Buổi chạy $timeOfDay #${countToday + 1}';
     }
   }
 
