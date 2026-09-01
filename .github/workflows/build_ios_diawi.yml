@@ -5,6 +5,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Khắc phục lỗi Deprecation Node 20 trên GitHub Actions Runners theo thông báo chính thức:
+# https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
+
 jobs:
   # ====================================================
   # 🤖 JOB 1: BIÊN DỊCH ANDROID APK (CHẠY TRÊN UBUNTU SIÊU NHANH)
@@ -18,10 +23,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: ☕ Cài đặt Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
+
+      - name: 🔑 Cấp quyền thực thi cho gradlew
+        run: chmod +x android/gradlew
 
       - name: 🐦 Cài đặt Flutter SDK
         uses: subosito/flutter-action@v2
