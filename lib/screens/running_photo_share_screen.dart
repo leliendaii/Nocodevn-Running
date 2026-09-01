@@ -375,10 +375,22 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Tạo ảnh check-in'),
+        title: const Text('Tạo ảnh'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.tune_rounded, color: AppTheme.textPrimary),
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.divider),
+              ),
+              child: const Icon(
+                Icons.dashboard_customize_rounded,
+                color: AppTheme.textPrimary,
+                size: 18,
+              ),
+            ),
             tooltip: 'Tuỳ chỉnh thông số',
             onPressed: _showOverlaySettingsSheet,
           ),
@@ -685,16 +697,13 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (_showLogo)
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryNeon,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(
-                    Icons.directions_run_rounded,
-                    size: 18,
-                    color: Colors.white,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.contain,
                   ),
                 )
               else
@@ -784,14 +793,14 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (_showLogo)
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.secondaryNeon.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.contain,
                   ),
-                  child: const Icon(Icons.route_rounded, color: AppTheme.secondaryNeon, size: 18),
                 )
               else
                 const SizedBox.shrink(),
@@ -879,13 +888,14 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       if (_showLogo)
-                        Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryNeon.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            width: 28,
+                            height: 28,
+                            fit: BoxFit.contain,
                           ),
-                          child: const Icon(Icons.workspace_premium_rounded, color: AppTheme.primaryNeon, size: 20),
                         )
                       else
                         const SizedBox.shrink(),
