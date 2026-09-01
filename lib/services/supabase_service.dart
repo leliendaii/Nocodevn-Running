@@ -101,7 +101,7 @@ class SupabaseService {
             .or(orFilters.join(','))
             .limit(1)
             .maybeSingle()
-            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
         if (res != null) return res;
       } catch (e) {
         debugPrint('Fetch profile SDK: $e, fallback REST direct');
@@ -119,7 +119,7 @@ class SupabaseService {
           'Authorization': 'Bearer $supabaseAnonKey',
           'Content-Type': 'application/json',
         },
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 8));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (data is List && data.isNotEmpty) {
@@ -160,7 +160,7 @@ class SupabaseService {
         final res = await supa
             .from('profiles')
             .select('id, name, username, email, role, avatar_url')
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 8));
         return List<Map<String, dynamic>>.from(res);
       } catch (e) {
         debugPrint('FetchAllProfiles SDK: $e, fallback REST direct');
@@ -177,7 +177,7 @@ class SupabaseService {
           'Authorization': 'Bearer $supabaseAnonKey',
           'Content-Type': 'application/json',
         },
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 8));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (data is List) {
@@ -439,7 +439,7 @@ class SupabaseService {
             .select()
             .order('start_time', ascending: false)
             .limit(300)
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 8));
         data = res;
       } catch (e) {
         debugPrint('Tải dữ liệu Supabase SDK: $e, fallback REST direct');
@@ -457,7 +457,7 @@ class SupabaseService {
             'Authorization': 'Bearer $supabaseAnonKey',
             'Content-Type': 'application/json',
           },
-        ).timeout(const Duration(seconds: 3));
+        ).timeout(const Duration(seconds: 8));
         if (resp.statusCode == 200) {
           final decoded = jsonDecode(resp.body);
           if (decoded is List) {
