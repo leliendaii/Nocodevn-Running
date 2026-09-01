@@ -33,10 +33,11 @@ class LiveWorkoutNotificationService {
 
       await _notifications.initialize(initSettings);
 
-      // Tạo Channel trên Android với cờ chạy ngầm mượt mà không rung chuông liên tục
+      // Tạo các Channel trên Android với cấu hình chuẩn
       final androidImplementation = _notifications.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       if (androidImplementation != null) {
+        // Channel 1: Live Workout Tracking
         await androidImplementation.createNotificationChannel(
           const AndroidNotificationChannel(
             _channelId,
@@ -48,6 +49,33 @@ class LiveWorkoutNotificationService {
             showBadge: false,
           ),
         );
+
+        // Channel 2: Nhắc nhở luyện tập hàng ngày
+        await androidImplementation.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'running_daily_reminder_channel',
+            'Nhắc nhở luyện tập hàng ngày',
+            description: 'Thông báo nhắc nhở chạy bộ buổi sáng và duy trì mục tiêu',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+            showBadge: true,
+          ),
+        );
+
+        // Channel 3: Tự động kết thúc phiên chạy
+        await androidImplementation.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'running_auto_end_channel',
+            'Tự động kết thúc phiên chạy',
+            description: 'Thông báo khi phiên chạy tự động chốt và lưu kết quả',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+            showBadge: true,
+          ),
+        );
+
         await androidImplementation.requestNotificationsPermission();
       }
 
@@ -93,6 +121,7 @@ class LiveWorkoutNotificationService {
         channelDescription: 'Hiển thị thông số chạy bộ thời gian thực',
         importance: Importance.low,
         priority: Priority.high,
+        icon: '@mipmap/launcher_icon',
         ongoing: true, // Ghim trên thanh thông báo không bị vuốt mất khi đang chạy
         autoCancel: false,
         onlyAlertOnce: true, // Không rung chuông mỗi giây
@@ -153,8 +182,9 @@ class LiveWorkoutNotificationService {
         'running_daily_reminder_channel',
         'Nhắc nhở luyện tập hàng ngày',
         channelDescription: 'Thông báo nhắc nhở chạy bộ buổi sáng và duy trì mục tiêu',
-        importance: Importance.high,
+        importance: Importance.max,
         priority: Priority.high,
+        icon: '@mipmap/launcher_icon',
         playSound: true,
         enableVibration: true,
         showWhen: true,
@@ -200,8 +230,9 @@ class LiveWorkoutNotificationService {
         'running_auto_end_channel',
         'Tự động kết thúc phiên chạy',
         channelDescription: 'Thông báo khi phiên chạy tự động chốt và lưu kết quả',
-        importance: Importance.high,
+        importance: Importance.max,
         priority: Priority.high,
+        icon: '@mipmap/launcher_icon',
         playSound: true,
         enableVibration: true,
         showWhen: true,

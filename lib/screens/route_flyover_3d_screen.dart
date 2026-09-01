@@ -57,7 +57,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   double _baseScaleMultiplier = 1.0;
   Offset _basePanOffset = Offset.zero;
   Offset _lastFocalPoint = Offset.zero;
-  String _selectedMapType = 'roadmap'; // 'roadmap' | 'terrain' | 'satellite'
+  String _selectedMapType = 'terrain'; // 'terrain' | 'satellite'
 
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
@@ -1567,7 +1567,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     required this.tileVersion,
     this.userScaleMultiplier = 1.0,
     this.userPanOffset = Offset.zero,
-    this.mapType = 'roadmap',
+    this.mapType = 'terrain',
     required this.onTileRequested,
   });
 
