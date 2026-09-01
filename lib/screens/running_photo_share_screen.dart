@@ -858,126 +858,150 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   Widget _buildBadgeTemplate() {
     final s = widget.session;
     final dateStr = DateFormat('dd/MM/yyyy').format(s.startTime);
+    final showTop = _showLogo || _showDate;
+
+    // Danh sách các thông số phụ đi kèm
+    final subStats = <Widget>[];
+    if (_showDuration) {
+      subStats.add(_buildBadgeInlineStat(Icons.timer_outlined, s.formattedDuration, Colors.white));
+    }
+    if (_showPace) {
+      subStats.add(_buildBadgeInlineStat(Icons.speed_rounded, '${s.formattedPace}/km', AppTheme.secondaryNeon));
+    }
+    if (_showCalories) {
+      subStats.add(_buildBadgeInlineStat(Icons.local_fire_department_rounded, '${s.calories} kcal', AppTheme.accentOrange));
+    }
 
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         children: [
           const Spacer(),
 
-          // Khung Badge Thể Thao Pro
+          // Thẻ Huy Hiệu Thể Thao Tinh Gọn (Compact Sports Badge)
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: AppTheme.surface.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppTheme.primaryNeon, width: 1.8),
+              color: Colors.black.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppTheme.primaryNeon.withValues(alpha: 0.55),
+                width: 1.2,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
+                  color: AppTheme.primaryNeon.withValues(alpha: 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_showLogo || _showDate) ...[
+                // 1. Dòng Header: Logo + Huy hiệu hoàn thành + Ngày
+                if (showTop) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (_showLogo)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(7),
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            width: 28,
-                            height: 28,
-                            fit: BoxFit.contain,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_showLogo) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(5),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                width: 18,
+                                height: 18,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          const Text(
+                            'HUY HIỆU HOÀN THÀNH',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.primaryNeon,
+                              letterSpacing: 0.8,
+                            ),
                           ),
-                        )
-                      else
-                        const SizedBox.shrink(),
+                        ],
+                      ),
                       if (_showDate)
                         Text(
                           dateStr,
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                     ],
                   ),
-                  const Divider(color: AppTheme.divider, height: 20),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 7),
+                    height: 0.8,
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
                 ],
+
+                // 2. Nội dung: Cự ly chính bên trái + Các thông số phụ xếp gọn bên phải
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (_showDistance)
-                      Column(
+                    // Cột trái: Cự ly nổi bật
+                    if (_showDistance) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             s.distanceKm.toStringAsFixed(2),
                             style: const TextStyle(
-                              fontSize: 32,
+                              fontSize: 28,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
+                              letterSpacing: -0.5,
+                              height: 1.0,
                             ),
                           ),
+                          const SizedBox(width: 4),
                           const Text(
                             'KM',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.primaryNeon,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ],
                       ),
-                    if (_showPace)
-                      Column(
-                        children: [
-                          Text(
-                            s.formattedPace,
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.secondaryNeon,
-                            ),
-                          ),
-                          const Text(
-                            'PACE',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                          ),
-                        ],
+                    ],
+
+                    // Vạch ngăn cách dọc
+                    if (_showDistance && subStats.isNotEmpty) ...[
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        height: 26,
+                        width: 1,
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
-                    if (_showDuration)
-                      Column(
-                        children: [
-                          Text(
-                            s.formattedDuration,
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const Text(
-                            'THỜI GIAN',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    if (_showCalories)
-                      Column(
-                        children: [
-                          Text(
-                            '${s.calories}',
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.accentOrange,
-                            ),
-                          ),
-                          const Text(
-                            'CALO',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                          ),
-                        ],
+                    ],
+
+                    // Cột phải: Các thông số phụ co giãn tự động không bao giờ overflow
+                    if (subStats.isNotEmpty)
+                      Expanded(
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: subStats,
+                        ),
                       ),
                   ],
                 ),
@@ -986,6 +1010,25 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBadgeInlineStat(IconData icon, String value, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: color),
+        const SizedBox(width: 3.5),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.95),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
     );
   }
 
