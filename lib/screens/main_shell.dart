@@ -834,11 +834,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
                 child: Column(
                   children: [
-                    // Mục 1: Tài Khoản & Bảo Mật
+                    // Mục 1: Tài khoản & bảo mật
                     _buildSettingsRowTile(
                       icon: Icons.person_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
-                      title: 'Tài Khoản & Bảo Mật',
+                      title: 'Tài khoản & bảo mật',
                       subtitle: 'Họ tên, email & đổi mật khẩu',
                       onTap: () {
                         Navigator.of(context).push(
@@ -850,13 +850,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                     const Divider(color: AppTheme.divider, height: 1, indent: 52),
 
-                    // Mục 2: Cài Đặt Luyện Tập (Gộp tự động chốt & nhắc nhở)
+                    // Mục 2: Cài đặt luyện tập (Gộp tự động chốt & nhắc nhở)
                     Consumer<RunningProvider>(
                       builder: (context, running, _) {
                         return _buildSettingsRowTile(
                           icon: Icons.tune_rounded,
                           iconColor: AppTheme.primaryNeon,
-                          title: 'Cài Đặt Luyện Tập',
+                          title: 'Cài đặt luyện tập',
                           subtitle: 'Tự động lưu phiên & nhắc nhở giờ chạy',
                           statusText: running.autoEndEnabled ? 'BẬT' : 'TẮT',
                           statusColor: running.autoEndEnabled
@@ -874,11 +874,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     ),
                     const Divider(color: AppTheme.divider, height: 1, indent: 52),
 
-                    // Mục 3: Về ứng dụng & Thông tin phiên bản
+                    // Mục 3: Về ứng dụng & hỗ trợ
                     _buildSettingsRowTile(
                       icon: Icons.info_outline_rounded,
                       iconColor: AppTheme.primaryNeon,
-                      title: 'Về Ứng Dụng & Hỗ Trợ',
+                      title: 'Về ứng dụng & hỗ trợ',
                       subtitle: 'Nocodevn Running v1.2.0 • Hướng dẫn & Bản quyền',
                       onTap: () => _showAppAboutDialog(context),
                     ),
@@ -901,7 +901,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: _buildSettingsRowTile(
                     icon: Icons.admin_panel_settings_rounded,
                     iconColor: AppTheme.primaryNeon,
-                    title: 'Trang Quản Trị Hệ Thống',
+                    title: 'Trang quản trị hệ thống',
                     subtitle: 'Quản lý runners & phân quyền dữ liệu',
                     statusText: 'ADMIN',
                     statusColor: AppTheme.primaryNeon,

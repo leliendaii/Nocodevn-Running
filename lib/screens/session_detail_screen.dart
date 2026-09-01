@@ -270,43 +270,51 @@ class SessionDetailScreen extends StatelessWidget {
             // ==========================================
             if (session.effectiveSplits.isNotEmpty) ...[
               SplitsBreakdownCard(splits: session.effectiveSplits),
-              const SizedBox(height: 16),
             ],
-
-            // ==========================================
-            // 4. NÚT XEM VIDEO QUÁ TRÌNH 3D (XANH #139EFE)
-            // ==========================================
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
+          ],
+        ),
+      ),
+      // Nút 'Xem quá trình' nhỏ gọn, dính ở giữa, bên dưới (không có icon)
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.secondaryNeon, // Màu Xanh #139EFE
                   foregroundColor: Colors.white,
-                  elevation: 4,
+                  elevation: 6,
+                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 11),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                icon: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Colors.white),
-                label: const Text(
-                  'XEM VIDEO QUÁ TRÌNH 3D',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.6,
-                  ),
+                  shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.45),
                 ),
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RouteFlyover3DScreen(session: session),
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) => RouteFlyover3DScreen(session: session),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                      transitionDuration: const Duration(milliseconds: 240),
+                      reverseTransitionDuration: const Duration(milliseconds: 180),
                     ),
                   );
                 },
+                child: const Text(
+                  'Xem quá trình',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

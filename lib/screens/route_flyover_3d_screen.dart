@@ -186,6 +186,21 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute != null) {
+      modalRoute.animation?.addStatusListener((status) {
+        if (status == AnimationStatus.reverse) {
+          // Bắt đầu lùi màn hình / vuốt thoát: Dừng ngay animation lập tức để giải phóng GPU tức thì, không bị delay
+          _isDisposed = true;
+          _controller.stop();
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _isDisposed = true;
     _controller.stop();
@@ -1081,9 +1096,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1D),
-      body: Stack(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        _isDisposed = true;
+        _controller.stop();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0F1D),
+        body: Stack(
         children: [
           // 1. KHUNG HÌNH 3D LỘ TRÌNH & VIDEO STORY (NHẬN DIỆN KHI XUẤT VIDEO)
           Positioned.fill(
@@ -1489,7 +1510,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
 

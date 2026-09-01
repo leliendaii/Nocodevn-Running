@@ -249,7 +249,11 @@ class SplitsBreakdownCard extends StatelessWidget {
                             child: Container(
                               height: 12,
                               decoration: BoxDecoration(
-                                color: isBest ? AppTheme.primaryNeon : AppTheme.secondaryNeon,
+                                gradient: LinearGradient(
+                                  colors: isBest
+                                      ? const [Color(0xFFFF2A42), Color(0xFFFF7043)]
+                                      : const [Color(0xFF139EFE), Color(0xFF00E5FF)],
+                                ),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -293,90 +297,189 @@ class SplitsBreakdownCard extends StatelessWidget {
           ),
 
           // ==========================================
-          // DÒNG TỔNG KẾT TOÀN CHẶNG Ở CUỐI
+          // DÒNG TỔNG KẾT TOÀN CHẶNG RÕ RÀNG & ĐẸP MẮT
           // ==========================================
           const Divider(color: AppTheme.divider, height: 1),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: const Color(0xFF0B132B).withValues(alpha: 0.95),
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              border: Border(
+                top: BorderSide(
+                  color: AppTheme.secondaryNeon.withValues(alpha: 0.4),
+                  width: 1.2,
+                ),
+              ),
             ),
-            child: Row(
+            child: Column(
               children: [
-                // 1. Tổng KM
-                SizedBox(
-                  width: 44,
-                  child: Text(
-                    totalDistanceKm.toStringAsFixed(2),
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.primaryNeon,
+                // Hàng 1: Badge TỔNG CỘNG + Quãng đường lớn + Tốc độ trung bình
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF2A42), Color(0xFFFF6B00)],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF2A42).withValues(alpha: 0.3),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            'TỔNG',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${totalDistanceKm.toStringAsFixed(2)} km',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-
-                // 2. Pace trung bình
-                SizedBox(
-                  width: 68,
-                  child: Text(
-                    '$totalAvgPace /km',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.secondaryNeon,
-                    ),
-                  ),
-                ),
-
-                // 3. Tốc độ trung bình
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      totalAvgSpeed,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.divider),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.bolt_rounded, size: 13, color: AppTheme.secondaryNeon),
+                          const SizedBox(width: 3),
+                          Text(
+                            totalAvgSpeed,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(height: 10),
+                const Divider(color: Color(0xFF1E293B), height: 1),
+                const SizedBox(height: 8),
 
-                // 4. Tổng Bước
-                SizedBox(
-                  width: 48,
-                  child: Text(
-                    '$totalSteps',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.secondaryNeon,
+                // Hàng 2: Chi tiết 3 thông số rõ ràng (Pace TB, Tổng bước, Tổng calo)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'PACE TB',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textMuted,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$totalAvgPace /km',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.secondaryNeon,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-
-                // 5. Tổng Calo (Không có chữ kcal)
-                SizedBox(
-                  width: 40,
-                  child: Text(
-                    '$totalCalories',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.primaryNeon,
+                    Container(width: 1, height: 28, color: const Color(0xFF1E293B)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'TỔNG BƯỚC',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textMuted,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _formatNumber(totalSteps),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.secondaryNeon,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    Container(width: 1, height: 28, color: const Color(0xFF1E293B)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'TỔNG CALO',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textMuted,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$totalCalories kcal',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.primaryNeon,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  static String _formatNumber(int val) {
+    final str = val.toString();
+    return str.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
     );
   }
 }
