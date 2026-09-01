@@ -199,11 +199,12 @@ class RunningProvider with ChangeNotifier {
 
     if (_reminderEnabled) {
       final timeStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
+      final effectiveName = getUserRealName(userId, 'Người chạy');
       LiveWorkoutNotificationService.scheduleDailyReminderNotification(
         hour: _reminderHour,
         minute: _reminderMinute,
-        title: '⏰ Đã đến giờ chạy bộ ($timeStr)',
-        body: 'Hãy mang giày vào và hoàn thành buổi chạy hôm nay để duy trì phong độ nhé!',
+        title: '⏰ Đã đến $timeStr rồi, $effectiveName ơi!',
+        body: 'Đã đến $timeStr! $effectiveName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
       );
     } else {
       LiveWorkoutNotificationService.cancelDailyReminder();
@@ -241,6 +242,7 @@ class RunningProvider with ChangeNotifier {
   /// Cập nhật cấu hình Nhắc nhở & Đồng bộ Alarm thông báo hệ thống lặp lại hàng ngày
   Future<void> updateReminderSchedule({
     required String userId,
+    String? userName,
     required bool enabled,
     required int hour,
     required int minute,
@@ -249,6 +251,10 @@ class RunningProvider with ChangeNotifier {
     _reminderEnabled = enabled;
     _reminderHour = hour;
     _reminderMinute = minute;
+
+    final effectiveName = (userName != null && userName.isNotEmpty)
+        ? userName
+        : getUserRealName(userId, 'Người chạy');
 
     await LocalStorageService.saveReminderConfig(
       userId: userId,
@@ -262,8 +268,8 @@ class RunningProvider with ChangeNotifier {
       await LiveWorkoutNotificationService.scheduleDailyReminderNotification(
         hour: hour,
         minute: minute,
-        title: '⏰ Đã đến giờ chạy bộ ($timeStr)',
-        body: 'Hãy mang giày vào và bắt đầu buổi chạy hôm nay để duy trì sức khỏe nhé!',
+        title: '⏰ Đã đến $timeStr rồi, $effectiveName ơi!',
+        body: 'Đã đến $timeStr! $effectiveName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
       );
     } else {
       await LiveWorkoutNotificationService.cancelDailyReminder();
@@ -414,18 +420,46 @@ class RunningProvider with ChangeNotifier {
       // GHI CHECKPOINT LIÊN TỤC MỖI GIÂY (CHỐNG MẤT DỮ LIỆU KHI TẮT APP ĐỘT NGỘT)
       saveActiveCheckpointNow();
 
-      // KIỂM TRA TỰ ĐỘNG CHỐT KHI QUA GIỜ CÀI ĐẶT CỦA USER (CHỐNG QUÊN)
-      if (_autoEndEnabled) {
-        final cutoffToday = DateTime(now.year, now.month, now.day, _autoEndHour, _autoEndMinute);
-        if (now.isAfter(cutoffToday) && _runStartTime!.isBefore(cutoffToday)) {
-          debugPrint('⏰ [AUTO-FINISH] Đã qua mốc giờ $_autoEndHour:$_autoEndMinute, tự động chốt buổi chạy cho user $_activeUserId!');
-          _wasAutoFinished = true;
-          stopAndSaveTracking(
-            userId: _activeUserId ?? 'current_user',
-            userName: getUserRealName(_activeUserId ?? '', 'Người chạy'),
-            notes: 'Tự động chốt lúc ${_autoEndHour.toString().padLeft(2, '0')}:${_autoEndMinute.toString().padLeft(2, '0')} (Chống quên)',
-          );
-        }
+      // KIỂM TRA TỰ ĐỘNG KẾT THÚC KHI CHẠM HOẶC QUA GIỜ CÀI ĐẶT (CHỐNG QUÊN)
+      _checkAutoEndCutoff(now);
+    }
+  }
+
+  /// Kiểm tra và tự động chốt phiên chạy khi đã đến hoặc vượt qua giờ kết thúc đã cài (Chống quên)
+  void _checkAutoEndCutoff(DateTime now) {
+    if (!_autoEndEnabled || _state != TrackingState.running || _runStartTime == null) return;
+
+    final cutoffToday = DateTime(now.year, now.month, now.day, _autoEndHour, _autoEndMinute);
+
+    // Điều kiện chốt:
+    // Buổi chạy được bắt đầu TRƯỚC mốc cutoff và thời gian hiện tại đã ĐẠT hoặc VƯỢT QUA mốc cutoff
+    final bool hasCrossedCutoff = _runStartTime!.isBefore(cutoffToday) &&
+        (now.isAfter(cutoffToday) || now.isAtSameMomentAs(cutoffToday));
+
+    if (hasCrossedCutoff) {
+      debugPrint('⏰ [AUTO-END] Tự động chốt buổi chạy lúc ${_autoEndHour.toString().padLeft(2, '0')}:${_autoEndMinute.toString().padLeft(2, '0')} (Chống quên)');
+      _wasAutoFinished = true;
+      final double finishedDistance = _distanceKm;
+      final int sec = _durationSeconds;
+      final min = sec ~/ 60;
+      final s = sec % 60;
+      final durationStr = '${min.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+      final realUserName = getUserRealName(_activeUserId ?? '', 'Người chạy');
+
+      if (_distanceKm >= 0.05 || _durationSeconds >= 30) {
+        stopAndSaveTracking(
+          userId: _activeUserId ?? 'current_user',
+          userName: realUserName,
+          notes: 'Tự động chốt lúc ${_autoEndHour.toString().padLeft(2, '0')}:${_autoEndMinute.toString().padLeft(2, '0')} (Chống quên)',
+        );
+
+        LiveWorkoutNotificationService.showAutoEndNotification(
+          distanceKm: finishedDistance,
+          durationStr: durationStr,
+        );
+      } else {
+        // Buổi chạy bấm nhầm hoặc chưa di chuyển (< 50m) -> Reset sạch sẽ
+        resetTracking();
       }
     }
   }
@@ -497,37 +531,6 @@ class RunningProvider with ChangeNotifier {
             calories: _calories,
             isPaused: false,
           );
-        }
-
-        // Tự động kết thúc phiên chạy khi chạm hoặc vượt qua giờ kết thúc đã cài
-        if (_autoEndEnabled) {
-          final now = DateTime.now();
-          final currentMin = now.hour * 60 + now.minute;
-          final endMin = _autoEndHour * 60 + _autoEndMinute;
-          final startMin = _autoStartHour * 60 + _autoStartMinute;
-
-          final bool isOverTime = (endMin > startMin)
-              ? (currentMin >= endMin)
-              : (currentMin >= endMin && currentMin < startMin);
-
-          if (isOverTime && _distanceKm > 0.02) {
-            _wasAutoFinished = true;
-            final double finishedDistance = _distanceKm;
-            final int sec = _durationSeconds;
-            final min = sec ~/ 60;
-            final s = sec % 60;
-            final durationStr = '${min.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-
-            stopAndSaveTracking(
-              userId: _activeUserId ?? 'user',
-              userName: 'Runner',
-            );
-
-            LiveWorkoutNotificationService.showAutoEndNotification(
-              distanceKm: finishedDistance,
-              durationStr: durationStr,
-            );
-          }
         }
       }
     });

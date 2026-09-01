@@ -305,6 +305,7 @@ class AutoEndScheduleScreen extends StatelessWidget {
                             onChanged: (val) {
                               running.updateReminderSchedule(
                                 userId: userId,
+                                userName: user?.name,
                                 enabled: val,
                                 hour: running.reminderHour,
                                 minute: running.reminderMinute,
@@ -342,6 +343,7 @@ class AutoEndScheduleScreen extends StatelessWidget {
                             if (picked != null) {
                               running.updateReminderSchedule(
                                 userId: userId,
+                                userName: user?.name,
                                 enabled: true,
                                 hour: picked.hour,
                                 minute: picked.minute,
@@ -400,9 +402,10 @@ class AutoEndScheduleScreen extends StatelessWidget {
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                             ),
                             onPressed: () async {
+                              final effectiveName = user?.name ?? running.getUserRealName(userId, 'Người chạy');
                               await LiveWorkoutNotificationService.showMorningReminderNotification(
-                                title: 'Nhắc nhở',
-                                body: 'Thông báo hoạt động tốt! Giờ nhắc nhở đã cài: $reminderStr',
+                                title: '⏰ Đã đến $reminderStr rồi, $effectiveName ơi!',
+                                body: 'Đã đến $reminderStr! $effectiveName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
                               );
                               if (context.mounted) {
                                 TopSyncToast.show(
