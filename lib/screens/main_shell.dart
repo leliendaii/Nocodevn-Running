@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -8,6 +9,7 @@ import '../providers/running_provider.dart';
 import '../models/user_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/dialogs/avatar_picker_dialog.dart';
+import '../widgets/dialogs/animated_reminder_dialog.dart';
 import '../widgets/user_avatar.dart';
 import 'running_screen.dart';
 import 'history_screen.dart';
@@ -15,6 +17,7 @@ import 'admin_dashboard_screen.dart';
 import 'auto_end_schedule_screen.dart';
 import 'account_info_screen.dart';
 import '../services/voice_coach_service.dart';
+import '../services/live_workout_notification_service.dart';
 import '../widgets/top_sync_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -29,6 +32,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _currentIndex = 0;
   TimeFilter _personalFilter = TimeFilter.week;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  Timer? _reminderCheckTimer;
+  String? _lastReminderTriggeredKey;
+  bool _isShowingReminderDialog = false;
 
   @override
   void initState() {
@@ -38,12 +44,56 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshAllAppData();
     });
+    // Quét định kỳ mỗi 10 giây để kích hoạt nhắc nhở đúng giờ kể cả khi đang mở app
+    _reminderCheckTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _checkScheduledReminder();
+    });
   }
 
   @override
   void dispose() {
+    _reminderCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _checkScheduledReminder() {
+    if (!mounted) return;
+    final running = context.read<RunningProvider>();
+    if (!running.reminderEnabled) return;
+
+    final now = DateTime.now();
+    if (now.hour == running.reminderHour && now.minute == running.reminderMinute) {
+      final triggerKey = '${now.year}-${now.month}-${now.day}-${now.hour}-${now.minute}';
+      if (_lastReminderTriggeredKey == triggerKey) return;
+      _lastReminderTriggeredKey = triggerKey;
+
+      final auth = context.read<AuthProvider>();
+      final userId = auth.currentUser?.id ?? '';
+      final userName = auth.currentUser?.name ?? running.getUserRealName(userId, 'Bạn');
+      final timeStr = '${running.reminderHour.toString().padLeft(2, '0')}:${running.reminderMinute.toString().padLeft(2, '0')}';
+
+      // 1. Gửi thông báo ra thanh trạng thái / màn hình khóa
+      LiveWorkoutNotificationService.showMorningReminderNotification(
+        title: '⏰ Đã đến $timeStr rồi, $userName ơi!',
+        body: 'Đã đến $timeStr! $userName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
+      );
+
+      // 2. Nếu đang mở app -> Hiện popup rung nhẹ nhẹ
+      if (!_isShowingReminderDialog && mounted) {
+        _isShowingReminderDialog = true;
+        AnimatedReminderDialog.show(
+          context,
+          userName: userName,
+          timeStr: timeStr,
+          onStartRunning: () {
+            setState(() => _currentIndex = 0);
+          },
+        ).then((_) {
+          _isShowingReminderDialog = false;
+        });
+      }
+    }
   }
 
   @override

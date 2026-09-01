@@ -19,6 +19,13 @@ class LiveWorkoutNotificationService {
     if (_isInitialized) return;
     try {
       tz.initializeTimeZones();
+      try {
+        tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
+      } catch (_) {
+        try {
+          tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
+        } catch (_) {}
+      }
 
       if (kIsWeb) {
         await requestPlatformNotificationPermission();
@@ -266,7 +273,7 @@ class LiveWorkoutNotificationService {
         channelDescription: 'Thông báo nhắc nhở chạy bộ hàng ngày theo lịch cài đặt',
         importance: Importance.max,
         priority: Priority.high,
-        icon: '@mipmap/launcher_icon',
+        icon: '@mipmap/ic_launcher',
         playSound: true,
         enableVibration: true,
         showWhen: true,
@@ -286,19 +293,34 @@ class LiveWorkoutNotificationService {
         iOS: iosDetails,
       );
 
-      await _notifications.zonedSchedule(
-        _reminderNotificationId,
-        title,
-        body,
-        scheduledDate,
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time, // Tự động lặp lại hàng ngày
-      );
+      try {
+        await _notifications.zonedSchedule(
+          _reminderNotificationId,
+          title,
+          body,
+          scheduledDate,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time, // Tự động lặp lại hàng ngày
+        );
+      } catch (e) {
+        debugPrint('Thử lại zonedSchedule với inexactAllowWhileIdle: $e');
+        await _notifications.zonedSchedule(
+          _reminderNotificationId,
+          title,
+          body,
+          scheduledDate,
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
 
-      debugPrint('🔔 [REMINDER] Đã lên lịch nhắc nhở chạy bộ lặp lại hàng ngày lúc $hour:$minute');
+      debugPrint('🔔 [REMINDER] Đã lên lịch nhắc nhở chạy bộ lặp lại hàng ngày lúc $hour:$minute (Target: $scheduledDate)');
     } catch (e) {
       debugPrint('Lỗi lập lịch nhắc nhở hàng ngày: $e');
     }
