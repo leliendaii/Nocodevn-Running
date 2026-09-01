@@ -359,15 +359,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. Nút Tạo ảnh check-in (Màu Đỏ Neon #FF2A42)
-              ElevatedButton.icon(
+              // 1. Nút Tạo ảnh (Màu Đỏ Neon #FF2A42)
+              ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryNeon,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shadowColor: Colors.transparent,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 18,
                     vertical: 11,
                   ),
                   shape: RoundedRectangleBorder(
@@ -378,7 +378,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
                     ),
                   ),
                 ),
-                icon: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
                 onPressed: () {
                   Navigator.of(context).push(
                     PageRouteBuilder(
@@ -396,8 +395,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
                     ),
                   );
                 },
-                label: const Text(
-                  'Tạo ảnh check-in',
+                child: const Text(
+                  'Tạo ảnh',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
