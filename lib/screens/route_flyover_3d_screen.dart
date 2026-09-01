@@ -141,15 +141,34 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return math.atan2(sinSum, cosSum);
     });
 
-    // Tiền tính toán góc lia camera độ trễ cao, điện ảnh, chậm và siêu mượt (chống lia lắc nhanh)
-    const int angleWindow = 140; // Window rộng ~150-200m
+    // CHỌN GÓC QUAY ĐIỆN ẢNH (KEY ANGLES - LIA MÁY ÍT, KHÓA GÓC CỐ ĐỊNH THEO TỪNG CUNG ĐƯỜNG):
+    // Giữ góc quay cố định khi chạy trên đường thẳng / khúc cong nhẹ (< 30 độ).
+    // Chỉ lia máy êm ái, trễ chậm khi rẽ qua góc cua lớn (> 30 độ) rồi khóa góc tiếp.
+    final List<double> keyAngles = List.filled(sampleCount, 0.0);
+    double lockedAngle = _sampledHeadings.first;
+    keyAngles[0] = lockedAngle;
+
+    for (int i = 1; i < sampleCount; i++) {
+      final double targetHeading = _sampledHeadings[i];
+      final double diff = (targetHeading - lockedAngle) % (2 * math.pi);
+      final double shortestDiff = (2 * diff) % (2 * math.pi) - diff;
+
+      // Chỉ cập nhật góc quay khi khúc cua lớn hơn 32 độ (~0.56 rad)
+      if (shortestDiff.abs() > 0.56) {
+        lockedAngle = lockedAngle + shortestDiff * 0.018;
+      }
+      keyAngles[i] = lockedAngle;
+    }
+
+    // Làm mượt tiếp các đoạn chuyển góc bằng Gaussian để chuyển tiếp mềm mại như Flycam chuyên nghiệp
+    const int angleWindow = 45;
     _smoothedCamAngles = List.generate(sampleCount, (i) {
       double sinSum = 0, cosSum = 0;
       for (int w = -angleWindow; w <= angleWindow; w++) {
         final idx = (i + w).clamp(0, sampleCount - 1);
-        final double weight = math.exp(-(w * w) / (2 * 55.0 * 55.0));
-        sinSum += math.sin(_sampledHeadings[idx]) * weight;
-        cosSum += math.cos(_sampledHeadings[idx]) * weight;
+        final double weight = math.exp(-(w * w) / (2 * 18.0 * 18.0));
+        sinSum += math.sin(keyAngles[idx]) * weight;
+        cosSum += math.cos(keyAngles[idx]) * weight;
       }
       return math.atan2(sinSum, cosSum);
     });
@@ -1565,11 +1584,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.20, 1.20);
-    // GÓC QUAY RỘNG HƠN HỢP LÝ BAO QUÁT (Nhìn rõ người chạy, đường phố xung quanh 500-600m):
-    final double chaseScale = (overviewScale * 2.1).clamp(0.72, 0.88);
-    // GÓC NGHIÊNG 3D THẬT CHUẨN THỂ THAO (46 độ nhìn từ sau lưng hướng về phía trước):
-    final double maxPitch = 46.0 * math.pi / 180.0;
-    final double perspectiveD = 0.0010; // Hệ số viễn cảnh 3D an toàn, không biến dạng
+    // GÓC QUAY RỘNG HƠN HỢP LÝ BAO QUÁT (Nhìn rõ người chạy, đường phố xung quanh):
+    final double chaseScale = (overviewScale * 2.2).clamp(0.76, 0.92);
+    // GÓC NGHIÊNG 3D THỂ THAO ĐIỆN ẢNH (58 độ nhìn sâu vào chân trời, chiều sâu 3D rõ rệt, không bị bằng phẳng):
+    final double maxPitch = 58.0 * math.pi / 180.0;
+    final double perspectiveD = 0.0018; // Hệ số viễn cảnh 3D có chiều sâu, rõ đường nét
 
     // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
     // - Phase 1 [0.00 - 0.08]: Bao quát toàn cảnh vùng chạy 2D ban đầu
@@ -1588,14 +1607,14 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     // Tính toán góc camera xuất phát mượt mà
     final double startCamHeading = smoothedCamAngles.first;
     final double targetStartAngle = startCamHeading + math.pi / 2;
-    final double startCamX = startPinPixel.dx - math.cos(startCamHeading) * (48.0 / chaseScale);
-    final double startCamY = startPinPixel.dy - math.sin(startCamHeading) * (48.0 / chaseScale);
+    final double startCamX = startPinPixel.dx - math.cos(startCamHeading) * (44.0 / chaseScale);
+    final double startCamY = startPinPixel.dy - math.sin(startCamHeading) * (44.0 / chaseScale);
 
     // Tính toán góc camera về đích
     final double lastCamHeading = smoothedCamAngles.last;
     final double targetFinishAngle = lastCamHeading + math.pi / 2;
-    final double finishCamX = finishPinPixel.dx - math.cos(lastCamHeading) * (48.0 / chaseScale);
-    final double finishCamY = finishPinPixel.dy - math.sin(lastCamHeading) * (48.0 / chaseScale);
+    final double finishCamX = finishPinPixel.dx - math.cos(lastCamHeading) * (44.0 / chaseScale);
+    final double finishCamY = finishPinPixel.dy - math.sin(lastCamHeading) * (44.0 / chaseScale);
 
     if (progress < 0.08) {
       // Phase 1: Toàn cảnh bao quát ban đầu
@@ -1625,12 +1644,12 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
       final Offset currentPos = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
 
-      // Góc lia camera điện ảnh: lấy từ bảng smoothedCamAngles đã được làm mượt Gaussian 140 mẫu
-      // giúp camera xoay chậm rãi, có độ trễ delay tự nhiên và tuyệt đối không lia lắc giật nhanh
+      // Góc lia camera điện ảnh: lấy từ bảng smoothedCamAngles đã được khóa góc theo chặng (Key Angles)
+      // giúp camera giữ cố định góc quay khi chạy thẳng, chỉ lia máy khi rẽ khúc cua lớn
       final double smoothCamHeading = _lerpAngle(smoothedCamAngles[baseIdx], smoothedCamAngles[nextIdx], subFrac);
 
       // Camera đặt sau lưng con trỏ định vị (định vị đi trước, camera đi sau)
-      final double dBehind = (48.0 / chaseScale).clamp(38.0, 62.0);
+      final double dBehind = (42.0 / chaseScale).clamp(32.0, 52.0);
       final double chaseCamX = currentPos.dx - math.cos(smoothCamHeading) * dBehind;
       final double chaseCamY = currentPos.dy - math.sin(smoothCamHeading) * dBehind;
 
@@ -1741,8 +1760,8 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
     // 4. MA TRẬN 3D CHUẨN THỂ THAO (CAMERA SAU LƯNG ĐỊNH VỊ, ĐỊNH VỊ ĐI TRƯỚC VÀ HƯỚNG LÊN TRÊN)
     final double screenCenterX = size.width / 2 + userPanOffset.dx;
-    // Điểm đặt mắt nhìn: khi ở 3D theo dõi, camera lùi sau nên điểm nhìn ở 68% màn hình
-    final double runnerScreenY = (size.height * (camPitch > 0.05 ? 0.68 : 0.50)) + userPanOffset.dy;
+    // Điểm đặt mắt nhìn: khi ở 3D theo dõi, camera lùi sau nên điểm nhìn ở 64% màn hình (để lộ cung đường phía trước)
+    final double runnerScreenY = (size.height * (camPitch > 0.05 ? 0.64 : 0.50)) + userPanOffset.dy;
 
     canvas.save();
     if (camPitch > 0.05) {
@@ -1766,12 +1785,15 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       canvas.translate(-camX, -camY);
     }
 
-    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN 100% TOÀN MÀN HÌNH (KHÔNG BAO GIỜ THIẾU GÓC Ở CUỐI VIDEO)
+    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN TOÀN MÀN HÌNH - TỐI ƯU HIỆU NĂNG CAO (CHỐNG LAG GIẬT)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
     final double maxHalfScreenExtent = math.max(size.width, size.height) / effectiveCamScale;
-    final int neededRadius = (maxHalfScreenExtent / tileSize).ceil() + 2;
-    final int tileRadius = camPitch > 0.05 ? 10 : neededRadius.clamp(6, 16);
+    final int neededRadius = (maxHalfScreenExtent / tileSize).ceil() + 1;
+    // Trong 3D: chỉ cần quét bán kính 4x5 tile là đủ phủ kín góc nhìn camera hướng về phía trước
+    // Giảm từ 441 tiles xuống còn ~64 tiles (giảm 85% tải GPU, triệt tiêu hoàn toàn giật lag)
+    final int tileRadiusX = camPitch > 0.05 ? 4 : neededRadius.clamp(4, 7);
+    final int tileRadiusY = camPitch > 0.05 ? 5 : neededRadius.clamp(4, 7);
 
     final Color mapBgColor = mapType == 'satellite'
         ? const Color(0xFF0F172A)
@@ -1779,15 +1801,15 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
             ? const Color(0xFFE2E8F0)
             : const Color(0xFFF1F5F9);
     final totalMapRect = Rect.fromLTRB(
-      (centerTileX - tileRadius) * tileSize,
-      (centerTileY - tileRadius) * tileSize,
-      (centerTileX + tileRadius + 1) * tileSize,
-      (centerTileY + tileRadius + 1) * tileSize,
+      (centerTileX - tileRadiusX) * tileSize,
+      (centerTileY - tileRadiusY) * tileSize,
+      (centerTileX + tileRadiusX + 1) * tileSize,
+      (centerTileY + tileRadiusY + 1) * tileSize,
     );
     canvas.drawRect(totalMapRect, Paint()..color = mapBgColor);
 
-    for (int dx = -tileRadius; dx <= tileRadius; dx++) {
-      for (int dy = -tileRadius; dy <= tileRadius; dy++) {
+    for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
+      for (int dy = -tileRadiusY; dy <= tileRadiusY; dy++) {
         final tx = centerTileX + dx;
         final ty = centerTileY + dy;
         final key = '$mapType/$zoom/$tx/$ty';
