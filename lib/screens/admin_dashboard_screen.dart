@@ -1024,82 +1024,84 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // 1. Header: Avatar + Tên VĐV + Ngày giờ + Cự ly & Nút Sửa/Xóa
+                                // 1. Header: Avatar + Tên VĐV + Ngày giờ + Cự ly & Nút Sửa/Xóa (Chống tràn màn hình)
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        UserAvatar(
-                                          avatarUrl: realAvatar,
-                                          name: realName,
-                                          radius: 20,
-                                          isAdmin: isAdmin,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              realName,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              dateFormat.format(session.startTime),
-                                              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                    UserAvatar(
+                                      avatarUrl: realAvatar,
+                                      name: realName,
+                                      radius: 18,
+                                      isAdmin: isAdmin,
                                     ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            realName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            dateFormat.format(session.startTime),
+                                            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
 
-                                    Row(
-                                      children: [
-                                        // Badge Cự ly KM
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
-                                          ),
-                                          child: Text(
-                                            '${session.formattedDistance} KM',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                              color: AppTheme.primaryNeon,
-                                              fontSize: 14,
-                                            ),
-                                          ),
+                                    // Badge Cự ly KM
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
+                                      ),
+                                      child: Text(
+                                        '${session.formattedDistance} KM',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.primaryNeon,
+                                          fontSize: 12.5,
                                         ),
-                                        const SizedBox(width: 4),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
 
-                                        // Nút SỬA
-                                        IconButton(
-                                          tooltip: 'Chỉnh sửa',
-                                          visualDensity: VisualDensity.compact,
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                                            padding: const EdgeInsets.all(6),
-                                          ),
-                                          icon: const Icon(Icons.edit_rounded, color: AppTheme.secondaryNeon, size: 14),
-                                          onPressed: () => _showEditRunDialog(context, session),
+                                    // Nút SỬA
+                                    InkWell(
+                                      onTap: () => _showEditRunDialog(context, session),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                        const SizedBox(width: 4),
+                                        child: const Icon(Icons.edit_rounded, color: AppTheme.secondaryNeon, size: 14),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
 
-                                        // Nút XÓA
-                                        IconButton(
-                                          tooltip: 'Xóa buổi chạy',
-                                          visualDensity: VisualDensity.compact,
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: AppTheme.danger.withValues(alpha: 0.15),
-                                            padding: const EdgeInsets.all(6),
-                                          ),
-                                          icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 14),
-                                          onPressed: () => _confirmDelete(context, session),
+                                    // Nút XÓA
+                                    InkWell(
+                                      onTap: () => _confirmDelete(context, session),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.danger.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                      ],
+                                        child: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 14),
+                                      ),
                                     ),
                                   ],
                                 ),
