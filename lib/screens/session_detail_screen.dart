@@ -7,7 +7,6 @@ import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/splits_breakdown_card.dart';
 import '../widgets/top_sync_toast.dart';
-import '../widgets/user_avatar.dart';
 import 'route_flyover_3d_screen.dart';
 
 /// Màn hình Xem Chi Tiết 1 Buổi Chạy (Trang riêng Navigation, Flat 2 màu Đỏ & Xanh)
@@ -21,27 +20,24 @@ class SessionDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy • HH:mm:ss');
+    final timeFormat = DateFormat('HH:mm:ss');
+    final dateFormat = DateFormat('dd/MM/yyyy');
     final running = context.watch<RunningProvider>();
     final auth = context.watch<AuthProvider>();
     final currentUser = auth.currentUser;
 
-    final realName = running.getUserRealName(session.userId, session.userName);
-    String realAvatar = running.getUserRealAvatar(session.userId);
-    if (realAvatar.isEmpty &&
-        currentUser != null &&
-        currentUser.id == session.userId &&
-        currentUser.avatarUrl.isNotEmpty) {
-      realAvatar = currentUser.avatarUrl;
-    }
-    final isAdmin = running.isUserAdmin(session.userId);
     final isOwnerOrAdmin = currentUser != null &&
         (currentUser.id == session.userId || currentUser.isAdmin);
 
-    // Tên buổi chạy (lấy từ session.notes hoặc tên tự sinh)
+    // Tên buổi chạy
     final sessionDisplayName = session.notes.trim().isNotEmpty
         ? session.notes.trim()
-        : 'Buổi chạy ${DateFormat('dd/MM/yyyy').format(session.startTime)}';
+        : 'Buổi chạy ${dateFormat.format(session.startTime)}';
+
+    final startTimeStr = timeFormat.format(session.startTime);
+    final endTimeStr = timeFormat.format(
+      session.startTime.add(Duration(seconds: session.durationSeconds)),
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -77,7 +73,7 @@ class SessionDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ==========================================
-            // 1. TÊN BUỔI CHẠY ĐƯA LÊN ĐẦU TIÊN (HERO)
+            // 1. THẺ THÔNG TIN BUỔI CHẠY (GỘP GỌN GÀNG, KHÔNG DƯ THỪA)
             // ==========================================
             Container(
               width: double.infinity,
@@ -90,87 +86,67 @@ class SessionDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Hàng tiêu đề: Tên buổi chạy + Ngày chạy
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5)),
-                        ),
-                        child: const Text(
-                          'TÊN BUỔI CHẠY',
-                          style: TextStyle(
-                            fontSize: 11,
+                      Expanded(
+                        child: Text(
+                          sessionDisplayName,
+                          style: const TextStyle(
+                            fontSize: 17,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                            color: AppTheme.secondaryNeon,
+                            color: AppTheme.textPrimary,
+                            height: 1.3,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppTheme.surfaceLight,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.divider),
                         ),
                         child: Text(
-                          DateFormat('dd/MM/yyyy').format(session.startTime),
+                          dateFormat.format(session.startTime),
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.textMuted,
+                            color: AppTheme.secondaryNeon,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    sessionDisplayName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.textPrimary,
-                      height: 1.3,
-                    ),
-                  ),
                   const SizedBox(height: 14),
                   const Divider(color: AppTheme.divider, height: 1),
                   const SizedBox(height: 12),
-                  // Thông tin người chạy & Giờ bắt đầu
+
+                  // Hàng thông tin thời gian & GPS gộp chung
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      UserAvatar(
-                        avatarUrl: realAvatar,
-                        name: realName,
-                        radius: 16,
-                        isAdmin: isAdmin,
+                      _buildHeaderMetaItem(
+                        icon: Icons.play_circle_outline_rounded,
+                        iconColor: AppTheme.secondaryNeon,
+                        label: 'BẮT ĐẦU',
+                        value: startTimeStr,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              realName,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            Text(
-                              dateFormat.format(session.startTime),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
+                      Container(width: 1, height: 28, color: AppTheme.divider),
+                      _buildHeaderMetaItem(
+                        icon: Icons.flag_outlined,
+                        iconColor: AppTheme.primaryNeon,
+                        label: 'KẾT THÚC',
+                        value: endTimeStr,
+                      ),
+                      Container(width: 1, height: 28, color: AppTheme.divider),
+                      _buildHeaderMetaItem(
+                        icon: Icons.location_on_outlined,
+                        iconColor: AppTheme.textMuted,
+                        label: 'TỌA ĐỘ GPS',
+                        value: '${session.routePoints.length} điểm',
                       ),
                     ],
                   ),
@@ -292,44 +268,11 @@ class SessionDetailScreen extends StatelessWidget {
             // ==========================================
             if (session.effectiveSplits.isNotEmpty) ...[
               SplitsBreakdownCard(splits: session.effectiveSplits),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
             ],
 
             // ==========================================
-            // 4. THÔNG TIN CHI TIẾT KỸ THUẬT
-            // ==========================================
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppTheme.divider),
-              ),
-              child: Column(
-                children: [
-                  _buildMetaRow(
-                    'Thời gian bắt đầu',
-                    DateFormat('HH:mm:ss - dd/MM/yyyy').format(session.startTime),
-                  ),
-                  const Divider(color: AppTheme.divider, height: 16),
-                  _buildMetaRow(
-                    'Thời gian kết thúc',
-                    DateFormat('HH:mm:ss - dd/MM/yyyy').format(
-                      session.startTime.add(Duration(seconds: session.durationSeconds)),
-                    ),
-                  ),
-                  const Divider(color: AppTheme.divider, height: 16),
-                  _buildMetaRow(
-                    'Số điểm tọa độ GPS',
-                    '${session.routePoints.length} điểm ghi nhận',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ==========================================
-            // 5. NÚT XEM VIDEO QUÁ TRÌNH 3D (XANH #139EFE)
+            // 4. NÚT XEM VIDEO QUÁ TRÌNH 3D (XANH #139EFE)
             // ==========================================
             SizedBox(
               width: double.infinity,
@@ -364,6 +307,44 @@ class SessionDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHeaderMetaItem({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: iconColor),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textMuted,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 
@@ -404,30 +385,6 @@ class SessionDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMetaRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            color: AppTheme.textSecondary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-      ],
     );
   }
 
