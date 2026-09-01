@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
+import '../widgets/user_avatar.dart';
 import '../widgets/top_sync_toast.dart';
 import 'session_detail_screen.dart';
 
@@ -618,13 +619,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // ==========================================
-              // 1. THẺ TỔNG QUAN THỂ THAO LIỀN MẠCH KÈM NÚT BỘ LỌC
+              // 1. THẺ TỔNG QUAN THỂ THAO RỘNG RÃI & TỐI ƯU SỐ DÀI
               // ==========================================
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
                   child: Container(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(22),
@@ -727,78 +728,94 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                         const SizedBox(height: 16),
                         const Divider(height: 1, color: AppTheme.divider),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
 
-                        // 3 Chỉ số lớn thể thao
+                        // 3 Chỉ số lớn thể thao - Căn chỉnh rộng rãi & Tự co dãn chống tràn số to
                         Row(
                           children: [
                             // 1. Tổng Cự Ly
                             Expanded(
+                              flex: 11,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                                    textBaseline: TextBaseline.alphabetic,
-                                    children: [
-                                      Text(
-                                        totalKm.toStringAsFixed(1),
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppTheme.primaryNeon,
-                                          height: 1.0,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          totalKm.toStringAsFixed(1),
+                                          style: const TextStyle(
+                                            fontSize: 25,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.primaryNeon,
+                                            height: 1.0,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 3),
-                                      const Text(
-                                        'KM',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppTheme.primaryNeon,
+                                        const SizedBox(width: 3),
+                                        const Text(
+                                          'KM',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.primaryNeon,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   const Text(
-                                    'TỔNG QUÃNG ĐƯỜNG',
+                                    'TỔNG KM',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 9.5,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: AppTheme.textMuted,
+                                      letterSpacing: 0.3,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
 
-                            Container(width: 1, height: 36, color: AppTheme.divider),
+                            Container(width: 1, height: 40, color: AppTheme.divider),
 
                             // 2. Buổi chạy
                             Expanded(
+                              flex: 9,
                               child: Padding(
-                                padding: const EdgeInsets.only(left: 14),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Text(
-                                      '${filteredSessions.length}',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppTheme.secondaryNeon,
-                                        height: 1.0,
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '${filteredSessions.length}',
+                                        style: const TextStyle(
+                                          fontSize: 23,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.secondaryNeon,
+                                          height: 1.0,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     const Text(
                                       'BUỔI CHẠY',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 9.5,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.textMuted,
+                                        letterSpacing: 0.3,
                                       ),
                                     ),
                                   ],
@@ -806,31 +823,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
 
-                            Container(width: 1, height: 36, color: AppTheme.divider),
+                            Container(width: 1, height: 40, color: AppTheme.divider),
 
                             // 3. Thời gian
                             Expanded(
+                              flex: 11,
                               child: Padding(
-                                padding: const EdgeInsets.only(left: 14),
+                                padding: const EdgeInsets.only(left: 12),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      hours > 0 ? '${hours}h ${minutes}p' : '${minutes}p',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppTheme.textPrimary,
-                                        height: 1.0,
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        hours > 0 ? '${hours}h ${minutes}p' : '${minutes}p',
+                                        style: const TextStyle(
+                                          fontSize: 23,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.textPrimary,
+                                          height: 1.0,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     const Text(
                                       'THỜI GIAN',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 9.5,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.textMuted,
+                                        letterSpacing: 0.3,
                                       ),
                                     ),
                                   ],
@@ -898,7 +923,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final session = visibleSessions[index];
-                        return _buildSportSessionCard(context, session);
+                        return _buildSessionCard(context, session);
                       },
                       childCount: visibleSessions.length,
                     ),
@@ -964,14 +989,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  /// Thẻ Buổi Chạy Chuẩn Thể Thao Hiện Đại (Strava / Nike Run Club)
-  Widget _buildSportSessionCard(BuildContext context, RunSession session) {
-    String formattedDate;
-    try {
-      formattedDate = DateFormat('dd/MM/yyyy • HH:mm').format(session.startTime);
-    } catch (_) {
-      formattedDate = '${session.startTime.day}/${session.startTime.month}/${session.startTime.year}';
+  /// Thẻ Buổi Chạy Đầy Đủ (Avatar + Tên người chạy + Tên buổi chạy + 4 Chỉ số thoáng đẹp)
+  Widget _buildSessionCard(BuildContext context, RunSession session) {
+    final dateFormat = DateFormat('dd/MM/yyyy • HH:mm');
+    final running = context.read<RunningProvider>();
+    final currentUser = context.read<AuthProvider>().currentUser;
+    final realName = running.getUserRealName(session.userId, session.userName);
+    String realAvatar = running.getUserRealAvatar(session.userId);
+    if (realAvatar.isEmpty && currentUser != null && currentUser.id == session.userId && currentUser.avatarUrl.isNotEmpty) {
+      realAvatar = currentUser.avatarUrl;
     }
+    final isAdmin = running.isUserAdmin(session.userId);
 
     // Tên buổi chạy nổi bật
     final sessionName = session.notes.trim().isNotEmpty
@@ -979,7 +1007,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         : 'Buổi chạy ${DateFormat('dd/MM/yyyy').format(session.startTime)}';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
@@ -1002,100 +1030,93 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // HÀNG 1: Tên Buổi Chạy + Cự Ly Nổi Bật (Màu Đỏ)
+                // 1. HEADER: AVATAR + TÊN NGƯỜI CHẠY + NGÀY GIỜ + CỰ LY (KM)
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Tên & Ngày chạy bên trái
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sessionName,
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.textPrimary,
-                              height: 1.25,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.access_time_rounded, size: 12.5, color: AppTheme.textMuted),
-                              const SizedBox(width: 4),
-                              Text(
-                                formattedDate,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    // Cự ly lớn bên phải
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    Row(
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
+                        UserAvatar(
+                          avatarUrl: realAvatar,
+                          name: realName,
+                          radius: 20,
+                          isAdmin: isAdmin,
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              session.formattedDistance,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.primaryNeon,
-                                height: 1.0,
-                              ),
+                              realName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
-                            const SizedBox(width: 3),
-                            const Text(
-                              'KM',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.primaryNeon,
-                              ),
+                            const SizedBox(height: 2),
+                            Text(
+                              dateFormat.format(session.startTime),
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                             ),
                           ],
                         ),
                       ],
                     ),
+
+                    // Badge Cự Ly Nổi Bật Bên Phải
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        '${session.formattedDistance} KM',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primaryNeon,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
-                // HÀNG 2: 4 Khối Chỉ Số Thể Thao (Grid Bo Góc Hiện Đại)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildMetricBox('THỜI GIAN', session.formattedDuration, AppTheme.textPrimary),
-                      _buildVerticalDivider(),
-                      _buildMetricBox('PACE TB', '${session.pace} /km', AppTheme.secondaryNeon),
-                      _buildVerticalDivider(),
-                      _buildMetricBox('CALO', '${session.calories}', AppTheme.primaryNeon),
-                      _buildVerticalDivider(),
-                      _buildMetricBox('SỐ BƯỚC', session.formattedTotalSteps, AppTheme.textPrimary),
-                    ],
-                  ),
+                // 2. TÊN BUỔI CHẠY (In đậm, rõ ràng)
+                Row(
+                  children: [
+                    const Icon(Icons.edit_note_rounded, size: 18, color: AppTheme.secondaryNeon),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        sessionName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: AppTheme.divider),
+                const SizedBox(height: 12),
+
+                // 3. KHỐI 4 THÔNG SỐ THỂ THAO (DÃN CÁCH RỘNG RÃI & TỰ CO DÃN CHỐNG TRÀN)
+                Row(
+                  children: [
+                    _buildMetricBox('THỜI GIAN', session.formattedDuration, AppTheme.textPrimary),
+                    _buildVerticalDivider(),
+                    _buildMetricBox('PACE', '${session.pace} /km', AppTheme.secondaryNeon),
+                    _buildVerticalDivider(),
+                    _buildMetricBox('CALO', '${session.calories} kcal', AppTheme.primaryNeon),
+                    _buildVerticalDivider(),
+                    _buildMetricBox('TỐC ĐỘ', '${session.formattedAvgSpeed} km/h', AppTheme.textPrimary),
+                  ],
                 ),
               ],
             ),
@@ -1109,17 +1130,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Expanded(
       child: Column(
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w900,
-              color: valueColor,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w900,
+                color: valueColor,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             style: const TextStyle(
@@ -1136,7 +1159,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildVerticalDivider() {
     return Container(
       width: 1,
-      height: 20,
+      height: 22,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       color: AppTheme.divider,
     );
   }
