@@ -324,17 +324,15 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     final double spanLng = (maxLng - minLng).abs();
     final double maxSpan = math.max(spanLat, spanLng);
 
-    // Tối ưu mức zoom vệ tinh HD: thấy rõ từng nóc nhà, sân vườn, làn đường, sông ngòi
-    if (maxSpan < 0.008) {
+    // Tối ưu mức zoom vệ tinh HD chuẩn Strava: Thấy rõ từng nóc nhà, sân vườn, làn đường, sông ngòi
+    if (maxSpan < 0.035) {
       return 17;
-    } else if (maxSpan < 0.020) {
+    } else if (maxSpan < 0.090) {
       return 16;
-    } else if (maxSpan < 0.050) {
+    } else if (maxSpan < 0.180) {
       return 15;
-    } else if (maxSpan < 0.100) {
-      return 14;
     } else {
-      return 13;
+      return 14;
     }
   }
 
@@ -1609,9 +1607,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
-    final double chaseScale = (overviewScale * 1.65).clamp(0.45, 2.30); // Zoom bám cận cảnh thấy rõ nhà cửa, địa hình
-    final double maxPitch = 58.0 * math.pi / 180.0; // 58 độ nghiêng 3D chân thực chuẩn Strava
-    final double perspectiveD = 0.0022; // Hệ số viễn cảnh perspective chuẩn Strava
+    // GÓC QUAY SÁT LẠI CHUẨN STRAVA: Cận cảnh bám sát sau lưng người chạy (thấy rõ từng nóc nhà, sân vườn, góc phố)
+    final double chaseScale = 1.48;
+    // GÓC QUAY TỪ DƯỚI HƯỚNG LÊN: Góc nghiêng 68 độ nhìn thấp từ sau lưng vươn lên chân trời
+    final double maxPitch = 68.0 * math.pi / 180.0;
+    final double perspectiveD = 0.0019; // Hệ số viễn cảnh perspective chuẩn Strava
 
     // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
     // - Phase 1 [0.00 - 0.08]: Bao quát toàn bộ vùng chạy ban đầu (Strava Screenshot 1)
@@ -1771,28 +1771,34 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
 
     // 4. MA TRẬN PHỐI CẢNH 3D STRAVA VỚI ĐƯỜNG CHÂN TRỜI VÀ BẦU TRỜI XANH
     final double screenCenterX = size.width / 2 + userPanOffset.dx;
-    // Điểm đặt người chạy: khi ở 3D bám đuôi, người chạy ở 1/3 dưới màn hình (Y = 68%)
-    final double runnerScreenY = (size.height * (camPitch > 0.05 ? 0.68 : 0.52)) + userPanOffset.dy;
+    // Điểm đặt người chạy: khi ở 3D bám đuôi, người chạy ở 1/3 dưới màn hình (Y = 66%)
+    final double runnerScreenY = (size.height * (camPitch > 0.05 ? 0.66 : 0.52)) + userPanOffset.dy;
 
     // Tính toán vị trí chân trời (Horizon) chính xác chuẩn Strava
     final double horizonY = camPitch > 0.05
-        ? (runnerScreenY - (1.0 / (perspectiveD * math.tan(camPitch)))).clamp(size.height * 0.22, size.height * 0.45)
+        ? (runnerScreenY - (1.0 / (perspectiveD * math.tan(camPitch)))).clamp(size.height * 0.28, size.height * 0.44)
         : -50.0;
 
     // A. VẼ BẦU TRỜI XANH STRAVA KHI Ở CHẾ ĐỘ 3D (Strava Screenshot 2)
     if (camPitch > 0.05) {
       final skyGradient = ui.Gradient.linear(
         const Offset(0, 0),
-        Offset(0, horizonY + 30),
+        Offset(0, horizonY),
         [
           const Color(0xFF1B3B6F), // Xanh thẫm đỉnh bầu trời
           const Color(0xFF2C5E9E), // Xanh da trời Strava
           const Color(0xFF5B8EB9), // Xanh lam nhạt
           const Color(0xFFA8C5DA), // Sương mù khí quyển chân trời
         ],
-        [0.0, 0.40, 0.78, 1.0],
+        [0.0, 0.45, 0.80, 1.0],
       );
-      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, horizonY + 35), Paint()..shader = skyGradient);
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, horizonY + 1.0), Paint()..shader = skyGradient);
+
+      // Đổ nền màu đất vệ tinh tự nhiên cho toàn bộ vùng từ chân trời xuống đáy (chống triệt để vệt đen)
+      canvas.drawRect(
+        Rect.fromLTWH(0, horizonY, size.width, size.height - horizonY),
+        Paint()..color = (mapType == 'satellite' ? const Color(0xFF2C3930) : const Color(0xFFE2E8F0)),
+      );
     }
 
     // B. VẼ ĐỊA HÌNH MẶT ĐẤT 3D (GIỚI HẠN TỪ ĐƯỜNG CHÂN TRỜI TRỞ XUỐNG)
@@ -1822,11 +1828,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
     final int tileRadius = camPitch > 0.05
-        ? 8
+        ? 10
         : (((math.sqrt(size.width * size.width + size.height * size.height) / 2) / effectiveCamScale) / tileSize).ceil().clamp(3, 9);
 
     final Color mapBgColor = mapType == 'satellite'
-        ? const Color(0xFF0B0F19)
+        ? const Color(0xFF2C3930)
         : mapType == 'terrain'
             ? const Color(0xFFE2E8F0)
             : const Color(0xFFF1F5F9);
