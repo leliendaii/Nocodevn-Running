@@ -64,6 +64,44 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     });
   }
 
+  StickerTransform? _getSelectedTransform() {
+    switch (_selectedStickerId) {
+      case 'header':
+        return _headerTransform;
+      case 'distance':
+        return _distanceTransform;
+      case 'stats':
+        return _statsTransform;
+      case 'map_route':
+        return _mapRouteTransform;
+      case 'map_stats':
+        return _mapStatsTransform;
+      case 'badge':
+        return _badgeTransform;
+      default:
+        return null;
+    }
+  }
+
+  String _getSelectedStickerLabel() {
+    switch (_selectedStickerId) {
+      case 'header':
+        return 'Logo & Thời gian';
+      case 'distance':
+        return 'Cự ly (KM)';
+      case 'stats':
+        return 'Hàng thông số';
+      case 'map_route':
+        return 'Đường vẽ GPS';
+      case 'map_stats':
+        return 'Thẻ thông số';
+      case 'badge':
+        return 'Huy hiệu thể thao';
+      default:
+        return '';
+    }
+  }
+
   // Cấu hình bật/tắt các thông số ghép vào ảnh
   bool _showLogo = true;
   bool _showTime = false; // Bật sẽ hiển thị giờ chạy (HH:mm) trước ngày
@@ -655,25 +693,143 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               ),
             ),
 
-            // Gợi ý tính năng kéo thả & thu phóng từng khối
-            const Padding(
-              padding: EdgeInsets.only(top: 3, bottom: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.touch_app_outlined, size: 12.5, color: AppTheme.secondaryNeon),
-                  SizedBox(width: 5),
-                  Text(
-                    'Chạm từng khối để kéo di chuyển hoặc chỉnh to nhỏ (+/-)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+            // THANH ĐIỀU KHIỂN KHỐI THÔNG SỐ (DOCKED TOOLBAR DƯỚI ẢNH KHI ĐƯỢC CHỌN)
+            if (_selectedStickerId != null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.secondaryNeon.withValues(alpha: 0.6),
+                    width: 1.2,
                   ),
-                ],
+                ),
+                child: Row(
+                  children: [
+                    // Tên khối đang chọn
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _getSelectedStickerLabel(),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.secondaryNeon,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Nút Giảm cỡ (-)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                      icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.white, size: 19),
+                      tooltip: 'Thu nhỏ (-10%)',
+                      onPressed: () {
+                        final t = _getSelectedTransform();
+                        if (t != null) {
+                          setState(() {
+                            t.scale = (t.scale - 0.1).clamp(0.4, 2.5);
+                          });
+                        }
+                      },
+                    ),
+
+                    // Thanh kéo Slider tỷ lệ kích thước
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          activeTrackColor: AppTheme.secondaryNeon,
+                          inactiveTrackColor: Colors.white24,
+                          thumbColor: AppTheme.secondaryNeon,
+                        ),
+                        child: Slider(
+                          value: (_getSelectedTransform()?.scale ?? 1.0).clamp(0.4, 2.5),
+                          min: 0.4,
+                          max: 2.5,
+                          onChanged: (val) {
+                            final t = _getSelectedTransform();
+                            if (t != null) {
+                              setState(() {
+                                t.scale = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+
+                    // Nút Tăng cỡ (+)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                      icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 19),
+                      tooltip: 'Phóng to (+10%)',
+                      onPressed: () {
+                        final t = _getSelectedTransform();
+                        if (t != null) {
+                          setState(() {
+                            t.scale = (t.scale + 0.1).clamp(0.4, 2.5);
+                          });
+                        }
+                      },
+                    ),
+
+                    // Tỷ lệ %
+                    Text(
+                      '${((_getSelectedTransform()?.scale ?? 1.0) * 100).round()}%',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Nút Xong (✓)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 21),
+                      tooltip: 'Xong',
+                      onPressed: () => setState(() => _selectedStickerId = null),
+                    ),
+                  ],
+                ),
+              )
+            else
+              // Gợi ý tính năng kéo thả & thu phóng từng khối
+              const Padding(
+                padding: EdgeInsets.only(top: 3, bottom: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.touch_app_outlined, size: 12.5, color: AppTheme.secondaryNeon),
+                    SizedBox(width: 5),
+                    Text(
+                      'Chạm từng khối để kéo di chuyển hoặc chỉnh to nhỏ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             // THANH CHỌN KIỂU HIỂN THỊ (SEGMENTED TABS) - TỐI GỌN, ĐƠN GIẢN
             Container(
@@ -849,10 +1005,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 transform: _headerTransform,
                 isSelected: _selectedStickerId == 'header',
                 onSelect: () => setState(() => _selectedStickerId = 'header'),
-                onDeselect: () => setState(() => _selectedStickerId = null),
-                onReset: () => setState(() => _headerTransform.reset()),
-                onPositionChanged: (delta) => setState(() => _headerTransform.offset += delta),
-                onScaleChanged: (scale) => setState(() => _headerTransform.scale = scale),
+                onPanUpdate: (delta) => setState(() => _headerTransform.offset += delta),
                 child: PhotoShareHeaderBlock(
                   showLogo: _showLogo,
                   dateTimeStr: dateTimeStr,
@@ -877,14 +1030,11 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             left: 18,
             child: DraggableSticker(
               id: 'distance',
-              label: 'Cự ly chính',
+              label: 'Cự ly (KM)',
               transform: _distanceTransform,
               isSelected: _selectedStickerId == 'distance',
               onSelect: () => setState(() => _selectedStickerId = 'distance'),
-              onDeselect: () => setState(() => _selectedStickerId = null),
-              onReset: () => setState(() => _distanceTransform.reset()),
-              onPositionChanged: (delta) => setState(() => _distanceTransform.offset += delta),
-              onScaleChanged: (scale) => setState(() => _distanceTransform.scale = scale),
+              onPanUpdate: (delta) => setState(() => _distanceTransform.offset += delta),
               child: MinimalDistanceBlock(
                 distanceKm: s.distanceKm,
               ),
@@ -904,14 +1054,11 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               alignment: Alignment.bottomLeft,
               child: DraggableSticker(
                 id: 'stats',
-                label: 'Thông số chạy',
+                label: 'Hàng thông số',
                 transform: _statsTransform,
                 isSelected: _selectedStickerId == 'stats',
                 onSelect: () => setState(() => _selectedStickerId = 'stats'),
-                onDeselect: () => setState(() => _selectedStickerId = null),
-                onReset: () => setState(() => _statsTransform.reset()),
-                onPositionChanged: (delta) => setState(() => _statsTransform.offset += delta),
-                onScaleChanged: (scale) => setState(() => _statsTransform.scale = scale),
+                onPanUpdate: (delta) => setState(() => _statsTransform.offset += delta),
                 child: MinimalStatsBlock(
                   session: s,
                   showDuration: _showDuration,
@@ -935,14 +1082,11 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             child: Center(
               child: DraggableSticker(
                 id: 'map_route',
-                label: 'Lộ trình GPS',
+                label: 'Đường vẽ GPS',
                 transform: _mapRouteTransform,
                 isSelected: _selectedStickerId == 'map_route',
                 onSelect: () => setState(() => _selectedStickerId = 'map_route'),
-                onDeselect: () => setState(() => _selectedStickerId = null),
-                onReset: () => setState(() => _mapRouteTransform.reset()),
-                onPositionChanged: (delta) => setState(() => _mapRouteTransform.offset += delta),
-                onScaleChanged: (scale) => setState(() => _mapRouteTransform.scale = scale),
+                onPanUpdate: (delta) => setState(() => _mapRouteTransform.offset += delta),
                 child: MapRouteBlock(
                   routePoints: s.routePoints,
                 ),
@@ -962,14 +1106,11 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             child: Center(
               child: DraggableSticker(
                 id: 'map_stats',
-                label: 'Thẻ thông số bản đồ',
+                label: 'Thẻ thông số',
                 transform: _mapStatsTransform,
                 isSelected: _selectedStickerId == 'map_stats',
                 onSelect: () => setState(() => _selectedStickerId = 'map_stats'),
-                onDeselect: () => setState(() => _selectedStickerId = null),
-                onReset: () => setState(() => _mapStatsTransform.reset()),
-                onPositionChanged: (delta) => setState(() => _mapStatsTransform.offset += delta),
-                onScaleChanged: (scale) => setState(() => _mapStatsTransform.scale = scale),
+                onPanUpdate: (delta) => setState(() => _mapStatsTransform.offset += delta),
                 child: MapStatsBlock(
                   session: s,
                   showDistance: _showDistance,
@@ -998,10 +1139,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               transform: _badgeTransform,
               isSelected: _selectedStickerId == 'badge',
               onSelect: () => setState(() => _selectedStickerId = 'badge'),
-              onDeselect: () => setState(() => _selectedStickerId = null),
-              onReset: () => setState(() => _badgeTransform.reset()),
-              onPositionChanged: (delta) => setState(() => _badgeTransform.offset += delta),
-              onScaleChanged: (scale) => setState(() => _badgeTransform.scale = scale),
+              onPanUpdate: (delta) => setState(() => _badgeTransform.offset += delta),
               child: BadgeCardBlock(
                 session: s,
                 dateTimeStr: dateTimeStr,
