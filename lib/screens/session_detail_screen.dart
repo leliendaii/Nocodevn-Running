@@ -86,21 +86,9 @@ class SessionDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Tên buổi chạy căn giữa nổi bật
-                  Text(
-                    sessionDisplayName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.textPrimary,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Badge Ngày chạy căn giữa
+                  // Badge Ngày chạy căn giữa đưa lên trên đầu
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceLight,
                       borderRadius: BorderRadius.circular(8),
@@ -109,10 +97,22 @@ class SessionDetailScreen extends StatelessWidget {
                     child: Text(
                       dateFormat.format(session.startTime),
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.secondaryNeon,
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Tên buổi chạy căn giữa nổi bật ở dưới ngày
+                  Text(
+                    sessionDisplayName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textPrimary,
+                      height: 1.3,
                     ),
                   ),
                   const SizedBox(height: 14),

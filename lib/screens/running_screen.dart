@@ -70,10 +70,17 @@ class _RunningScreenState extends State<RunningScreen>
     String userId,
     String userName,
   ) {
+    // ⏱️ Tạm dừng đếm giờ ngay lập tức khi bấm Kết thúc (chống mất thời gian chết khi đang suy nghĩ đặt tên)
+    final wasRunning = running.isRunning;
+    if (wasRunning) {
+      running.pauseTracking();
+    }
+
     // 🛡️ CHỐNG BẤM NHẦM / BUỔI CHẠY QUÁ NGẮN (< 50m & < 20 giây - Giống Strava / NRC)
     if (running.distanceKm < 0.05 && running.durationSeconds < 20) {
       showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (ctx) => Dialog(
           backgroundColor: AppTheme.surface,
           insetPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -131,7 +138,12 @@ class _RunningScreenState extends State<RunningScreen>
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: () => Navigator.of(ctx).pop(),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            if (wasRunning) {
+                              running.resumeTracking();
+                            }
+                          },
                           child: const Text(
                             'TIẾP TỤC',
                             style: TextStyle(
@@ -297,21 +309,36 @@ class _RunningScreenState extends State<RunningScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              // Ô NHẬP TÊN BUỔI CHẠY GỌN GÀNG
-              TextField(
-                controller: notesController,
-                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
-                decoration: const InputDecoration(
-                  labelText: 'Tên buổi chạy',
-                  hintText: 'Nhập tên buổi chạy...',
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  prefixIcon: Icon(
-                    Icons.edit_note_rounded,
-                    color: AppTheme.primaryNeon,
-                    size: 20,
-                  ),
-                ),
+              // Ô NHẬP TÊN BUỔI CHẠY KÈM NÚT XÓA NHANH
+              StatefulBuilder(
+                builder: (dialogCtx, setDialogState) {
+                  return TextField(
+                    controller: notesController,
+                    onChanged: (_) => setDialogState(() {}),
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      labelText: 'Tên buổi chạy',
+                      hintText: 'Nhập tên buổi chạy...',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      prefixIcon: const Icon(
+                        Icons.edit_note_rounded,
+                        color: AppTheme.primaryNeon,
+                        size: 20,
+                      ),
+                      suffixIcon: notesController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.cancel_rounded, color: AppTheme.textMuted, size: 18),
+                              tooltip: 'Xóa tên nhanh',
+                              onPressed: () {
+                                notesController.clear();
+                                setDialogState(() {});
+                              },
+                            )
+                          : null,
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               // 2 NÚT NẰM TRÊN 1 HÀNG (ĐỎ & XANH)
