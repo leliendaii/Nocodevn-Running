@@ -79,11 +79,17 @@ class LiveWorkoutNotificationService {
         await androidImplementation.requestNotificationsPermission();
       }
 
-      // Yêu cầu quyền thông báo trên iOS / Android 13+
+      // Yêu cầu quyền thông báo trên iOS / iPhone
       if (!kIsWeb) {
-        await _notifications
-            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-            ?.requestPermissions(alert: true, badge: true, sound: true);
+        final iosPlugin = _notifications
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+        if (iosPlugin != null) {
+          await iosPlugin.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+        }
       }
 
       _isInitialized = true;
@@ -134,9 +140,11 @@ class LiveWorkoutNotificationService {
       );
 
       final iosDetails = DarwinNotificationDetails(
-        presentAlert: false, // Không nhảy popup che màn hình
+        presentAlert: false, // Không nhảy popup che màn hình khi đang chạy
+        presentBanner: false,
         presentBadge: false,
         presentSound: false,
+        presentList: true,
         categoryIdentifier: 'workout_tracking',
         threadIdentifier: 'running_workout',
       );
@@ -166,7 +174,7 @@ class LiveWorkoutNotificationService {
     }
   }
 
-  /// Bắn thông báo nhắc nhở ra màn hình khóa & trung tâm thông báo
+  /// Bắn thông báo nhắc nhở ra màn hình khóa & trung tâm thông báo (Hỗ trợ iPhone / iOS & Android)
   static Future<void> showMorningReminderNotification({
     required String title,
     required String body,
@@ -192,8 +200,11 @@ class LiveWorkoutNotificationService {
 
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
+        presentBanner: true,
         presentBadge: true,
         presentSound: true,
+        presentList: true,
+        interruptionLevel: InterruptionLevel.active,
       );
 
       const details = NotificationDetails(
@@ -240,8 +251,11 @@ class LiveWorkoutNotificationService {
 
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
+        presentBanner: true,
         presentBadge: true,
         presentSound: true,
+        presentList: true,
+        interruptionLevel: InterruptionLevel.active,
       );
 
       const details = NotificationDetails(
