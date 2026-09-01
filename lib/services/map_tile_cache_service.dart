@@ -10,23 +10,13 @@ import 'package:path_provider/path_provider.dart';
 class MapTileCacheService {
   static final Map<String, ui.Image> _memoryCache = {};
   static final Set<String> _pendingFetches = {};
-  static final Map<String, DateTime> _failedFetches = {};
   static final http.Client _client = http.Client();
   static final ValueNotifier<int> tileNotifier = ValueNotifier<int>(0);
-  static Timer? _notifyDebounceTimer;
   static Directory? _diskCacheDir;
   static bool _isDiskDirInitialized = false;
 
   /// Lấy ảnh tile từ RAM cache (nếu đã có)
   static ui.Image? getFromMemory(String key) => _memoryCache[key];
-
-  /// Thông báo UI cập nhật có kiểm soát (Debounce 60ms) chống lag giật khung hình
-  static void _notifyTileUpdated() {
-    if (_notifyDebounceTimer?.isActive ?? false) return;
-    _notifyDebounceTimer = Timer(const Duration(milliseconds: 60), () {
-      tileNotifier.value++;
-    });
-  }
 
   /// Khởi tạo thư mục cache trên ổ đĩa
   static Future<void> _initDiskDirectory() async {
@@ -56,19 +46,13 @@ class MapTileCacheService {
       return _memoryCache[key];
     }
 
-    // 2. Chặn yêu cầu lặp lại nếu tile đang tải hoặc đã thất bại gần đây
     if (_pendingFetches.contains(key)) return null;
-    final lastFailed = _failedFetches[key];
-    if (lastFailed != null && DateTime.now().difference(lastFailed).inSeconds < 45) {
-      return null;
-    }
-
     _pendingFetches.add(key);
 
     try {
       await _initDiskDirectory();
 
-      // 3. Kiểm tra Disk Cache trên thiết bị (< 2ms)
+      // 2. Kiểm tra Disk Cache trên thiết bị (< 2ms)
       if (!kIsWeb && _diskCacheDir != null) {
         final diskFile = File('${_diskCacheDir!.path}/tile_${normalizedType}_${z}_${x}_$y.png');
         if (await diskFile.exists()) {
@@ -77,13 +61,13 @@ class MapTileCacheService {
           if (image != null) {
             _memoryCache[key] = image;
             _pendingFetches.remove(key);
-            _notifyTileUpdated();
+            tileNotifier.value++;
             return image;
           }
         }
       }
 
-      // 4. Danh sách URL tải theo thứ tự ưu tiên (Google Maps ➔ Esri Satellite Fallback)
+      // 3. Danh sách URL tải theo thứ tự ưu tiên (Google Maps ➔ Esri Satellite Fallback)
       final int serverId = (x.abs() + y.abs()) % 4;
       final List<String> candidateUrls = [];
 
@@ -121,16 +105,12 @@ class MapTileCacheService {
         if (image != null) {
           _memoryCache[key] = image;
           _pendingFetches.remove(key);
-          _failedFetches.remove(key);
-          _notifyTileUpdated();
+          tileNotifier.value++;
           return image;
         }
       }
-
-      // Đánh dấu thất bại để không spam request
-      _failedFetches[key] = DateTime.now();
     } catch (_) {
-      _failedFetches[key] = DateTime.now();
+      // Bỏ qua lỗi mạng
     } finally {
       _pendingFetches.remove(key);
     }
