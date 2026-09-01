@@ -1593,13 +1593,11 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
-    final double chaseScale = (overviewScale * 1.50).clamp(0.45, 2.20); // Zoom bám cận cảnh thấy rõ nhà cửa, địa hình
-    final double maxPitch = 52.0 * math.pi / 180.0; // 52 độ nghiêng nhìn dốc từ trên xuống tạo cảm giác không gian 3D
-    final double chaseOffset = 30.0; // Lùi camera lại sau lưng định vị 30px
+    final double chaseScale = (overviewScale * 1.55).clamp(0.45, 2.20); // Zoom bám cận cảnh thấy rõ từng khối nhà, địa hình
 
     // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
     // - Phase 1 [0.00 - 0.08]: Bao quát toàn bộ vùng chạy ban đầu
-    // - Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & đổi góc quay về sau lưng cái định vị, nghiêng góc 3D
+    // - Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & đổi góc quay về sau lưng cái định vị
     // - Phase 3 [0.18 - 0.72]: Chạy bám sau lưng định vị, tự động ôm cua mượt mà theo góc rẽ
     // - Phase 4 [0.72 - 0.78]: Chạy đến đích thì đợi 1s (giữ nguyên góc nhìn đích)
     // - Phase 5 [0.78 - 0.88]: Zoom nhỏ lại mượt mà để thấy toàn bộ quãng đường chạy
@@ -1607,19 +1605,14 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     double camX;
     double camY;
     double camScale;
-    double camPitch;
     double camAngle;
     double flightProgress;
 
     final double startHeading = sampledHeadings.first;
     final double targetStartAngle = startHeading + math.pi / 2;
-    final double targetStartCamX = startPinPixel.dx - math.cos(startHeading) * chaseOffset;
-    final double targetStartCamY = startPinPixel.dy - math.sin(startHeading) * chaseOffset;
 
     final double lastHeading = sampledHeadings.last;
     final double targetFinishAngle = lastHeading + math.pi / 2;
-    final double targetFinishCamX = finishPinPixel.dx - math.cos(lastHeading) * chaseOffset;
-    final double targetFinishCamY = finishPinPixel.dy - math.sin(lastHeading) * chaseOffset;
 
     if (progress < 0.08) {
       // 1. Phase 1 [0.00 - 0.08]: Bao quát toàn cảnh vùng chạy
@@ -1627,16 +1620,14 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camX = routeCenterX;
       camY = routeCenterY;
       camScale = overviewScale;
-      camPitch = 0.0;
       camAngle = 0.0;
     } else if (progress < 0.18) {
-      // 2. Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & Đổi góc quay về sau cái định vị, nghiêng 3D
+      // 2. Phase 2 [0.08 - 0.18]: Zoom về điểm bắt đầu & Đổi góc quay về sau cái định vị
       flightProgress = 0.0;
       final double tTransit = Curves.easeInOutCubic.transform(((progress - 0.08) / 0.10).clamp(0.0, 1.0));
-      camX = ui.lerpDouble(routeCenterX, targetStartCamX, tTransit)!;
-      camY = ui.lerpDouble(routeCenterY, targetStartCamY, tTransit)!;
+      camX = ui.lerpDouble(routeCenterX, startPinPixel.dx, tTransit)!;
+      camY = ui.lerpDouble(routeCenterY, startPinPixel.dy, tTransit)!;
       camScale = ui.lerpDouble(overviewScale, chaseScale, tTransit)!;
-      camPitch = ui.lerpDouble(0.0, isFlycamMode ? maxPitch : 0.0, tTransit)!;
       camAngle = _lerpAngle(0.0, isFlycamMode ? targetStartAngle : 0.0, tTransit);
     } else if (progress < 0.72) {
       // 3. Phase 3 [0.18 - 0.72]: Chạy lộ trình theo dõi sát sau lưng định vị (chú ý góc cua, rẽ xoay mượt mà)
@@ -1651,32 +1642,28 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       final double curHeading = _lerpAngle(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac);
 
       if (isFlycamMode) {
-        camX = currentPos.dx - math.cos(curHeading) * chaseOffset;
-        camY = currentPos.dy - math.sin(curHeading) * chaseOffset;
+        camX = currentPos.dx;
+        camY = currentPos.dy;
         camScale = chaseScale;
-        camPitch = maxPitch;
         camAngle = curHeading + math.pi / 2;
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
-        camPitch = 0.0;
         camAngle = 0.0;
       }
     } else if (progress < 0.78) {
       // 4. Phase 4 [0.72 - 0.78]: Chạy đến điểm cuối thì đợi 1s (giữ nguyên góc nhìn đích)
       flightProgress = 1.0;
       if (isFlycamMode) {
-        camX = targetFinishCamX;
-        camY = targetFinishCamY;
+        camX = finishPinPixel.dx;
+        camY = finishPinPixel.dy;
         camScale = chaseScale;
-        camPitch = maxPitch;
         camAngle = targetFinishAngle;
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
-        camPitch = 0.0;
         camAngle = 0.0;
       }
     } else if (progress < 0.88) {
@@ -1684,16 +1671,14 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       flightProgress = 1.0;
       final double tOut = Curves.easeInOutCubic.transform(((progress - 0.78) / 0.10).clamp(0.0, 1.0));
       if (isFlycamMode) {
-        camX = ui.lerpDouble(targetFinishCamX, routeCenterX, tOut)!;
-        camY = ui.lerpDouble(targetFinishCamY, routeCenterY, tOut)!;
+        camX = ui.lerpDouble(finishPinPixel.dx, routeCenterX, tOut)!;
+        camY = ui.lerpDouble(finishPinPixel.dy, routeCenterY, tOut)!;
         camScale = ui.lerpDouble(chaseScale, overviewScale, tOut)!;
-        camPitch = ui.lerpDouble(maxPitch, 0.0, tOut)!;
         camAngle = _lerpAngle(targetFinishAngle, 0.0, tOut);
       } else {
         camX = routeCenterX;
         camY = routeCenterY;
         camScale = overviewScale;
-        camPitch = 0.0;
         camAngle = 0.0;
       }
     } else {
@@ -1705,7 +1690,6 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       camX = routeCenterX + floatX;
       camY = routeCenterY + floatY;
       camScale = overviewScale;
-      camPitch = 0.0;
       camAngle = 0.0;
     }
 
@@ -1758,49 +1742,44 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // 4. MA TRẬN CAMERA 3D CHUYÊN NGHIỆP (GÓC NGHIÊNG 3D + XOAY THEO HƯỚNG CHẠY)
+    // 4. MA TRẬN CAMERA CHUYÊN NGHIỆP: XOAY THEO HƯỚNG CHẠY & PHỦ KÍN 100% MÀN HÌNH
     final double screenCenterX = size.width / 2 + userPanOffset.dx;
-    // Khi đang nghiêng 3D bám sau lưng, dời tâm chiếu xuống 60% màn hình để định vị ở 1/3 dưới, lộ trình vươn lên phía trên
-    final double screenCenterY = (size.height * (isFlycamMode && camPitch > 0.05 ? 0.60 : 0.52)) + userPanOffset.dy;
-
-    final Matrix4 matrix = Matrix4.identity();
-    matrix.translateByDouble(screenCenterX, screenCenterY, 0.0, 1.0);
-    // Độ sâu Perspective 3D
-    matrix.setEntry(3, 2, 0.0012);
-    if (camPitch > 0.001) {
-      matrix.rotateX(camPitch);
-    }
-    if (camAngle.abs() > 0.001) {
-      matrix.rotateZ(-camAngle);
-    }
-    matrix.scaleByDouble(effectiveCamScale, effectiveCamScale, 1.0, 1.0);
-    matrix.translateByDouble(-camX, -camY, 0.0, 1.0);
+    // Khi đang theo dõi: định vị ở khoảng 62% màn hình (1/3 dưới), cung đường vươn dài lên phía trên
+    final double targetCenterRatio = isFlycamMode && (progress >= 0.08 && progress < 0.88) ? 0.62 : 0.52;
+    final double screenCenterY = (size.height * targetCenterRatio) + userPanOffset.dy;
 
     canvas.save();
-    canvas.transform(matrix.storage);
+    canvas.translate(screenCenterX, screenCenterY);
+    if (camAngle.abs() > 0.001) {
+      canvas.rotate(-camAngle);
+    }
+    canvas.scale(effectiveCamScale, effectiveCamScale);
+    canvas.translate(-camX, -camY);
 
-    // 5. VẼ MAP TILES GOOGLE MAPS BAO PHỦ VÙNG NHÌN THỰC TẾ (LOAD SIÊU TỐC, KHÔNG CÓ Ô ĐEN)
+    // 5. VẼ MAP TILES PHỦ KÍN 100% MÀN HÌNH (TÍNH TOÁN BÁN KÍNH THEO ĐƯỜNG CHÉO MÀN HÌNH)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadiusX = (((size.width / 2) / effectiveCamScale) / tileSize).ceil().clamp(3, 8);
-    final int tileRadiusY = (((size.height / 2) / effectiveCamScale) / tileSize).ceil().clamp(4, 9);
 
-    // Nền đồng nhất liền mạch cho bản đồ trong tích tắc đang tải (Loại bỏ hoàn toàn ô đen)
+    // Bán kính đủ bao phủ trọn vẹn toàn bộ đường chéo màn hình khi xoay góc bất kỳ
+    final double screenDiag = math.sqrt(size.width * size.width + size.height * size.height);
+    final int tileRadius = (((screenDiag / 2) / effectiveCamScale) / tileSize).ceil().clamp(3, 9);
+
+    // Nền đồng nhất liền mạch cho bản đồ trong tích tắc đang tải
     final Color mapBgColor = mapType == 'satellite'
         ? const Color(0xFF0B0F19)
         : mapType == 'terrain'
             ? const Color(0xFFE2E8F0)
             : const Color(0xFFF1F5F9);
     final totalMapRect = Rect.fromLTRB(
-      (centerTileX - tileRadiusX) * tileSize,
-      (centerTileY - tileRadiusY) * tileSize,
-      (centerTileX + tileRadiusX + 1) * tileSize,
-      (centerTileY + tileRadiusY + 1) * tileSize,
+      (centerTileX - tileRadius) * tileSize,
+      (centerTileY - tileRadius) * tileSize,
+      (centerTileX + tileRadius + 1) * tileSize,
+      (centerTileY + tileRadius + 1) * tileSize,
     );
     canvas.drawRect(totalMapRect, Paint()..color = mapBgColor);
 
-    for (int dx = -tileRadiusX; dx <= tileRadiusX; dx++) {
-      for (int dy = -tileRadiusY; dy <= tileRadiusY + 1; dy++) {
+    for (int dx = -tileRadius; dx <= tileRadius; dx++) {
+      for (int dy = -tileRadius; dy <= tileRadius; dy++) {
         final tx = centerTileX + dx;
         final ty = centerTileY + dy;
         final key = '$mapType/$zoom/$tx/$ty';
