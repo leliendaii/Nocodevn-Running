@@ -479,7 +479,7 @@ class _RunningScreenState extends State<RunningScreen>
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                  padding: const EdgeInsets.fromLTRB(18.0, 10.0, 18.0, 10.0),
                   child: Column(
                     children: [
               // HEADER GỘP: THÔNG TIN USER + TRẠNG THÁI + NÚT VOICE COACH + NÚT ĐĂNG XUẤT
@@ -638,13 +638,14 @@ class _RunningScreenState extends State<RunningScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
 
               // KHÔNG GIAN ĐỒNG HỒ THỂ THAO THOÁNG ĐÃNG (PRO SPORT DASHBOARD)
               Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const Spacer(flex: 1),
                     // 1. Khung Thời gian chạy (Tối ưu bằng Selector)
                     Column(
                       mainAxisSize: MainAxisSize.min,
@@ -1016,10 +1017,11 @@ class _RunningScreenState extends State<RunningScreen>
                         );
                       },
                     ),
+                    const Spacer(flex: 2),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
 
               // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY (Tối ưu bằng Selector)
               Selector<RunningProvider, TrackingState>(
