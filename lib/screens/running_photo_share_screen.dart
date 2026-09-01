@@ -547,6 +547,24 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
       appBar: AppBar(
         title: const Text('Tạo ảnh'),
         actions: [
+          if (_hasAnyStickerModified)
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.6)),
+                ),
+                child: const Icon(
+                  Icons.restart_alt_rounded,
+                  color: AppTheme.secondaryNeon,
+                  size: 18,
+                ),
+              ),
+              tooltip: 'Đặt lại vị trí gốc',
+              onPressed: _resetAllStickers,
+            ),
           IconButton(
             icon: Container(
               padding: const EdgeInsets.all(7),
@@ -564,6 +582,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
             tooltip: 'Tuỳ chỉnh thông số',
             onPressed: _showOverlaySettingsSheet,
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: SafeArea(
@@ -616,76 +635,6 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
 
                             // 3. Các lớp khối đồ họa thể thao ĐỘC LẬP (Mỗi khối kéo thả & thu phóng riêng)
                             ..._buildTemplateLayers(),
-
-                            // 4. Nút đổi ảnh nhanh ở góc trên bên phải
-                            Positioned(
-                              top: 12,
-                              right: 12,
-                              child: GestureDetector(
-                                onTap: _showImageSourceSheet,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.65),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.photo_camera_rounded, size: 13, color: Colors.white),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Đổi ảnh',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // 5. Nút phục hồi vị trí gốc nhanh nếu có bất kỳ khối nào bị kéo lệch hoặc đổi kích thước
-                            if (_hasAnyStickerModified)
-                              Positioned(
-                                top: 12,
-                                left: 12,
-                                child: GestureDetector(
-                                  onTap: _resetAllStickers,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.secondaryNeon.withValues(alpha: 0.9),
-                                      borderRadius: BorderRadius.circular(16),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.3),
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.restart_alt_rounded, size: 13, color: Colors.black),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Vị trí gốc',
-                                          style: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -799,6 +748,23 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
+
+                    // Nút Đặt lại khối này (↺)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      icon: const Icon(Icons.restart_alt_rounded, color: Colors.white70, size: 18),
+                      tooltip: 'Đặt lại khối này',
+                      onPressed: () {
+                        final t = _getSelectedTransform();
+                        if (t != null) {
+                          setState(() {
+                            t.reset();
+                          });
+                        }
+                      },
+                    ),
 
                     // Nút Xong (✓)
                     IconButton(

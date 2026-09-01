@@ -58,20 +58,20 @@ class _DraggableStickerState extends State<DraggableSticker> {
           behavior: HitTestBehavior.opaque,
           onTap: widget.onSelect,
           onScaleStart: (details) {
-            widget.onSelect();
+            // Chỉ kích hoạt chọn nếu chưa chọn, tránh rebuild giật trong lúc bắt đầu kéo
+            if (!widget.isSelected) {
+              widget.onSelect();
+            }
             _baseScale = widget.transform.scale;
           },
           onScaleUpdate: (details) {
             if (details.pointerCount > 1 && widget.onScaleUpdate != null) {
-              // 2 ngón tay: Chụm/mở để thu nhỏ/phóng to mượt mà
+              // 2 ngón tay: Chụm/mở để phóng to hoặc thu nhỏ
               final newScale = (_baseScale * details.scale).clamp(0.4, 2.5);
               widget.onScaleUpdate!(newScale);
             } else {
-              // 1 ngón tay: Kéo di chuyển khối
-              // Bù trừ tỷ lệ Transform.scale: focalPointDelta trong RenderTransform bị chia cho scale,
-              // nên ta nhân ngược lại với transform.scale để toạ độ di chuyển 1:1 chính xác theo đầu ngón tay
-              final screenDelta = details.focalPointDelta * widget.transform.scale;
-              widget.onPanUpdate(screenDelta);
+              // 1 ngón tay hoặc chuột: Kéo di chuyển khối tự do
+              widget.onPanUpdate(details.focalPointDelta);
             }
           },
           child: AnimatedContainer(
