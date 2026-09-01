@@ -37,6 +37,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   bool _showDuration = true;
   bool _showPace = true;
   bool _showCalories = true;
+  bool _showSteps = true;
 
   /// Chọn ảnh từ máy ảnh hoặc thư viện
   Future<void> _pickImage(ImageSource source) async {
@@ -182,6 +183,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                             _showDuration = true;
                             _showPace = true;
                             _showCalories = true;
+                            _showSteps = true;
                           });
                           setModalState(() {});
                         },
@@ -248,6 +250,15 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                     value: _showCalories,
                     onChanged: (val) {
                       setState(() => _showCalories = val);
+                      setModalState(() {});
+                    },
+                  ),
+                  _buildSettingSwitch(
+                    title: 'Số bước chân',
+                    icon: Icons.directions_walk_rounded,
+                    value: _showSteps,
+                    onChanged: (val) {
+                      setState(() => _showSteps = val);
                       setModalState(() {});
                     },
                   ),
@@ -871,6 +882,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     if (_showCalories) {
       subStats.add(_buildBadgeInlineStat(Icons.local_fire_department_rounded, '${s.calories} kcal', AppTheme.accentOrange));
     }
+    if (_showSteps) {
+      subStats.add(_buildBadgeInlineStat(Icons.directions_walk_rounded, '${s.totalSteps} bước', const Color(0xFF00E5FF)));
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -878,65 +892,45 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
         children: [
           const Spacer(),
 
-          // Thẻ Huy Hiệu Thể Thao Tinh Gọn (Compact Sports Badge)
+          // Thẻ Huy Hiệu Thể Thao Tinh Gọn (Không box-shadow)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppTheme.primaryNeon.withValues(alpha: 0.55),
+                color: AppTheme.primaryNeon.withValues(alpha: 0.6),
                 width: 1.2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryNeon.withValues(alpha: 0.18),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. Dòng Header: Logo + Huy hiệu hoàn thành + Ngày
+                // 1. Dòng Header: Chỉ có Logo App bên trái và Ngày chạy bên phải (đã bỏ text Huy hiệu hoàn thành)
                 if (showTop) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_showLogo) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(5),
-                              child: Image.asset(
-                                'assets/images/logo.png',
-                                width: 18,
-                                height: 18,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          const Text(
-                            'HUY HIỆU HOÀN THÀNH',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.primaryNeon,
-                              letterSpacing: 0.8,
-                            ),
+                      if (_showLogo)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.contain,
                           ),
-                        ],
-                      ),
+                        )
+                      else
+                        const SizedBox.shrink(),
                       if (_showDate)
                         Text(
                           dateStr,
                           style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11,
+                            color: Colors.white.withValues(alpha: 0.75),
                             fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
                           ),
                         ),
                     ],
@@ -948,7 +942,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                   ),
                 ],
 
-                // 2. Nội dung: Cự ly chính bên trái + Các thông số phụ xếp gọn bên phải
+                // 2. Nội dung: Cự ly chính bên trái + Các thông số phụ căng đều 2 bên
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -993,14 +987,27 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                       ),
                     ],
 
-                    // Cột phải: Các thông số phụ co giãn tự động không bao giờ overflow
+                    // Cột phải: Các thông số phụ xếp thành lưới 2 cột căng đều 2 bên
                     if (subStats.isNotEmpty)
                       Expanded(
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: subStats,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (int i = 0; i < subStats.length; i += 2) ...[
+                              if (i > 0) const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(child: subStats[i]),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: (i + 1 < subStats.length)
+                                        ? subStats[i + 1]
+                                        : const SizedBox.shrink(),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                   ],
@@ -1017,15 +1024,19 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: color),
-        const SizedBox(width: 3.5),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.95),
-            letterSpacing: 0.2,
+        Icon(icon, size: 12.5, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withValues(alpha: 0.95),
+              letterSpacing: 0.2,
+            ),
           ),
         ),
       ],
