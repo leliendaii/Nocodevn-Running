@@ -409,10 +409,10 @@ class RunningProvider with ChangeNotifier {
         durationSeconds: _durationSeconds,
       );
 
-      // KIỂM TRA PHÂN RÃ TỐC ĐỘ TỨC THỜI KHI ĐỨNG YÊN (NẾU 2S KHÔNG CÓ TỌA ĐỘ MỚI -> 0 KM/H)
+      // KIỂM TRA PHÂN RÃ TỐC ĐỘ TỨC THỜI KHI ĐỨNG YÊN (NẾU 4S KHÔNG CÓ TỌA ĐỘ MỚI -> 0 KM/H)
       if (_lastPositionTime != null) {
         final secSinceLastPos = now.difference(_lastPositionTime!).inSeconds;
-        if (secSinceLastPos >= 2 && _instantSpeedKmh > 0.0) {
+        if (secSinceLastPos >= 4 && _instantSpeedKmh > 0.0) {
           _instantSpeedKmh = 0.0;
         }
       }
@@ -613,10 +613,19 @@ class RunningProvider with ChangeNotifier {
                 _pauseStartTime = null;
               }
             }
+          } else {
+            _isAutoPausedByFilter = false;
           }
 
-          // Ghi nhận di chuyển hợp lệ
-          if (result.isValidMovement && result.distanceDeltaMeters > 0.0 && !_isAutoPausedByFilter) {
+          // Ghi nhận di chuyển hợp lệ (Khi người dùng di chuyển, đảm bảo auto-pause được giải phóng ngay)
+          if (result.isValidMovement && result.distanceDeltaMeters > 0.0) {
+            if (_isAutoPausedByFilter) {
+              _isAutoPausedByFilter = false;
+              if (_pauseStartTime != null) {
+                _totalPausedSeconds += now.difference(_pauseStartTime!).inSeconds;
+                _pauseStartTime = null;
+              }
+            }
             _distanceKm += result.distanceDeltaMeters / 1000.0;
             _calories = CalorieCalculator.calculate(
               distanceKm: _distanceKm,
@@ -787,6 +796,8 @@ class RunningProvider with ChangeNotifier {
       _pauseStartTime = null;
     }
     _state = TrackingState.running;
+    _isAutoPausedByFilter = false;
+    _lastPositionTime = DateTime.now();
     _positionStream?.resume();
     _updateDurationFromWallClock();
     saveActiveCheckpointNow();
