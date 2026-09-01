@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
@@ -469,6 +470,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.watch<AuthProvider>().currentUser;
+    if (currentUser == null || !currentUser.isAdmin) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          title: const Text('KHÔNG CÓ QUYỀN TRUY CẬP'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline_rounded, size: 64, color: AppTheme.danger),
+                const SizedBox(height: 16),
+                const Text(
+                  'Quyền truy cập bị từ chối',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Trang này chỉ dành riêng cho Quản Trị Viên (Admin). Tài khoản của bạn không đủ phân quyền.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('QUAY LẠI'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final running = context.watch<RunningProvider>();
 
     // Tính toán số liệu thống kê dựa trên CẢ MỐC THỜI GIAN VÀ USER ĐƯỢC CHỌN
