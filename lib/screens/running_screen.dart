@@ -643,9 +643,8 @@ class _RunningScreenState extends State<RunningScreen>
               // KHÔNG GIAN ĐỒNG HỒ THỂ THAO THOÁNG ĐÃNG (PRO SPORT DASHBOARD)
               Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    const Spacer(flex: 1),
                     // 1. Khung Thời gian chạy (Tối ưu bằng Selector)
                     Column(
                       mainAxisSize: MainAxisSize.min,
@@ -696,25 +695,25 @@ class _RunningScreenState extends State<RunningScreen>
                                     distanceKm.toStringAsFixed(2),
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                      fontSize: 96,
+                                      fontSize: 84,
                                       fontWeight: FontWeight.w900,
                                       color: AppTheme.primaryNeon,
                                       height: 0.95,
                                       letterSpacing: -2.0,
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 5),
                                   const Text(
                                     'KILOMET',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w900,
                                       color: AppTheme.primaryNeon,
                                       letterSpacing: 3.5,
                                     ),
                                   ),
-                                  const SizedBox(height: 14),
+                                  const SizedBox(height: 12),
                                   // Badge trạng thái hoạt động
                                   Selector<RunningProvider, (String, double, bool)>(
                                     selector: (_, p) => (p.currentActivityType, p.instantSpeedKmh, p.isRunning),
@@ -805,12 +804,12 @@ class _RunningScreenState extends State<RunningScreen>
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              vertical: 18,
-                              horizontal: 16,
+                              vertical: 14,
+                              horizontal: 14,
                             ),
                             decoration: BoxDecoration(
                               color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: AppTheme.divider),
                             ),
                             child: Column(
@@ -835,7 +834,7 @@ class _RunningScreenState extends State<RunningScreen>
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 8),
                                 Selector<RunningProvider, String>(
                                   selector: (_, p) => p.currentPace,
                                   builder: (context, pace, _) {
@@ -853,18 +852,18 @@ class _RunningScreenState extends State<RunningScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
 
                         // Thẻ Calories
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              vertical: 18,
-                              horizontal: 16,
+                              vertical: 14,
+                              horizontal: 14,
                             ),
                             decoration: BoxDecoration(
                               color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: AppTheme.divider),
                             ),
                             child: Column(
@@ -910,18 +909,22 @@ class _RunningScreenState extends State<RunningScreen>
                       ],
                     ),
 
-                    // 4. Thanh Từng KM Trực Tiếp (Live Splits Bar)
-                    Selector<RunningProvider, (List<KmSplit>, bool)>(
-                      selector: (_, p) => (p.currentSplits, p.isRunning || p.isPaused),
+                    // 4. THẺ THỜI TIẾT (IDLE/FINISHED) HOẶC THANH TỪNG KM TRỰC TIẾP (RUNNING/PAUSED)
+                    Selector<RunningProvider, (TrackingState, List<KmSplit>)>(
+                      selector: (_, p) => (p.state, p.currentSplits),
                       builder: (context, data, _) {
-                        final splits = data.$1;
-                        final isActive = data.$2;
-                        if (!isActive || splits.isEmpty) return const SizedBox.shrink();
+                        final state = data.$1;
+                        final splits = data.$2;
+
+                        if (state == TrackingState.idle || state == TrackingState.finished) {
+                          return const WeatherAqiWidget();
+                        }
+
+                        if (splits.isEmpty) return const SizedBox.shrink();
 
                         final lastSplit = splits.last;
                         return Container(
-                          margin: const EdgeInsets.only(top: 14),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
                             color: AppTheme.surface,
                             borderRadius: BorderRadius.circular(16),
@@ -1017,69 +1020,62 @@ class _RunningScreenState extends State<RunningScreen>
                         );
                       },
                     ),
-                    const Spacer(flex: 2),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
 
-              // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY (Tối ưu bằng Selector)
+              // BỘ NÚT ĐIỀU KHIỂN THAO TÁC CHẠY (Tối ưu nhỏ gọn cao 48px)
               Selector<RunningProvider, TrackingState>(
                 selector: (_, p) => p.state,
                 builder: (context, state, _) {
                   final running = context.read<RunningProvider>();
 
                   if (state == TrackingState.idle || state == TrackingState.finished) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const WeatherAqiWidget(),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 58,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              VoiceCoachService.speakStart();
-                              running.startTracking(user?.id);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryNeon,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              elevation: 8,
-                              shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.play_arrow_rounded,
-                                  size: 28,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'BẮT ĐẦU CHẠY',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          VoiceCoachService.speakStart();
+                          running.startTracking(user?.id);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryNeon,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
+                          elevation: 6,
+                          shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.4),
                         ),
-                      ],
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.play_arrow_rounded,
+                              size: 24,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'BẮT ĐẦU CHẠY',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   } else if (state == TrackingState.running) {
                     return Row(
                       children: [
                         Expanded(
                           child: SizedBox(
-                            height: 58,
+                            height: 48,
                             child: OutlinedButton(
                               onPressed: () {
                                 VoiceCoachService.speakPause();
@@ -1092,7 +1088,7 @@ class _RunningScreenState extends State<RunningScreen>
                                 ),
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               child: const Row(
@@ -1100,7 +1096,7 @@ class _RunningScreenState extends State<RunningScreen>
                                 children: [
                                   Icon(
                                     Icons.pause_rounded,
-                                    size: 22,
+                                    size: 20,
                                     color: AppTheme.secondaryNeon,
                                   ),
                                   SizedBox(width: 6),
@@ -1109,7 +1105,7 @@ class _RunningScreenState extends State<RunningScreen>
                                     style: TextStyle(
                                       color: AppTheme.secondaryNeon,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 14,
+                                      fontSize: 13.5,
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -1121,7 +1117,7 @@ class _RunningScreenState extends State<RunningScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: SizedBox(
-                            height: 58,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: () => _showSaveRunDialog(
                                 context,
@@ -1133,17 +1129,17 @@ class _RunningScreenState extends State<RunningScreen>
                                 backgroundColor: AppTheme.accentOrange,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                elevation: 8,
-                                shadowColor: AppTheme.accentOrange.withValues(alpha: 0.5),
+                                elevation: 6,
+                                shadowColor: AppTheme.accentOrange.withValues(alpha: 0.4),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
                                     Icons.stop_rounded,
-                                    size: 22,
+                                    size: 20,
                                     color: Colors.white,
                                   ),
                                   SizedBox(width: 6),
@@ -1152,7 +1148,7 @@ class _RunningScreenState extends State<RunningScreen>
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 14,
+                                      fontSize: 13.5,
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -1169,7 +1165,7 @@ class _RunningScreenState extends State<RunningScreen>
                       children: [
                         Expanded(
                           child: SizedBox(
-                            height: 58,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: () {
                                 VoiceCoachService.speakResume();
@@ -1179,17 +1175,17 @@ class _RunningScreenState extends State<RunningScreen>
                                 backgroundColor: AppTheme.secondaryNeon,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                elevation: 8,
-                                shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.5),
+                                elevation: 6,
+                                shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.4),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
                                     Icons.play_arrow_rounded,
-                                    size: 22,
+                                    size: 20,
                                     color: Colors.black,
                                   ),
                                   SizedBox(width: 6),
@@ -1198,7 +1194,7 @@ class _RunningScreenState extends State<RunningScreen>
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 14,
+                                      fontSize: 13.5,
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -1210,7 +1206,7 @@ class _RunningScreenState extends State<RunningScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: SizedBox(
-                            height: 58,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: () => _showSaveRunDialog(
                                 context,
@@ -1222,17 +1218,17 @@ class _RunningScreenState extends State<RunningScreen>
                                 backgroundColor: AppTheme.accentOrange,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                elevation: 8,
-                                shadowColor: AppTheme.accentOrange.withValues(alpha: 0.5),
+                                elevation: 6,
+                                shadowColor: AppTheme.accentOrange.withValues(alpha: 0.4),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
                                     Icons.stop_rounded,
-                                    size: 22,
+                                    size: 20,
                                     color: Colors.white,
                                   ),
                                   SizedBox(width: 6),
@@ -1241,7 +1237,7 @@ class _RunningScreenState extends State<RunningScreen>
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 14,
+                                      fontSize: 13.5,
                                       letterSpacing: 0.5,
                                     ),
                                   ),
