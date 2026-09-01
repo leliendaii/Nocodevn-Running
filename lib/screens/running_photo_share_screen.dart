@@ -155,140 +155,149 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTheme.divider,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'TUỲ CHỈNH THÔNG SỐ ẢNH',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _showLogo = true;
-                            _showTime = false;
-                            _showDate = true;
-                            _showDistance = true;
-                            _showDuration = true;
-                            _showPace = true;
-                            _showCalories = true;
-                            _showSteps = true;
-                          });
-                          setModalState(() {});
-                        },
-                        child: const Text(
-                          'Mặc định',
-                          style: TextStyle(
-                            color: AppTheme.secondaryNeon,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppTheme.divider,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'TUỲ CHỈNH THÔNG SỐ ẢNH',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textPrimary,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _showLogo = true;
+                                _showTime = false;
+                                _showDate = true;
+                                _showDistance = true;
+                                _showDuration = true;
+                                _showPace = true;
+                                _showCalories = true;
+                                _showSteps = true;
+                              });
+                              setModalState(() {});
+                            },
+                            child: const Text(
+                              'Mặc định',
+                              style: TextStyle(
+                                color: AppTheme.secondaryNeon,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSettingSwitch(
+                        title: 'Logo ứng dụng',
+                        icon: Icons.directions_run_rounded,
+                        value: _showLogo,
+                        onChanged: (val) {
+                          setState(() => _showLogo = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Giờ chạy (Time)',
+                        icon: Icons.access_time_rounded,
+                        value: _showTime,
+                        onChanged: (val) {
+                          setState(() => _showTime = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Ngày chạy (Date)',
+                        icon: Icons.calendar_today_rounded,
+                        value: _showDate,
+                        onChanged: (val) {
+                          setState(() => _showDate = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Cự ly (KM)',
+                        icon: Icons.straighten_rounded,
+                        value: _showDistance,
+                        onChanged: (val) {
+                          setState(() => _showDistance = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Thời gian chạy',
+                        icon: Icons.timer_rounded,
+                        value: _showDuration,
+                        onChanged: (val) {
+                          setState(() => _showDuration = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Nhịp Pace (/km)',
+                        icon: Icons.speed_rounded,
+                        value: _showPace,
+                        onChanged: (val) {
+                          setState(() => _showPace = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Lượng Calo (kcal)',
+                        icon: Icons.local_fire_department_rounded,
+                        value: _showCalories,
+                        onChanged: (val) {
+                          setState(() => _showCalories = val);
+                          setModalState(() {});
+                        },
+                      ),
+                      _buildSettingSwitch(
+                        title: 'Số bước chân',
+                        icon: Icons.directions_walk_rounded,
+                        value: _showSteps,
+                        onChanged: (val) {
+                          setState(() => _showSteps = val);
+                          setModalState(() {});
+                        },
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  _buildSettingSwitch(
-                    title: 'Logo ứng dụng',
-                    icon: Icons.directions_run_rounded,
-                    value: _showLogo,
-                    onChanged: (val) {
-                      setState(() => _showLogo = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Giờ chạy (Time)',
-                    icon: Icons.access_time_rounded,
-                    value: _showTime,
-                    onChanged: (val) {
-                      setState(() => _showTime = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Ngày chạy (Date)',
-                    icon: Icons.calendar_today_rounded,
-                    value: _showDate,
-                    onChanged: (val) {
-                      setState(() => _showDate = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Cự ly (KM)',
-                    icon: Icons.straighten_rounded,
-                    value: _showDistance,
-                    onChanged: (val) {
-                      setState(() => _showDistance = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Thời gian chạy',
-                    icon: Icons.timer_rounded,
-                    value: _showDuration,
-                    onChanged: (val) {
-                      setState(() => _showDuration = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Nhịp Pace (/km)',
-                    icon: Icons.speed_rounded,
-                    value: _showPace,
-                    onChanged: (val) {
-                      setState(() => _showPace = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Lượng Calo (kcal)',
-                    icon: Icons.local_fire_department_rounded,
-                    value: _showCalories,
-                    onChanged: (val) {
-                      setState(() => _showCalories = val);
-                      setModalState(() {});
-                    },
-                  ),
-                  _buildSettingSwitch(
-                    title: 'Số bước chân',
-                    icon: Icons.directions_walk_rounded,
-                    value: _showSteps,
-                    onChanged: (val) {
-                      setState(() => _showSteps = val);
-                      setModalState(() {});
-                    },
-                  ),
-                ],
+                ),
               ),
             ),
           );
@@ -304,7 +313,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     required ValueChanged<bool> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
       child: Row(
         children: [
           Icon(icon, size: 18, color: value ? AppTheme.primaryNeon : AppTheme.textMuted),
