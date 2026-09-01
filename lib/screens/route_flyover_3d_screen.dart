@@ -62,7 +62,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
   static const double tileSize = 256.0;
 
-  int _baseDurationMs = 16000;
+  int _baseDurationMs = 15000;
 
   @override
   void initState() {
@@ -83,7 +83,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       _effectiveCalories = 165;
     }
 
-    _baseDurationMs = 16000;
+    _baseDurationMs = 15000;
 
     // 2. Tuyến đường cố định 100% nhất quán cho từng buổi chạy
     _smoothRoute = _buildConsistentRoute(widget.session);
@@ -636,9 +636,12 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                     if (frameBytes != null) {
                       await session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
 
-                      // Ở frame cuối (t = 1.0), giữ nguyên toàn cảnh 5 giây (125 frames) để thấy trọn vẹn thông số
+                      // Ở frame cuối (t = 1.0), giữ nguyên toàn cảnh để thấy trọn vẹn thông số:
+                      // - Video Theo dõi: để đó tầm 5s (125 frames ở 25 fps)
+                      // - Video Toàn cảnh: để đó tầm 2s (50 frames ở 25 fps)
                       if (step == totalSteps) {
-                        for (int hold = 0; hold < 125; hold++) {
+                        final int holdFrames = _isFlycamMode ? 125 : 50;
+                        for (int hold = 0; hold < holdFrames; hold++) {
                           await session.pushRawFrame(frameBytes, exportWidth.toInt(), exportHeight.toInt());
                         }
                       }
@@ -857,10 +860,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
 
     // 2. Tính toán các chỉ số thành tích thời gian thực
     double curProgress = 0.0;
-    if (t < 0.10) {
+    if (t < 0.18) {
       curProgress = 0.0;
-    } else if (t < 0.58) {
-      curProgress = ((t - 0.10) / 0.48).clamp(0.0, 1.0);
+    } else if (t < 0.70) {
+      curProgress = ((t - 0.18) / 0.52).clamp(0.0, 1.0);
     } else {
       curProgress = 1.0;
     }
@@ -1354,10 +1357,10 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
               builder: (context, _) {
                 final double t = _controller.value.clamp(0.0, 1.0);
                 double curProgress = 0.0;
-                if (t < 0.10) {
+                if (t < 0.18) {
                   curProgress = 0.0;
-                } else if (t < 0.58) {
-                  curProgress = ((t - 0.10) / 0.48).clamp(0.0, 1.0);
+                } else if (t < 0.70) {
+                  curProgress = ((t - 0.18) / 0.52).clamp(0.0, 1.0);
                 } else {
                   curProgress = 1.0;
                 }
@@ -1579,76 +1582,109 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     final double targetScaleX = (size.width * 0.70) / (spanW > 40 ? spanW : 160);
     final double targetScaleY = (size.height * 0.50) / (spanH > 40 ? spanH : 160);
     final double overviewScale = math.min(targetScaleX, targetScaleY).clamp(0.25, 1.80);
-    final double chaseScale = (overviewScale * 1.35).clamp(0.35, 1.85); // Zoom Flycam vừa vặn
-    final double startScale = (overviewScale * 1.65).clamp(0.45, 2.40); // Zoom cận cảnh điểm BẮT ĐẦU
+    final double chaseScale = (overviewScale * 1.45).clamp(0.35, 1.85); // Zoom Theo dõi vừa vặn
+    final double startScale = (overviewScale * 1.70).clamp(0.45, 2.40); // Zoom cận cảnh điểm BẮT ĐẦU
+    final double wideOverviewScale = overviewScale * 0.90; // Zoom nhỏ lại 1 tí để thấy hết toàn bộ quãng đường
 
-    // 2. TIMELINE ĐIỆN ẢNH CHUẨN XÁC:
-    // - Phase 1 [0.00 - 0.10] (~1.5s): Zoom cận cảnh vị trí BẮT ĐẦU
-    // - Phase 2 [0.10 - 0.58] (~7.7s): Chạy lộ trình mượt mà từ 0% đến 100%
-    // - Phase 3 [0.58 - 0.65] (~1.0s): Dừng tại điểm KẾT THÚC đúng 1 giây (giữ nguyên góc camera đích)
-    // - Phase 4 [0.65 - 0.74] (~1.5s): Thu nhỏ mở rộng bản đồ ra lại TOÀN CẢNH
-    // - Phase 5 [0.74 - 1.00] (~5.0s): Đợi 5 giây ở TOÀN CẢNH để thấy trọn vẹn thông số & cung đường
     double camX;
     double camY;
     double camScale;
     double flightProgress;
 
-    if (progress < 0.10) {
-      // 1. Giai đoạn BẮT ĐẦU: Giữ zoom cận cảnh điểm xuất phát (1.5s)
-      flightProgress = 0.0;
-      camX = startPinPixel.dx;
-      camY = startPinPixel.dy;
-      camScale = startScale;
-    } else if (progress < 0.58) {
-      // 2. Giai đoạn CHẠY: Tiến độ lộ trình từ 0.0 đến 1.0
-      flightProgress = ((progress - 0.10) / 0.48).clamp(0.0, 1.0);
+    if (isFlycamMode) {
+      // ==========================================
+      // CHẾ ĐỘ VIDEO THEO DÕI (FLYCAM TRACKING)
+      // ==========================================
+      if (progress < 0.10) {
+        // 1. Mới vô: Map nhỏ lại (Toàn cảnh) load được cả quãng đường đã chạy (~1.5s)
+        flightProgress = 0.0;
+        camX = routeCenterX;
+        camY = routeCenterY;
+        camScale = overviewScale;
+      } else if (progress < 0.18) {
+        // 2. Sau 1.5s: Zoom mượt đến chỗ BẮT ĐẦU (~1.2s)
+        flightProgress = 0.0;
+        final double tTransit = Curves.easeInOutCubic.transform(((progress - 0.10) / 0.08).clamp(0.0, 1.0));
+        camX = ui.lerpDouble(routeCenterX, startPinPixel.dx, tTransit)!;
+        camY = ui.lerpDouble(routeCenterY, startPinPixel.dy, tTransit)!;
+        camScale = ui.lerpDouble(overviewScale, chaseScale, tTransit)!;
+      } else if (progress < 0.70) {
+        // 3. Chạy theo dõi mượt mà từ điểm bắt đầu đến điểm KẾT THÚC (~7.8s)
+        flightProgress = ((progress - 0.18) / 0.52).clamp(0.0, 1.0);
+        final double fIndex = (sampledPositions.length - 1) * flightProgress;
+        final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
+        final int nextIdx = math.min(baseIdx + 1, sampledPositions.length - 1);
+        final double subFrac = fIndex - baseIdx;
+        final Offset smoothedCam = Offset.lerp(smoothedCamPositions[baseIdx], smoothedCamPositions[nextIdx], subFrac)!;
 
-      final double fIndex = (sampledPositions.length - 1) * flightProgress;
-      final int baseIdx = fIndex.floor().clamp(0, sampledPositions.length - 1);
-      final int nextIdx = math.min(baseIdx + 1, sampledPositions.length - 1);
-      final double subFrac = fIndex - baseIdx;
-      final Offset smoothedCam = Offset.lerp(smoothedCamPositions[baseIdx], smoothedCamPositions[nextIdx], subFrac)!;
-
-      if (isFlycamMode) {
-        final double introTransit = Curves.easeInOutCubic.transform((flightProgress / 0.15).clamp(0.0, 1.0));
-        camX = ui.lerpDouble(startPinPixel.dx, smoothedCam.dx, introTransit)!;
-        camY = ui.lerpDouble(startPinPixel.dy, smoothedCam.dy, introTransit)!;
-        camScale = ui.lerpDouble(startScale, chaseScale, introTransit)!;
+        camX = smoothedCam.dx;
+        camY = smoothedCam.dy;
+        camScale = chaseScale;
+      } else if (progress < 0.75) {
+        // 4. Về đích: Đợi 0.75s tại điểm KẾT THÚC (giữ nguyên góc nhìn camera đích)
+        flightProgress = 1.0;
+        final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
+        camX = lastCam.dx;
+        camY = lastCam.dy;
+        camScale = chaseScale;
+      } else if (progress < 0.85) {
+        // 5. Sau 0.75s: Zoom nhỏ lại để xem toàn bộ quãng đường đã chạy (~1.5s)
+        flightProgress = 1.0;
+        final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.75) / 0.10).clamp(0.0, 1.0));
+        final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
+        camX = ui.lerpDouble(lastCam.dx, routeCenterX, tOverview)!;
+        camY = ui.lerpDouble(lastCam.dy, routeCenterY, tOverview)!;
+        camScale = ui.lerpDouble(chaseScale, overviewScale, tOverview)!;
       } else {
-        final double introTransit = Curves.easeInOutCubic.transform((flightProgress / 0.18).clamp(0.0, 1.0));
-        camX = ui.lerpDouble(startPinPixel.dx, routeCenterX, introTransit)!;
-        camY = ui.lerpDouble(startPinPixel.dy, routeCenterY, introTransit)!;
-        camScale = ui.lerpDouble(startScale, overviewScale, introTransit)!;
+        // 6. Để yên toàn cảnh tầm 2s và kết thúc (TĨNH 100%, KHÔNG CÓ HIỆU ỨNG RUNG LẮC)
+        flightProgress = 1.0;
+        camX = routeCenterX;
+        camY = routeCenterY;
+        camScale = overviewScale;
       }
-    } else if (progress < 0.65) {
-      // 3. Giai đoạn ĐÍCH: Dừng tại điểm KẾT THÚC đúng 1 giây (KHÔNG zoom to lên)
-      flightProgress = 1.0;
-      final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
-      camX = isFlycamMode ? lastCam.dx : routeCenterX;
-      camY = isFlycamMode ? lastCam.dy : routeCenterY;
-      camScale = isFlycamMode ? chaseScale : overviewScale;
-    } else if (progress < 0.74) {
-      // 4. Giai đoạn THU NHỎ: Thu nhỏ bản đồ về lại TOÀN CẢNH
-      flightProgress = 1.0;
-      final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.65) / 0.09).clamp(0.0, 1.0));
-      final Offset lastCam = smoothedCamPositions.isNotEmpty ? smoothedCamPositions.last : finishPinPixel;
-      final double fromX = isFlycamMode ? lastCam.dx : routeCenterX;
-      final double fromY = isFlycamMode ? lastCam.dy : routeCenterY;
-      final double fromScale = isFlycamMode ? chaseScale : overviewScale;
-
-      camX = ui.lerpDouble(fromX, routeCenterX, tOverview)!;
-      camY = ui.lerpDouble(fromY, routeCenterY, tOverview)!;
-      camScale = ui.lerpDouble(fromScale, overviewScale, tOverview)!;
     } else {
-      // 5. Giai đoạn ĐỢI 5 GIÂY TOÀN CẢNH: Giữ nguyên toàn cảnh và các thông số hiển thị trọn vẹn
-      flightProgress = 1.0;
-      final double overviewT = ((progress - 0.74) / 0.26).clamp(0.0, 1.0);
-      // Hiệu ứng Flycam Drone lơ lửng nhẹ nhàng làm mềm khung nhìn toàn cảnh
-      final double floatX = math.sin(overviewT * math.pi * 2) * (spanW * 0.02);
-      final double floatY = math.cos(overviewT * math.pi * 2) * (spanH * 0.015);
-      camX = routeCenterX + floatX;
-      camY = routeCenterY + floatY;
-      camScale = overviewScale;
+      // ==========================================
+      // CHẾ ĐỘ VIDEO TOÀN CẢNH (OVERVIEW TRACKING)
+      // ==========================================
+      if (progress < 0.10) {
+        // 1. Mới vô: Map ở điểm BẮT ĐẦU (cận cảnh điểm bắt đầu), đợi tầm 1.5s
+        flightProgress = 0.0;
+        camX = startPinPixel.dx;
+        camY = startPinPixel.dy;
+        camScale = startScale;
+      } else if (progress < 0.18) {
+        // 2. Sau 1.5s: Zoom to lên mở rộng thấy được cả quãng đường đã chạy (~1.2s)
+        flightProgress = 0.0;
+        final double tTransit = Curves.easeInOutCubic.transform(((progress - 0.10) / 0.08).clamp(0.0, 1.0));
+        camX = ui.lerpDouble(startPinPixel.dx, routeCenterX, tTransit)!;
+        camY = ui.lerpDouble(startPinPixel.dy, routeCenterY, tTransit)!;
+        camScale = ui.lerpDouble(startScale, overviewScale, tTransit)!;
+      } else if (progress < 0.70) {
+        // 3. Chạy trên toàn cảnh từ điểm bắt đầu đến điểm KẾT THÚC (~7.8s)
+        flightProgress = ((progress - 0.18) / 0.52).clamp(0.0, 1.0);
+        camX = routeCenterX;
+        camY = routeCenterY;
+        camScale = overviewScale;
+      } else if (progress < 0.75) {
+        // 4. Về đích: Đợi 0.75s tại điểm KẾT THÚC
+        flightProgress = 1.0;
+        camX = routeCenterX;
+        camY = routeCenterY;
+        camScale = overviewScale;
+      } else if (progress < 0.85) {
+        // 5. Sau 0.75s: Zoom nhỏ lại 1 tí thôi để xem được hết quãng đường đã chạy (~1.5s)
+        flightProgress = 1.0;
+        final double tOverview = Curves.easeInOutCubic.transform(((progress - 0.75) / 0.10).clamp(0.0, 1.0));
+        camX = routeCenterX;
+        camY = routeCenterY;
+        camScale = ui.lerpDouble(overviewScale, wideOverviewScale, tOverview)!;
+      } else {
+        // 6. Để yên toàn cảnh tầm 2s và kết thúc (TĨNH 100%, KHÔNG CÓ HIỆU ỨNG RUNG LẮC)
+        flightProgress = 1.0;
+        camX = routeCenterX;
+        camY = routeCenterY;
+        camScale = wideOverviewScale;
+      }
     }
 
     final double currentDist = totalLength * flightProgress;
