@@ -17,8 +17,8 @@ class StickerTransform {
   }
 }
 
-/// Khối Sticker có thể Kéo Thả (Pan Drag) và Thu Phóng (Scale) siêu mượt
-class DraggableSticker extends StatelessWidget {
+/// Khối Sticker có thể Kéo Thả (Pan Drag) và Thu Phóng (Scale / Pinch) siêu mượt
+class DraggableSticker extends StatefulWidget {
   final String id;
   final String label;
   final Widget child;
@@ -26,6 +26,7 @@ class DraggableSticker extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onSelect;
   final ValueChanged<Offset> onPanUpdate;
+  final ValueChanged<double>? onScaleUpdate;
 
   const DraggableSticker({
     super.key,
@@ -36,23 +37,46 @@ class DraggableSticker extends StatelessWidget {
     required this.isSelected,
     required this.onSelect,
     required this.onPanUpdate,
+    this.onScaleUpdate,
   });
+
+  @override
+  State<DraggableSticker> createState() => _DraggableStickerState();
+}
+
+class _DraggableStickerState extends State<DraggableSticker> {
+  double _baseScale = 1.0;
 
   @override
   Widget build(BuildContext context) {
     return Transform.translate(
-      offset: transform.offset,
+      offset: widget.transform.offset,
       child: Transform.scale(
-        scale: transform.scale,
+        scale: widget.transform.scale,
         alignment: Alignment.center,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: onSelect,
-          onPanStart: (_) => onSelect(),
-          onPanUpdate: (details) => onPanUpdate(details.delta),
+          onTap: widget.onSelect,
+          onScaleStart: (details) {
+            widget.onSelect();
+            _baseScale = widget.transform.scale;
+          },
+          onScaleUpdate: (details) {
+            if (details.pointerCount > 1 && widget.onScaleUpdate != null) {
+              // 2 ngón tay: Chụm/mở để thu nhỏ/phóng to mượt mà
+              final newScale = (_baseScale * details.scale).clamp(0.4, 2.5);
+              widget.onScaleUpdate!(newScale);
+            } else {
+              // 1 ngón tay: Kéo di chuyển khối
+              // Bù trừ tỷ lệ Transform.scale: focalPointDelta trong RenderTransform bị chia cho scale,
+              // nên ta nhân ngược lại với transform.scale để toạ độ di chuyển 1:1 chính xác theo đầu ngón tay
+              final screenDelta = details.focalPointDelta * widget.transform.scale;
+              widget.onPanUpdate(screenDelta);
+            }
+          },
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            decoration: isSelected
+            duration: const Duration(milliseconds: 100),
+            decoration: widget.isSelected
                 ? BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
@@ -68,7 +92,7 @@ class DraggableSticker extends StatelessWidget {
                     ],
                   )
                 : null,
-            child: child,
+            child: widget.child,
           ),
         ),
       ),

@@ -371,29 +371,31 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                       ),
                       const Divider(color: AppTheme.divider, height: 22),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Vị trí & Kích thước khối',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary,
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Vị trí & Kích thước khối',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Chạm khối để kéo thả hoặc chỉnh to nhỏ',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textMuted,
+                                SizedBox(height: 2),
+                                Text(
+                                  'Chạm khối để kéo thả hoặc chỉnh to nhỏ',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textMuted,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           TextButton.icon(
                             onPressed: () {
                               _resetAllStickers();
@@ -1006,6 +1008,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 isSelected: _selectedStickerId == 'header',
                 onSelect: () => setState(() => _selectedStickerId = 'header'),
                 onPanUpdate: (delta) => setState(() => _headerTransform.offset += delta),
+                onScaleUpdate: (scale) => setState(() => _headerTransform.scale = scale),
                 child: PhotoShareHeaderBlock(
                   showLogo: _showLogo,
                   dateTimeStr: dateTimeStr,
@@ -1035,6 +1038,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               isSelected: _selectedStickerId == 'distance',
               onSelect: () => setState(() => _selectedStickerId = 'distance'),
               onPanUpdate: (delta) => setState(() => _distanceTransform.offset += delta),
+              onScaleUpdate: (scale) => setState(() => _distanceTransform.scale = scale),
               child: MinimalDistanceBlock(
                 distanceKm: s.distanceKm,
               ),
@@ -1059,6 +1063,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 isSelected: _selectedStickerId == 'stats',
                 onSelect: () => setState(() => _selectedStickerId = 'stats'),
                 onPanUpdate: (delta) => setState(() => _statsTransform.offset += delta),
+                onScaleUpdate: (scale) => setState(() => _statsTransform.scale = scale),
                 child: MinimalStatsBlock(
                   session: s,
                   showDuration: _showDuration,
@@ -1087,6 +1092,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 isSelected: _selectedStickerId == 'map_route',
                 onSelect: () => setState(() => _selectedStickerId = 'map_route'),
                 onPanUpdate: (delta) => setState(() => _mapRouteTransform.offset += delta),
+                onScaleUpdate: (scale) => setState(() => _mapRouteTransform.scale = scale),
                 child: MapRouteBlock(
                   routePoints: s.routePoints,
                 ),
@@ -1111,6 +1117,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                 isSelected: _selectedStickerId == 'map_stats',
                 onSelect: () => setState(() => _selectedStickerId = 'map_stats'),
                 onPanUpdate: (delta) => setState(() => _mapStatsTransform.offset += delta),
+                onScaleUpdate: (scale) => setState(() => _mapStatsTransform.scale = scale),
                 child: MapStatsBlock(
                   session: s,
                   showDistance: _showDistance,
@@ -1140,6 +1147,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               isSelected: _selectedStickerId == 'badge',
               onSelect: () => setState(() => _selectedStickerId = 'badge'),
               onPanUpdate: (delta) => setState(() => _badgeTransform.offset += delta),
+              onScaleUpdate: (scale) => setState(() => _badgeTransform.scale = scale),
               child: BadgeCardBlock(
                 session: s,
                 dateTimeStr: dateTimeStr,
