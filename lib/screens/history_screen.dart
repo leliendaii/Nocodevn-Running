@@ -9,7 +9,7 @@ import '../widgets/user_avatar.dart';
 import '../widgets/top_sync_toast.dart';
 import 'session_detail_screen.dart';
 
-enum HistoryDateFilterType { all, thisWeek, thisMonth, custom }
+enum HistoryDateFilterType { all, today, thisWeek, thisMonth, last7Days, last30Days, lastMonth, custom }
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -87,6 +87,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  void _clearFilter() {
+    setState(() {
+      _filterType = HistoryDateFilterType.all;
+      _selectedCustomRange = null;
+      _displayedCount = _pageSize;
+    });
+  }
+
+  String _getActiveFilterLabel() {
+    switch (_filterType) {
+      case HistoryDateFilterType.all:
+        return 'Tất cả';
+      case HistoryDateFilterType.today:
+        return 'Hôm nay';
+      case HistoryDateFilterType.thisWeek:
+        return 'Tuần này';
+      case HistoryDateFilterType.thisMonth:
+        return 'Tháng này';
+      case HistoryDateFilterType.last7Days:
+        return '7 ngày qua';
+      case HistoryDateFilterType.last30Days:
+        return '30 ngày qua';
+      case HistoryDateFilterType.lastMonth:
+        return 'Tháng trước';
+      case HistoryDateFilterType.custom:
+        if (_selectedCustomRange != null) {
+          final fmt = DateFormat('dd/MM/yyyy');
+          return '${fmt.format(_selectedCustomRange!.start)} ➔ ${fmt.format(_selectedCustomRange!.end)}';
+        }
+        return 'Tùy chọn';
+    }
+  }
+
   List<RunSession> _applyDateFilter(List<RunSession> list) {
     final now = DateTime.now();
 
@@ -94,15 +127,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case HistoryDateFilterType.all:
         return list;
 
+      case HistoryDateFilterType.today:
+        final startOfToday = DateTime(now.year, now.month, now.day, 0, 0, 0);
+        return list.where((s) => !s.startTime.isBefore(startOfToday)).toList();
+
       case HistoryDateFilterType.thisWeek:
-        // Bắt đầu từ thứ Hai đầu tuần đến hiện tại
         final startOfWeek = DateTime(now.year, now.month, now.day - (now.weekday - 1), 0, 0, 0);
         return list.where((s) => !s.startTime.isBefore(startOfWeek)).toList();
 
       case HistoryDateFilterType.thisMonth:
-        // Bắt đầu từ ngày 1 của tháng hiện tại
         final startOfMonth = DateTime(now.year, now.month, 1, 0, 0, 0);
         return list.where((s) => !s.startTime.isBefore(startOfMonth)).toList();
+
+      case HistoryDateFilterType.last7Days:
+        final start7 = now.subtract(const Duration(days: 7));
+        return list.where((s) => !s.startTime.isBefore(start7)).toList();
+
+      case HistoryDateFilterType.last30Days:
+        final start30 = now.subtract(const Duration(days: 30));
+        return list.where((s) => !s.startTime.isBefore(start30)).toList();
+
+      case HistoryDateFilterType.lastMonth:
+        final startLastMonth = DateTime(now.year, now.month - 1, 1, 0, 0, 0);
+        final endLastMonth = DateTime(now.year, now.month, 0, 23, 59, 59);
+        return list.where((s) => !s.startTime.isBefore(startLastMonth) && !s.startTime.isAfter(endLastMonth)).toList();
 
       case HistoryDateFilterType.custom:
         if (_selectedCustomRange == null) return list;
@@ -122,9 +170,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  /// Modal Bottom Sheet chọn khoảng ngày tùy chỉnh thiết kế chuyên nghiệp 100% tiếng Việt
-  void _openCustomDateRangeSheet() {
+  /// Modal Bottom Sheet Bộ Lọc Thời Gian
+  void _openFilterBottomSheet() {
     final now = DateTime.now();
+    HistoryDateFilterType tempType = _filterType;
     DateTime tempStart = _selectedCustomRange?.start ?? now.subtract(const Duration(days: 7));
     DateTime tempEnd = _selectedCustomRange?.end ?? now;
 
@@ -152,7 +201,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 builder: (context, child) => _buildDatePickerTheme(context, child),
               );
               if (picked != null) {
-                setModalState(() => tempStart = picked);
+                setModalState(() {
+                  tempStart = picked;
+                  tempType = HistoryDateFilterType.custom;
+                });
               }
             }
 
@@ -168,7 +220,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 builder: (context, child) => _buildDatePickerTheme(context, child),
               );
               if (picked != null) {
-                setModalState(() => tempEnd = picked);
+                setModalState(() {
+                  tempEnd = picked;
+                  tempType = HistoryDateFilterType.custom;
+                });
               }
             }
 
@@ -202,10 +257,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
                       Row(
                         children: const [
-                          Icon(Icons.calendar_month_rounded, color: AppTheme.primaryNeon, size: 20),
+                          Icon(Icons.tune_rounded, color: AppTheme.primaryNeon, size: 20),
                           SizedBox(width: 8),
                           Text(
-                            'LỌC THEO KHOẢNG NGÀY',
+                            'BỘ LỌC THỜI GIAN',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
@@ -225,39 +280,97 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 2 Card chọn Ngày Bắt Đầu & Ngày Kết Thúc đối xứng
+                  // 1. CHỌN NHANH (Bao gồm: Tất cả, Hôm nay, Tuần này, Tháng này, 7 ngày, 30 ngày, Tháng trước)
+                  const Text(
+                    'CHỌN NHANH:',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildModalChip(
+                        label: 'Tất cả',
+                        isSelected: tempType == HistoryDateFilterType.all,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.all),
+                      ),
+                      _buildModalChip(
+                        label: 'Hôm nay',
+                        isSelected: tempType == HistoryDateFilterType.today,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.today),
+                      ),
+                      _buildModalChip(
+                        label: 'Tuần này',
+                        isSelected: tempType == HistoryDateFilterType.thisWeek,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.thisWeek),
+                      ),
+                      _buildModalChip(
+                        label: 'Tháng này',
+                        isSelected: tempType == HistoryDateFilterType.thisMonth,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.thisMonth),
+                      ),
+                      _buildModalChip(
+                        label: '7 ngày qua',
+                        isSelected: tempType == HistoryDateFilterType.last7Days,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.last7Days),
+                      ),
+                      _buildModalChip(
+                        label: '30 ngày qua',
+                        isSelected: tempType == HistoryDateFilterType.last30Days,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.last30Days),
+                      ),
+                      _buildModalChip(
+                        label: 'Tháng trước',
+                        isSelected: tempType == HistoryDateFilterType.lastMonth,
+                        onTap: () => setModalState(() => tempType = HistoryDateFilterType.lastMonth),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 2. TÙY CHỌN KHOẢNG NGÀY
+                  const Text(
+                    'TÙY CHỌN THEO NGÀY:',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       // Card Từ Ngày
                       Expanded(
                         child: InkWell(
                           onTap: pickStartDate,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceLight,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.5)),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: tempType == HistoryDateFilterType.custom
+                                    ? AppTheme.secondaryNeon
+                                    : AppTheme.divider,
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: const [
-                                    Icon(Icons.play_circle_outline_rounded, size: 14, color: AppTheme.secondaryNeon),
+                                    Icon(Icons.event_available_rounded, size: 14, color: AppTheme.secondaryNeon),
                                     SizedBox(width: 6),
                                     Text(
                                       'TỪ NGÀY',
-                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
                                   dateFormat.format(tempStart),
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 13.5,
                                     fontWeight: FontWeight.w900,
                                     color: AppTheme.textPrimary,
                                   ),
@@ -272,13 +385,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       Expanded(
                         child: InkWell(
                           onTap: pickEndDate,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceLight,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.5)),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: tempType == HistoryDateFilterType.custom
+                                    ? AppTheme.primaryNeon
+                                    : AppTheme.divider,
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,15 +406,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     SizedBox(width: 6),
                                     Text(
                                       'ĐẾN NGÀY',
-                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
                                   dateFormat.format(tempEnd),
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 13.5,
                                     fontWeight: FontWeight.w900,
                                     color: AppTheme.textPrimary,
                                   ),
@@ -309,83 +426,69 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // Các mốc chọn nhanh (Quick Presets)
-                  const Text(
-                    'CHỌN NHANH:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildModalQuickChip(
-                        label: '7 ngày qua',
-                        onTap: () {
-                          setModalState(() {
-                            tempStart = now.subtract(const Duration(days: 7));
-                            tempEnd = now;
-                          });
-                        },
-                      ),
-                      _buildModalQuickChip(
-                        label: '30 ngày qua',
-                        onTap: () {
-                          setModalState(() {
-                            tempStart = now.subtract(const Duration(days: 30));
-                            tempEnd = now;
-                          });
-                        },
-                      ),
-                      _buildModalQuickChip(
-                        label: 'Tháng trước',
-                        onTap: () {
-                          setModalState(() {
-                            final prevMonth = DateTime(now.year, now.month - 1, 1);
-                            tempStart = prevMonth;
-                            tempEnd = DateTime(now.year, now.month, 0, 23, 59, 59);
-                          });
-                        },
-                      ),
-                      _buildModalQuickChip(
-                        label: 'Toàn bộ năm nay',
-                        onTap: () {
-                          setModalState(() {
-                            tempStart = DateTime(now.year, 1, 1);
-                            tempEnd = now;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 22),
 
-                  // Nút Áp Dụng
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryNeon,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  // 3. NÚT ÁP DỤNG & XÓA BỘ LỌC
+                  Row(
+                    children: [
+                      // Nút Xóa bộ lọc
+                      if (tempType != HistoryDateFilterType.all || _filterType != HistoryDateFilterType.all) ...[
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 46,
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.textSecondary,
+                                side: const BorderSide(color: AppTheme.divider),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                _clearFilter();
+                                Navigator.of(ctx).pop();
+                              },
+                              child: const Text(
+                                'XÓA BỘ LỌC',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+
+                      // Nút Áp Dụng
+                      Expanded(
+                        flex: 3,
+                        child: SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryNeon,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _filterType = tempType;
+                                if (tempType == HistoryDateFilterType.custom) {
+                                  _selectedCustomRange = DateTimeRange(start: tempStart, end: tempEnd);
+                                } else {
+                                  _selectedCustomRange = null;
+                                }
+                                _displayedCount = _pageSize;
+                              });
+                              Navigator.of(ctx).pop();
+                            },
+                            child: const Text(
+                              'ÁP DỤNG',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                            ),
+                          ),
+                        ),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _selectedCustomRange = DateTimeRange(start: tempStart, end: tempEnd);
-                          _filterType = HistoryDateFilterType.custom;
-                          _displayedCount = _pageSize;
-                        });
-                        Navigator.of(ctx).pop();
-                      },
-                      child: const Text(
-                        'ÁP DỤNG BỘ LỌC',
-                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 0.6),
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -414,23 +517,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildModalQuickChip({required String label, required VoidCallback onTap}) {
+  Widget _buildModalChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceLight,
+          color: isSelected ? AppTheme.primaryNeon : AppTheme.surfaceLight,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppTheme.divider),
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryNeon : AppTheme.divider,
+          ),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textSecondary,
+            color: isSelected ? Colors.white : AppTheme.textSecondary,
           ),
         ),
       ),
@@ -454,6 +564,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final int hours = totalSeconds ~/ 3600;
     final int minutes = (totalSeconds % 3600) ~/ 60;
 
+    final isFiltered = _filterType != HistoryDateFilterType.all;
+
     // Danh sách đã phân trang (Load More)
     final visibleCount = _displayedCount.clamp(0, filteredSessions.length);
     final visibleSessions = filteredSessions.take(visibleCount).toList();
@@ -462,6 +574,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('LỊCH SỬ CHẠY BỘ'),
+        actions: [
+          // NÚT BỘ LỌC GỌN GÀNG TRÊN APPBAR
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: InkWell(
+              onTap: _openFilterBottomSheet,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isFiltered ? AppTheme.primaryNeon.withValues(alpha: 0.18) : AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isFiltered ? AppTheme.primaryNeon : AppTheme.divider,
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.tune_rounded,
+                      size: 14,
+                      color: isFiltered ? AppTheme.primaryNeon : AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Bộ lọc',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isFiltered ? AppTheme.primaryNeon : AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: _showScrollToTop
           ? FloatingActionButton.extended(
@@ -507,123 +659,72 @@ class _HistoryScreenState extends State<HistoryScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // ==========================================
-              // 1. THANH BỘ LỌC NGÀY GỌN GÀNG (FIT 100% MÀN HÌNH)
+              // 1. THANH TRẠNG THÁI BỘ LỌC (CHỈ HIỆN KHI ĐANG LỌC)
               // ==========================================
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                  child: Column(
-                    children: [
-                      // Thanh 4 Tab gọn gàng, không bị tràn màn hình
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.divider),
-                        ),
-                        child: Row(
-                          children: [
-                            _buildSegmentTab(
-                              label: 'TẤT CẢ',
-                              isSelected: _filterType == HistoryDateFilterType.all,
-                              onTap: () {
-                                setState(() {
-                                  _filterType = HistoryDateFilterType.all;
-                                  _displayedCount = _pageSize;
-                                });
-                              },
-                            ),
-                            _buildSegmentTab(
-                              label: 'TUẦN NÀY',
-                              isSelected: _filterType == HistoryDateFilterType.thisWeek,
-                              onTap: () {
-                                setState(() {
-                                  _filterType = HistoryDateFilterType.thisWeek;
-                                  _displayedCount = _pageSize;
-                                });
-                              },
-                            ),
-                            _buildSegmentTab(
-                              label: 'THÁNG NÀY',
-                              isSelected: _filterType == HistoryDateFilterType.thisMonth,
-                              onTap: () {
-                                setState(() {
-                                  _filterType = HistoryDateFilterType.thisMonth;
-                                  _displayedCount = _pageSize;
-                                });
-                              },
-                            ),
-                            _buildSegmentTab(
-                              label: 'TÙY CHỌN',
-                              icon: Icons.calendar_month_rounded,
-                              isSelected: _filterType == HistoryDateFilterType.custom,
-                              activeColor: AppTheme.secondaryNeon,
-                              onTap: _openCustomDateRangeSheet,
-                            ),
-                          ],
-                        ),
+              if (isFiltered)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondaryNeon.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.4)),
                       ),
-
-                      // Badge hiển thị khoảng ngày tùy chọn khi đang active
-                      if (_filterType == HistoryDateFilterType.custom && _selectedCustomRange != null) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.secondaryNeon.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.date_range_rounded, size: 14, color: AppTheme.secondaryNeon),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${DateFormat('dd/MM/yyyy').format(_selectedCustomRange!.start)} ➔ ${DateFormat('dd/MM/yyyy').format(_selectedCustomRange!.end)}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.secondaryNeon,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _filterType = HistoryDateFilterType.all;
-                                    _selectedCustomRange = null;
-                                    _displayedCount = _pageSize;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.secondaryNeon.withValues(alpha: 0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.close_rounded, size: 14, color: AppTheme.secondaryNeon),
+                              const Icon(Icons.tune_rounded, size: 14, color: AppTheme.secondaryNeon),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Bộ lọc: ${_getActiveFilterLabel()}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.secondaryNeon,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ],
+                          InkWell(
+                            onTap: _clearFilter,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.danger.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Text(
+                                    'Xóa lọc',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.danger,
+                                    ),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Icon(Icons.close_rounded, size: 13, color: AppTheme.danger),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
 
               // ==========================================
               // 2. THẺ TỔNG QUAN ĐÃ TỰ ĐỘNG LỌC SỐ LIỆU
               // ==========================================
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
@@ -658,21 +759,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         const Icon(Icons.directions_run_outlined, size: 56, color: AppTheme.textMuted),
                         const SizedBox(height: 14),
                         Text(
-                          _filterType == HistoryDateFilterType.all
+                          !isFiltered
                               ? 'Chưa có buổi chạy nào'
-                              : 'Không có buổi chạy nào trong khoảng ngày này',
+                              : 'Không có buổi chạy nào trong khoảng thời gian này',
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _filterType == HistoryDateFilterType.all
+                          !isFiltered
                               ? 'Vuốt xuống để tải lại hoặc bấm "Bắt đầu chạy"!'
-                              : 'Hãy chọn khoảng ngày khác hoặc bấm "Tất cả"',
+                              : 'Hãy chọn mốc thời gian khác hoặc bấm "Xóa bộ lọc"',
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
-                        if (_filterType != HistoryDateFilterType.all) ...[
+                        if (isFiltered) ...[
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
@@ -684,13 +785,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                             icon: const Icon(Icons.refresh_rounded, size: 16),
                             label: const Text('XEM TẤT CẢ BUỔI CHẠY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              setState(() {
-                                _filterType = HistoryDateFilterType.all;
-                                _selectedCustomRange = null;
-                                _displayedCount = _pageSize;
-                              });
-                            },
+                            onPressed: _clearFilter,
                           ),
                         ],
                       ],
@@ -764,52 +859,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ),
               ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSegmentTab({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    IconData? icon,
-    Color activeColor = AppTheme.primaryNeon,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 13,
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
-                ),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
-                  letterSpacing: 0.2,
-                ),
-              ),
             ],
           ),
         ),
