@@ -5,7 +5,6 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../models/run_session.dart';
 import '../theme/app_theme.dart';
-import '../widgets/user_avatar.dart';
 import '../widgets/top_sync_toast.dart';
 import 'session_detail_screen.dart';
 
@@ -113,8 +112,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return 'Tháng trước';
       case HistoryDateFilterType.custom:
         if (_selectedCustomRange != null) {
-          final fmt = DateFormat('dd/MM/yyyy');
-          return '${fmt.format(_selectedCustomRange!.start)} ➔ ${fmt.format(_selectedCustomRange!.end)}';
+          final fmt = DateFormat('dd/MM');
+          return '${fmt.format(_selectedCustomRange!.start)} - ${fmt.format(_selectedCustomRange!.end)}';
         }
         return 'Tùy chọn';
     }
@@ -280,7 +279,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 1. CHỌN NHANH (Bao gồm: Tất cả, Hôm nay, Tuần này, Tháng này, 7 ngày, 30 ngày, Tháng trước)
+                  // 1. CHỌN NHANH
                   const Text(
                     'CHỌN NHANH:',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
@@ -331,7 +330,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                   // 2. TÙY CHỌN KHOẢNG NGÀY
                   const Text(
-                    'TÙY CHỌN THEO NGÀY:',
+                    'TÙY CHỌN KHOẢNG NGÀY:',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                   ),
                   const SizedBox(height: 8),
@@ -448,7 +447,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 Navigator.of(ctx).pop();
                               },
                               child: const Text(
-                                'XÓA BỘ LỌC',
+                                'XÓA LỌC',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                               ),
                             ),
@@ -574,46 +573,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('LỊCH SỬ CHẠY BỘ'),
-        actions: [
-          // NÚT BỘ LỌC GỌN GÀNG TRÊN APPBAR
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: InkWell(
-              onTap: _openFilterBottomSheet,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isFiltered ? AppTheme.primaryNeon.withValues(alpha: 0.18) : AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isFiltered ? AppTheme.primaryNeon : AppTheme.divider,
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.tune_rounded,
-                      size: 14,
-                      color: isFiltered ? AppTheme.primaryNeon : AppTheme.textSecondary,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Bộ lọc',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: isFiltered ? AppTheme.primaryNeon : AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       floatingActionButton: _showScrollToTop
           ? FloatingActionButton.extended(
@@ -659,87 +618,227 @@ class _HistoryScreenState extends State<HistoryScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // ==========================================
-              // 1. THANH TRẠNG THÁI BỘ LỌC (CHỈ HIỆN KHI ĐANG LỌC)
-              // ==========================================
-              if (isFiltered)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.secondaryNeon.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.tune_rounded, size: 14, color: AppTheme.secondaryNeon),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Bộ lọc: ${_getActiveFilterLabel()}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.secondaryNeon,
-                                ),
-                              ),
-                            ],
-                          ),
-                          InkWell(
-                            onTap: _clearFilter,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.danger.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: const [
-                                  Text(
-                                    'Xóa lọc',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppTheme.danger,
-                                    ),
-                                  ),
-                                  SizedBox(width: 3),
-                                  Icon(Icons.close_rounded, size: 13, color: AppTheme.danger),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-              // ==========================================
-              // 2. THẺ TỔNG QUAN ĐÃ TỰ ĐỘNG LỌC SỐ LIỆU
+              // 1. THẺ TỔNG QUAN THỂ THAO LIỀN MẠCH KÈM NÚT BỘ LỌC
               // ==========================================
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.divider),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: isFiltered ? AppTheme.primaryNeon.withValues(alpha: 0.5) : AppTheme.divider,
+                        width: isFiltered ? 1.2 : 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSummaryStat('TỔNG KM', '${totalKm.toStringAsFixed(1)} km', AppTheme.primaryNeon),
-                        Container(width: 1, height: 36, color: AppTheme.divider),
-                        _buildSummaryStat('BUỔI CHẠY', '${filteredSessions.length}', AppTheme.secondaryNeon),
-                        Container(width: 1, height: 36, color: AppTheme.divider),
-                        _buildSummaryStat('THỜI GIAN', '${hours}h ${minutes}p', AppTheme.textPrimary),
+                        // Hàng tiêu đề thẻ tổng quan + Nút Bộ lọc
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.analytics_outlined,
+                                    color: AppTheme.primaryNeon,
+                                    size: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'TỔNG KẾT THÀNH TÍCH',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Nút Bộ Lọc Tinh Tế
+                            InkWell(
+                              onTap: _openFilterBottomSheet,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: isFiltered
+                                      ? AppTheme.primaryNeon.withValues(alpha: 0.18)
+                                      : AppTheme.surfaceLight,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isFiltered ? AppTheme.primaryNeon : AppTheme.divider,
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.tune_rounded,
+                                      size: 13,
+                                      color: isFiltered ? AppTheme.primaryNeon : AppTheme.textSecondary,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      isFiltered ? _getActiveFilterLabel() : 'Bộ lọc',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: isFiltered ? AppTheme.primaryNeon : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                    if (isFiltered) ...[
+                                      const SizedBox(width: 4),
+                                      GestureDetector(
+                                        onTap: _clearFilter,
+                                        child: const Icon(
+                                          Icons.close_rounded,
+                                          size: 13,
+                                          color: AppTheme.primaryNeon,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+                        const Divider(height: 1, color: AppTheme.divider),
+                        const SizedBox(height: 16),
+
+                        // 3 Chỉ số lớn thể thao
+                        Row(
+                          children: [
+                            // 1. Tổng Cự Ly
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        totalKm.toStringAsFixed(1),
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.primaryNeon,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      const Text(
+                                        'KM',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.primaryNeon,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'TỔNG QUÃNG ĐƯỜNG',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            Container(width: 1, height: 36, color: AppTheme.divider),
+
+                            // 2. Buổi chạy
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${filteredSessions.length}',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.secondaryNeon,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'BUỔI CHẠY',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            Container(width: 1, height: 36, color: AppTheme.divider),
+
+                            // 3. Thời gian
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      hours > 0 ? '${hours}h ${minutes}p' : '${minutes}p',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.textPrimary,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'THỜI GIAN',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -747,7 +846,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
 
               // ==========================================
-              // 3. DANH SÁCH BUỔI CHẠY HOẶC EMPTY STATE
+              // 2. DANH SÁCH BUỔI CHẠY (PREMIUM SESSION CARDS)
               // ==========================================
               if (filteredSessions.isEmpty)
                 SliverToBoxAdapter(
@@ -793,14 +892,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 )
               else ...[
-                // Danh sách các buổi chạy có phân trang (15 items / lần)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final session = visibleSessions[index];
-                        return _buildSessionCard(context, session);
+                        return _buildSportSessionCard(context, session);
                       },
                       childCount: visibleSessions.length,
                     ),
@@ -866,169 +964,180 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildSummaryStat(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSessionCard(BuildContext context, RunSession session) {
-    final dateFormat = DateFormat('dd/MM/yyyy • HH:mm');
-    final running = context.read<RunningProvider>();
-    final currentUser = context.read<AuthProvider>().currentUser;
-    final realName = running.getUserRealName(session.userId, session.userName);
-    String realAvatar = running.getUserRealAvatar(session.userId);
-    if (realAvatar.isEmpty && currentUser != null && currentUser.id == session.userId && currentUser.avatarUrl.isNotEmpty) {
-      realAvatar = currentUser.avatarUrl;
+  /// Thẻ Buổi Chạy Chuẩn Thể Thao Hiện Đại (Strava / Nike Run Club)
+  Widget _buildSportSessionCard(BuildContext context, RunSession session) {
+    String formattedDate;
+    try {
+      formattedDate = DateFormat('dd/MM/yyyy • HH:mm').format(session.startTime);
+    } catch (_) {
+      formattedDate = '${session.startTime.day}/${session.startTime.month}/${session.startTime.year}';
     }
-    final isAdmin = running.isUserAdmin(session.userId);
 
-    // Tên buổi chạy
+    // Tên buổi chạy nổi bật
     final sessionName = session.notes.trim().isNotEmpty
         ? session.notes.trim()
         : 'Buổi chạy ${DateFormat('dd/MM/yyyy').format(session.startTime)}';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: InkWell(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SessionDetailScreen(session: session),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header: Tên người chạy + Cự ly
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      UserAvatar(
-                        avatarUrl: realAvatar,
-                        name: realName,
-                        radius: 20,
-                        isAdmin: isAdmin,
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SessionDetailScreen(session: session),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // HÀNG 1: Tên Buổi Chạy + Cự Ly Nổi Bật (Màu Đỏ)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tên & Ngày chạy bên trái
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            realName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            sessionName,
+                            style: const TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textPrimary,
+                              height: 1.25,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          Text(
-                            dateFormat.format(session.startTime),
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time_rounded, size: 12.5, color: AppTheme.textMuted),
+                              const SizedBox(width: 4),
+                              Text(
+                                formattedDate,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // Cự ly lớn bên phải
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              session.formattedDistance,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.primaryNeon,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Text(
+                              'KM',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.primaryNeon,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // HÀNG 2: 4 Khối Chỉ Số Thể Thao (Grid Bo Góc Hiện Đại)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildMetricBox('THỜI GIAN', session.formattedDuration, AppTheme.textPrimary),
+                      _buildVerticalDivider(),
+                      _buildMetricBox('PACE TB', '${session.pace} /km', AppTheme.secondaryNeon),
+                      _buildVerticalDivider(),
+                      _buildMetricBox('CALO', '${session.calories}', AppTheme.primaryNeon),
+                      _buildVerticalDivider(),
+                      _buildMetricBox('SỐ BƯỚC', session.formattedTotalSteps, AppTheme.textPrimary),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
-                    ),
-                    child: Text(
-                      '${session.formattedDistance} KM',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.primaryNeon,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Tên buổi chạy
-              Row(
-                children: [
-                  const Icon(Icons.edit_note_rounded, size: 16, color: AppTheme.secondaryNeon),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      sessionName,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: AppTheme.divider),
-              const SizedBox(height: 12),
-              // Bảng 4 thông số ngắn gọn
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildCardStatItem('THỜI GIAN', session.formattedDuration),
-                  _buildCardStatItem('PACE', '${session.pace} /km', color: AppTheme.secondaryNeon),
-                  _buildCardStatItem('CALO', '${session.calories} kcal', color: AppTheme.primaryNeon),
-                  _buildCardStatItem('TỐC ĐỘ', '${session.formattedAvgSpeed} km/h'),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCardStatItem(String label, String value, {Color color = AppTheme.textPrimary}) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9.5,
-            color: AppTheme.textMuted,
-            fontWeight: FontWeight.bold,
+  Widget _buildMetricBox(String label, String value, Color valueColor) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+              color: valueColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w900,
-            color: color,
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textMuted,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerticalDivider() {
+    return Container(
+      width: 1,
+      height: 20,
+      color: AppTheme.divider,
     );
   }
 }
