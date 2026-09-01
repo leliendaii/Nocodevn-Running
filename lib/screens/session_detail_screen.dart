@@ -340,10 +340,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
           // Nút 'Xem quá trình' sát xuống gần dưới, cách bottom đúng 15px
           // Bộ đôi nút 'Tạo ảnh check-in' & 'Video tổng quan' sát xuống gần dưới, cách bottom đúng 15px
           Positioned(
-            left: 0,
-            right: 0,
+            left: 18,
+            right: 18,
             bottom: 15,
-            child: Center(child: _buildAnimatedProcessButtons(context)),
+            child: _buildAnimatedProcessButtons(context),
           ),
         ],
       ),
@@ -357,97 +357,100 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
         return Transform.scale(
           scale: _scaleAnimation.value,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. Nút Tạo ảnh (Màu Đỏ Neon #FF2A42)
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryNeon,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 11,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: const BorderSide(
-                      color: Colors.white,
-                      width: 1.5,
+              // 1. Nút Tạo ảnh (Màu Đỏ Neon #FF2A42) - 50%
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryNeon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: const BorderSide(
+                          color: Colors.white,
+                          width: 1.5,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          RunningPhotoShareScreen(session: widget.session),
-                      transitionsBuilder:
-                          (context, animation, secondaryAnimation, child) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            );
-                          },
-                      transitionDuration: const Duration(milliseconds: 240),
-                      reverseTransitionDuration: const Duration(milliseconds: 180),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              RunningPhotoShareScreen(session: widget.session),
+                          transitionsBuilder:
+                              (context, animation, secondaryAnimation, child) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                );
+                              },
+                          transitionDuration: const Duration(milliseconds: 240),
+                          reverseTransitionDuration: const Duration(milliseconds: 180),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Tạo ảnh',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
                     ),
-                  );
-                },
-                child: const Text(
-                  'Tạo ảnh',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
 
-              // 2. Nút Video tổng quan (Màu Xanh Neon #139EFE)
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.secondaryNeon,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 11,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: const BorderSide(
-                      color: Colors.white,
-                      width: 1.5,
+              // 2. Nút Video tổng quan (Màu Xanh Neon #139EFE) - 50%
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.secondaryNeon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: const BorderSide(
+                          color: Colors.white,
+                          width: 1.5,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          RouteFlyover3DScreen(session: widget.session),
-                      transitionsBuilder:
-                          (context, animation, secondaryAnimation, child) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            );
-                          },
-                      transitionDuration: const Duration(milliseconds: 240),
-                      reverseTransitionDuration: const Duration(milliseconds: 180),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              RouteFlyover3DScreen(session: widget.session),
+                          transitionsBuilder:
+                              (context, animation, secondaryAnimation, child) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                );
+                              },
+                          transitionDuration: const Duration(milliseconds: 240),
+                          reverseTransitionDuration: const Duration(milliseconds: 180),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Video tổng quan',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                      ),
                     ),
-                  );
-                },
-                child: const Text(
-                  'Video tổng quan',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
                   ),
                 ),
               ),
