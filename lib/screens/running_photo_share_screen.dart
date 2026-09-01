@@ -27,7 +27,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   final ImagePicker _picker = ImagePicker();
 
   File? _selectedImage;
-  int _selectedTemplate = 0; // 0: Tối giản (Strava), 1: Line GPS Art, 2: Huy hiệu Pro
+  int _selectedTemplate = 0; // 0: Tối giản, 1: Bản đồ, 2: Huy hiệu
   bool _isExporting = false;
 
   /// Chọn ảnh từ máy ảnh hoặc thư viện
@@ -274,58 +274,79 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               ),
             ),
 
-            // THANH CHỌN MẪU TEM (TEMPLATE SELECTOR)
+            // THANH CHỌN KIỂU HIỂN THỊ (SEGMENTED TABS) - TỐI GỌN, ĐƠN GIẢN
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.divider),
+              ),
               child: Row(
                 children: [
-                  _buildTemplateChip(0, 'Tối giản Strava', Icons.space_dashboard_rounded),
-                  const SizedBox(width: 8),
-                  _buildTemplateChip(1, 'Line GPS Art', Icons.route_rounded),
-                  const SizedBox(width: 8),
-                  _buildTemplateChip(2, 'Huy hiệu Pro', Icons.military_tech_rounded),
+                  _buildSegmentItem(0, 'Tối giản'),
+                  _buildSegmentItem(1, 'Bản đồ'),
+                  _buildSegmentItem(2, 'Huy hiệu'),
                 ],
               ),
             ),
 
-            // NÚT THAO TÁC: LƯU VÀO MÁY & CHIA SẺ
+            // THANH HÀNH ĐỘNG: ĐỔI ẢNH, LƯU ẢNH, CHIA SẺ
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
               child: Row(
                 children: [
-                  // Nút đổi ảnh nhanh nếu chưa chọn
-                  IconButton.filledTonal(
-                    onPressed: _showImageSourceSheet,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.surfaceLight,
-                      padding: const EdgeInsets.all(14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  // Nút đổi ảnh
+                  InkWell(
+                    onTap: _showImageSourceSheet,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.divider),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_rounded,
+                        color: AppTheme.textPrimary,
+                        size: 20,
+                      ),
                     ),
-                    icon: const Icon(Icons.camera_alt_outlined, color: AppTheme.textPrimary),
-                    tooltip: 'Chụp hoặc chọn ảnh',
                   ),
                   const SizedBox(width: 10),
 
-                  // Nút Lưu vào máy
+                  // Nút Lưu ảnh
                   Expanded(
                     child: SizedBox(
-                      height: 52,
+                      height: 48,
                       child: OutlinedButton.icon(
                         onPressed: _isExporting ? null : _saveToGallery,
                         icon: _isExporting
                             ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
-                            : const Icon(Icons.download_rounded, color: Colors.white),
+                            : const Icon(Icons.download_rounded, color: Colors.white, size: 18),
                         label: const Text(
-                          'LƯU VÀO MÁY',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                          'Lưu ảnh',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                          ),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.white, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white, width: 1.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                       ),
                     ),
@@ -335,18 +356,24 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                   // Nút Chia sẻ
                   Expanded(
                     child: SizedBox(
-                      height: 52,
+                      height: 48,
                       child: ElevatedButton.icon(
                         onPressed: _isExporting ? null : _shareImage,
-                        icon: const Icon(Icons.share_rounded, color: Colors.white),
+                        icon: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
                         label: const Text(
-                          'CHIA SẺ',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                          'Chia sẻ',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryNeon,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          elevation: 4,
+                          shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                       ),
                     ),
@@ -360,45 +387,39 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
     );
   }
 
-  /// Nút chọn Mẫu Template
-  Widget _buildTemplateChip(int index, String label, IconData icon) {
+  /// Nút chọn Mẫu Tab Segmented
+  Widget _buildSegmentItem(int index, String title) {
     final isSelected = _selectedTemplate == index;
     return Expanded(
-      child: InkWell(
+      child: GestureDetector(
         onTap: () => setState(() => _selectedTemplate = index),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppTheme.primaryNeon.withValues(alpha: 0.2)
-                : AppTheme.surfaceLight,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected ? AppTheme.primaryNeon : AppTheme.divider,
-              width: 1.2,
-            ),
+            color: isSelected ? AppTheme.primaryNeon : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppTheme.primaryNeon.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? AppTheme.primaryNeon : AppTheme.textMuted,
+          child: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                color: isSelected ? Colors.white : AppTheme.textMuted,
+                letterSpacing: 0.3,
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -407,46 +428,53 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
 
   /// Nền thể thao mặc định nếu người dùng chưa chụp ảnh
   Widget _buildDefaultSportsBackground() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0F111E),
-            Color(0xFF1E2139),
-            Color(0xFF0D0E15),
-          ],
+    return GestureDetector(
+      onTap: _showImageSourceSheet,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F111E),
+              Color(0xFF1E2139),
+              Color(0xFF0D0E15),
+            ],
+          ),
         ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.primaryNeon.withValues(alpha: 0.15),
-                border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4), width: 1.5),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.primaryNeon.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: AppTheme.primaryNeon.withValues(alpha: 0.35),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.add_photo_alternate_rounded,
+                  size: 40,
+                  color: AppTheme.primaryNeon,
+                ),
               ),
-              child: const Icon(
-                Icons.directions_run_rounded,
-                size: 48,
-                color: AppTheme.primaryNeon,
+              const SizedBox(height: 12),
+              const Text(
+                'Chạm để chọn hoặc chụp ảnh',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Chạm vào icon máy ảnh\nđể thêm bức ảnh của bạn',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12.5,
-                color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -456,19 +484,19 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   Widget _buildTemplateOverlay() {
     switch (_selectedTemplate) {
       case 1:
-        return _buildGpsArtTemplate();
+        return _buildMapTemplate();
       case 2:
         return _buildBadgeTemplate();
       case 0:
       default:
-        return _buildMinimalStravaTemplate();
+        return _buildMinimalTemplate();
     }
   }
 
   // ==========================================
-  // TEMPLATE 1: TỐI GIẢN (CHUẨN STRAVA MINIMAL)
+  // TEMPLATE 1: TỐI GIẢN (MINIMAL STATS)
   // ==========================================
-  Widget _buildMinimalStravaTemplate() {
+  Widget _buildMinimalTemplate() {
     final s = widget.session;
     final dateStr = DateFormat('dd/MM/yyyy • HH:mm').format(s.startTime);
 
@@ -553,7 +581,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
               _buildDivider(),
               _buildMiniStat('PACE', '${s.formattedPace} /km'),
               _buildDivider(),
-              _buildMiniStat('CALORIES', '${s.calories} kcal'),
+              _buildMiniStat('CALO', '${s.calories} kcal'),
             ],
           ),
         ],
@@ -562,9 +590,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   }
 
   // ==========================================
-  // TEMPLATE 2: NEON GPS ART (VẼ LỘ TRÌNH GPS NỔI)
+  // TEMPLATE 2: BẢN ĐỒ GPS (ROUTE OVERLAY)
   // ==========================================
-  Widget _buildGpsArtTemplate() {
+  Widget _buildMapTemplate() {
     final s = widget.session;
 
     return Padding(
@@ -574,10 +602,10 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
           // Logo top
           Row(
             children: const [
-              Icon(Icons.share_location_rounded, color: AppTheme.secondaryNeon, size: 18),
+              Icon(Icons.route_rounded, color: AppTheme.secondaryNeon, size: 18),
               SizedBox(width: 6),
               Text(
-                'LỘ TRÌNH CHẠY BỘ GPS',
+                'BẢN ĐỒ LỘ TRÌNH',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
