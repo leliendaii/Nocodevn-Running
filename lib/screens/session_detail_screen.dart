@@ -10,7 +10,7 @@ import '../widgets/top_sync_toast.dart';
 import 'route_flyover_3d_screen.dart';
 
 /// Màn hình Xem Chi Tiết 1 Buổi Chạy (Trang riêng Navigation, Flat 2 màu Đỏ & Xanh)
-class SessionDetailScreen extends StatelessWidget {
+class SessionDetailScreen extends StatefulWidget {
   final RunSession session;
 
   const SessionDetailScreen({
@@ -19,7 +19,39 @@ class SessionDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<SessionDetailScreen> createState() => _SessionDetailScreenState();
+}
+
+class _SessionDetailScreenState extends State<SessionDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
     final timeFormat = DateFormat('HH:mm:ss');
     final dateFormat = DateFormat('dd/MM/yyyy');
     final running = context.watch<RunningProvider>();
@@ -67,10 +99,12 @@ class SessionDetailScreen extends StatelessWidget {
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ==========================================
             // 1. THẺ THÔNG TIN BUỔI CHẠY (CĂN GIỮA TOÀN BỘ)
@@ -274,49 +308,84 @@ class SessionDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-      // Nút 'Xem quá trình' nhỏ gọn, dính ở giữa, bên dưới (không có icon)
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.secondaryNeon, // Màu Xanh #139EFE
-                  foregroundColor: Colors.white,
-                  elevation: 6,
-                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 11),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  shadowColor: AppTheme.secondaryNeon.withValues(alpha: 0.45),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) => RouteFlyover3DScreen(session: session),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(opacity: animation, child: child);
-                      },
-                      transitionDuration: const Duration(milliseconds: 240),
-                      reverseTransitionDuration: const Duration(milliseconds: 180),
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Xem quá trình',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-            ],
+
+      // Nút 'Xem quá trình' lơ lửng ở giữa, bên dưới với animation nhẹ nhàng & nền trong suốt (KHÔNG nền đen)
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 18,
+        child: SafeArea(
+          child: Center(
+            child: _buildAnimatedProcessButton(context),
           ),
         ),
       ),
+    ],
+  ),
+);
+  }
+
+  Widget _buildAnimatedProcessButton(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF139EFE).withValues(
+                    alpha: 0.35 + 0.30 * _pulseController.value,
+                  ),
+                  blurRadius: 10 + 8 * _pulseController.value,
+                  spreadRadius: 1 + 2 * _pulseController.value,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.secondaryNeon, // Màu Xanh #139EFE
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: BorderSide(
+                    color: Colors.white.withValues(
+                      alpha: 0.25 + 0.25 * _pulseController.value,
+                    ),
+                    width: 1.0,
+                  ),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        RouteFlyover3DScreen(session: widget.session),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    transitionDuration: const Duration(milliseconds: 240),
+                    reverseTransitionDuration: const Duration(milliseconds: 180),
+                  ),
+                );
+              },
+              child: const Text(
+                'Xem quá trình',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -435,7 +504,7 @@ class SessionDetailScreen extends StatelessWidget {
             ),
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await running.deleteRunSession(session.id);
+              await running.deleteRunSession(widget.session.id);
               if (context.mounted) {
                 TopSyncToast.show(context, message: 'Đã xóa buổi chạy thành công!');
                 Navigator.of(context).pop(); // Quay lại trang lịch sử
