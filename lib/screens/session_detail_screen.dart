@@ -309,15 +309,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
         ),
       ),
 
-      // Nút 'Xem quá trình' lơ lửng ở giữa, bên dưới với animation nhẹ nhàng & nền trong suốt (KHÔNG nền đen)
+      // Nút 'Xem quá trình' sát xuống gần dưới, cách bottom đúng 15px
       Positioned(
         left: 0,
         right: 0,
-        bottom: 18,
-        child: SafeArea(
-          child: Center(
-            child: _buildAnimatedProcessButton(context),
-          ),
+        bottom: 15,
+        child: Center(
+          child: _buildAnimatedProcessButton(context),
         ),
       ),
     ],
