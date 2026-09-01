@@ -1798,7 +1798,8 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       final Matrix4 matrix = Matrix4.identity();
       matrix.translateByDouble(screenCenterX, runnerScreenY, 0.0, 1.0);
       matrix.setEntry(3, 2, perspectiveD);
-      matrix.rotateX(camPitch);
+      // GÓC NGHIÊNG TỪ SAU VỀ TRƯỚC VÀ DƯỚI LÊN TRÊN: -camPitch làm đỉnh màn hình xa dần về chân trời
+      matrix.rotateX(-camPitch);
       if (camAngle.abs() > 0.001) {
         matrix.rotateZ(-camAngle);
       }
@@ -1817,7 +1818,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN 100% TOÀN MÀN HÌNH (KHÔNG BAO GIỜ THIẾU GÓC)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadius = camPitch > 0.05 ? 9 : 5;
+    final int tileRadius = camPitch > 0.05 ? 10 : 5;
 
     final Color mapBgColor = mapType == 'satellite'
         ? const Color(0xFF0F172A)
