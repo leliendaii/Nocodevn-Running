@@ -12,8 +12,10 @@ class LiveWorkoutNotificationService {
   static bool _isInitialized = false;
   static const int _notificationId = 888;
   static const int _reminderNotificationId = 999;
-  static const String _channelId = 'live_workout_tracking_channel';
+  static const String _channelId = 'live_workout_silent_tracking_v3';
   static const String _channelName = 'Theo dõi chạy bộ trực tiếp';
+  static DateTime? _lastNotificationUpdate;
+  static bool? _lastPausedState;
 
   /// Khởi tạo kênh thông báo hệ thống
   static Future<void> initialize() async {
@@ -119,7 +121,7 @@ class LiveWorkoutNotificationService {
     }
   }
 
-  /// Cập nhật thông số trực tiếp lên Trung tâm thông báo & Màn hình khóa
+  /// Cập nhật thông số trực tiếp lên Trung tâm thông báo & Màn hình khóa (Chạy ngầm êm ái, không popup làm phiền)
   static Future<void> updateWorkoutNotification({
     required double distanceKm,
     required int durationSeconds,
@@ -128,6 +130,17 @@ class LiveWorkoutNotificationService {
     required bool isPaused,
   }) async {
     try {
+      // 1. Cơ chế throttle chống spam: Nếu không đổi trạng thái (pause/resume) thì chỉ cập nhật tối đa 1 lần mỗi 3 giây
+      final now = DateTime.now();
+      final bool stateChanged = _lastPausedState != isPaused;
+      if (!stateChanged && _lastNotificationUpdate != null) {
+        if (now.difference(_lastNotificationUpdate!).inSeconds < 3) {
+          return; // Bỏ qua cập nhật quá dày đặc để chống spam và tiết kiệm pin
+        }
+      }
+      _lastNotificationUpdate = now;
+      _lastPausedState = isPaused;
+
       if (!_isInitialized) await initialize();
 
       final int hours = durationSeconds ~/ 3600;
@@ -149,12 +162,13 @@ class LiveWorkoutNotificationService {
         _channelName,
         channelDescription: 'Hiển thị thông số chạy bộ thời gian thực',
         importance: Importance.low,
-        priority: Priority.high,
+        priority: Priority.low, // Bắt buộc Priority.low để KHÔNG bị popup banner che màn hình mỗi vài giây
         icon: '@mipmap/ic_launcher',
         ongoing: true, // Ghim trên thanh thông báo không bị vuốt mất khi đang chạy
         autoCancel: false,
-        onlyAlertOnce: true, // Không rung chuông mỗi giây
+        onlyAlertOnce: true, // Tuyệt đối không rung chuông / âm thanh mỗi khi nhảy số
         showWhen: false,
+        category: AndroidNotificationCategory.workout,
         styleInformation: BigTextStyleInformation(
           '⏱️ Thời gian: $timeStr\n⚡ Pace: $pace /km\n🔥 Calo: $calories kcal',
           contentTitle: title,
@@ -170,6 +184,7 @@ class LiveWorkoutNotificationService {
         presentList: true,
         categoryIdentifier: 'workout_tracking',
         threadIdentifier: 'running_workout',
+        interruptionLevel: InterruptionLevel.passive,
       );
 
       final details = NotificationDetails(
@@ -191,6 +206,8 @@ class LiveWorkoutNotificationService {
   /// Xóa thông báo khi kết thúc buổi chạy
   static Future<void> cancelWorkoutNotification() async {
     try {
+      _lastNotificationUpdate = null;
+      _lastPausedState = null;
       await _notifications.cancel(_notificationId);
     } catch (e) {
       debugPrint('Lỗi hủy thông báo: $e');
