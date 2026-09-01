@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -30,7 +31,7 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
   final GlobalKey _previewKey = GlobalKey();
   final ImagePicker _picker = ImagePicker();
 
-  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
   int _selectedTemplate = 0; // 0: Tối giản, 1: Bản đồ, 2: Huy hiệu
   bool _isExporting = false;
 
@@ -97,8 +98,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
         maxWidth: 1920,
       );
       if (picked != null) {
+        final bytes = await picked.readAsBytes();
         setState(() {
-          _selectedImage = File(picked.path);
+          _selectedImageBytes = bytes;
         });
       }
     } catch (e) {
@@ -542,9 +544,9 @@ class _RunningPhotoShareScreenState extends State<RunningPhotoShareScreen> {
                           fit: StackFit.expand,
                           children: [
                             // 1. Ảnh nền (Ảnh user chọn hoặc Nền chạy bộ marathon mặc định siêu nét)
-                            if (_selectedImage != null)
-                              Image.file(
-                                _selectedImage!,
+                            if (_selectedImageBytes != null)
+                              Image.memory(
+                                _selectedImageBytes!,
                                 fit: BoxFit.cover,
                               )
                             else
