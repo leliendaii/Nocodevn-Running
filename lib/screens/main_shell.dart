@@ -68,7 +68,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final running = context.read<RunningProvider>();
     if (auth.currentUser != null) {
       running.loadAutoEndConfigForUser(auth.currentUser!.id);
-      running.checkDailyReminder(auth.currentUser!.id);
     }
 
     // CHỈ khôi phục buổi chạy cũ khi App KHỞI ĐỘNG LẠI TỪ ĐẦU (Cold start & state idle)

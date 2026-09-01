@@ -72,7 +72,6 @@ class RunningProvider with ChangeNotifier {
   bool _reminderEnabled = true;
   int _reminderHour = 5;
   int _reminderMinute = 30;
-  DateTime? _lastReminderTriggerDate;
 
   // Haptic & Milestone callback cho mỗi 1 KM hoàn thành (giống Nike Run Club / Strava)
   int _lastMilestoneKm = 0;
@@ -87,11 +86,6 @@ class RunningProvider with ChangeNotifier {
   RunningProvider() {
     _loadInitialSessions();
     _loadUserProfiles();
-
-    // Heartbeat Timer: Tự động quét kiểm tra nhắc nhở siêu nhẹ (15 giây/lần, 0% CPU, 0 tốn pin)
-    Timer.periodic(const Duration(seconds: 15), (_) {
-      checkDailyReminder(_activeUserId ?? 'default_user');
-    });
   }
 
   /// Tải danh sách profile thật của tất cả user từ Cloud
@@ -106,7 +100,6 @@ class RunningProvider with ChangeNotifier {
         }
       }
       notifyListeners();
-      checkDailyReminder(_activeUserId ?? 'default_user');
     }
   }
 
@@ -138,9 +131,6 @@ class RunningProvider with ChangeNotifier {
       }
 
       notifyListeners();
-      if (_activeUserId != null) {
-        checkDailyReminder(_activeUserId!);
-      }
 
       // Đồng bộ offline chạy ngầm trong nền không gây đơ kéo vuốt
       _syncPendingOfflineRuns();
@@ -259,7 +249,6 @@ class RunningProvider with ChangeNotifier {
     _reminderEnabled = enabled;
     _reminderHour = hour;
     _reminderMinute = minute;
-    _lastReminderTriggerDate = null;
 
     await LocalStorageService.saveReminderConfig(
       userId: userId,
@@ -281,44 +270,6 @@ class RunningProvider with ChangeNotifier {
     }
 
     notifyListeners();
-  }
-
-  /// Kiểm tra và kích hoạt thông báo nhắc nhở thông minh khi app đang chạy đúng phút cài đặt
-  Future<void> checkDailyReminder(String userId) async {
-    if (!_reminderEnabled) return;
-    final now = DateTime.now();
-
-    // 1. Chỉ kích hoạt khi thời gian hiện tại đúng khớp với giờ & phút đã cài
-    if (now.hour != _reminderHour || now.minute != _reminderMinute) {
-      return;
-    }
-
-    // 2. Nếu hôm nay đã gửi nhắc nhở rồi thì không lặp lại
-    if (_lastReminderTriggerDate != null &&
-        _lastReminderTriggerDate!.year == now.year &&
-        _lastReminderTriggerDate!.month == now.month &&
-        _lastReminderTriggerDate!.day == now.day) {
-      return;
-    }
-
-    // 3. Kiểm tra xem người dùng hôm nay đã có buổi chạy nào chưa
-    final userRuns = _sessions.where((s) => s.userId == userId).toList();
-    final bool hasRunToday = userRuns.any((s) =>
-        s.startTime.year == now.year &&
-        s.startTime.month == now.month &&
-        s.startTime.day == now.day);
-
-    if (hasRunToday) {
-      // Đã hoàn thành bài chạy hôm nay -> Không cần nhắc
-      return;
-    }
-
-    _lastReminderTriggerDate = now;
-    final timeStr = '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
-    await LiveWorkoutNotificationService.showMorningReminderNotification(
-      title: '⏰ Đã đến giờ chạy bộ ($timeStr)',
-      body: 'Hãy mang giày vào và bắt đầu buổi chạy hôm nay để duy trì sức khỏe nhé!',
-    );
   }
 
   /// Tải dữ liệu kết hợp Offline Cache & Supabase Cloud
