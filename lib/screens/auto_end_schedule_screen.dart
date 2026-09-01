@@ -4,7 +4,6 @@ import '../providers/auth_provider.dart';
 import '../providers/running_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
-import '../services/live_workout_notification_service.dart';
 
 class AutoEndScheduleScreen extends StatelessWidget {
   const AutoEndScheduleScreen({super.key});
@@ -383,37 +382,6 @@ class AutoEndScheduleScreen extends StatelessWidget {
                                 const Icon(Icons.edit_outlined, size: 14, color: AppTheme.textMuted),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Nút thử nghiệm thông báo
-                        SizedBox(
-                          width: double.infinity,
-                          height: 42,
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.primaryNeon,
-                              side: const BorderSide(color: AppTheme.primaryNeon, width: 1.2),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.notifications_active_rounded, size: 18),
-                            label: const Text(
-                              'THỬ BẮN THÔNG BÁO RA MÀN HÌNH',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                            ),
-                            onPressed: () async {
-                              final effectiveName = user?.name ?? running.getUserRealName(userId, 'Người chạy');
-                              await LiveWorkoutNotificationService.showMorningReminderNotification(
-                                title: '⏰ Đã đến $reminderStr rồi, $effectiveName ơi!',
-                                body: 'Đã đến $reminderStr! $effectiveName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
-                              );
-                              if (context.mounted) {
-                                TopSyncToast.show(
-                                  context,
-                                  message: 'Đã gửi thông báo thử nghiệm ra màn hình!',
-                                );
-                              }
-                            },
                           ),
                         ),
                       ],

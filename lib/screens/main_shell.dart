@@ -18,6 +18,7 @@ import 'auto_end_schedule_screen.dart';
 import 'account_info_screen.dart';
 import '../services/voice_coach_service.dart';
 import '../services/live_workout_notification_service.dart';
+import '../services/local_storage_service.dart';
 import '../widgets/top_sync_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -33,7 +34,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   TimeFilter _personalFilter = TimeFilter.week;
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   Timer? _reminderCheckTimer;
-  String? _lastReminderTriggeredKey;
   bool _isShowingReminderDialog = false;
 
   @override
@@ -63,25 +63,34 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (!running.reminderEnabled) return;
 
     final now = DateTime.now();
-    if (now.hour == running.reminderHour && now.minute == running.reminderMinute) {
-      final triggerKey = '${now.year}-${now.month}-${now.day}-${now.hour}-${now.minute}';
-      if (_lastReminderTriggeredKey == triggerKey) return;
-      _lastReminderTriggeredKey = triggerKey;
+    // Kiểm tra đúng giờ & phút hẹn (hoặc trong khoảng 3 phút đầu khi người dùng vừa mở app lên)
+    final isExactMinute = (now.hour == running.reminderHour && now.minute == running.reminderMinute);
+    final isWithinWindow = (now.hour == running.reminderHour &&
+        now.minute >= running.reminderMinute &&
+        now.minute <= running.reminderMinute + 3);
 
+    if (isExactMinute || isWithinWindow) {
       final auth = context.read<AuthProvider>();
       final userId = auth.currentUser?.id ?? '';
+      final todayKey = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final userName = auth.currentUser?.name ?? running.getUserRealName(userId, 'Bạn');
       final timeStr = '${running.reminderHour.toString().padLeft(2, '0')}:${running.reminderMinute.toString().padLeft(2, '0')}';
 
-      // 1. Gửi thông báo ra thanh trạng thái / màn hình khóa
-      LiveWorkoutNotificationService.showMorningReminderNotification(
-        title: '⏰ Đã đến $timeStr rồi, $userName ơi!',
-        body: 'Đã đến $timeStr! $userName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
-      );
+      // 1. Chỉ bắn thông báo hệ thống ngoài màn hình NẾU HÔM NAY CHƯA BẮN (Tuyệt đối không bắn đúp)
+      final lastNotifDate = LocalStorageService.getLastReminderNotificationDate(userId);
+      if (lastNotifDate != todayKey) {
+        LocalStorageService.saveLastReminderNotificationDate(userId, todayKey);
+        LiveWorkoutNotificationService.showMorningReminderNotification(
+          title: '⏰ Đã đến $timeStr rồi, $userName ơi!',
+          body: 'Đã đến $timeStr! $userName hãy mang giày lên và chạy ngay đi, cùng chinh phục mục tiêu hôm nay nhé! 🔥🏃‍♂️',
+        );
+      }
 
-      // 2. Nếu đang mở app -> Hiện popup rung nhẹ nhẹ
-      if (!_isShowingReminderDialog && mounted) {
+      // 2. Nếu đang mở app -> Hiện sẵn popup nhắc nhở rung nhẹ nhẹ (chỉ hiện 1 lần/ngày)
+      final lastPopupDate = LocalStorageService.getLastReminderPopupDate(userId);
+      if (lastPopupDate != todayKey && !_isShowingReminderDialog && mounted) {
         _isShowingReminderDialog = true;
+        LocalStorageService.saveLastReminderPopupDate(userId, todayKey);
         AnimatedReminderDialog.show(
           context,
           userName: userName,

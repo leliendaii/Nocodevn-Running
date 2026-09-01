@@ -587,5 +587,27 @@ class LocalStorageService {
       };
     }
   }
+
+  /// Lấy ngày cuối cùng đã gửi thông báo hệ thống nhắc nhở ra ngoài màn hình
+  static String? getLastReminderNotificationDate(String userId) {
+    return _cachedPrefs?.getString('last_reminder_notif_$userId');
+  }
+
+  /// Lưu ngày đã gửi thông báo hệ thống ra ngoài màn hình
+  static Future<void> saveLastReminderNotificationDate(String userId, String dateKey) async {
+    final prefs = await _getPrefs();
+    await prefs.setString('last_reminder_notif_$userId', dateKey);
+  }
+
+  /// Lấy ngày cuối cùng đã hiển thị popup nhắc nhở trong app
+  static String? getLastReminderPopupDate(String userId) {
+    return _cachedPrefs?.getString('last_reminder_popup_$userId');
+  }
+
+  /// Lưu ngày đã hiển thị popup nhắc nhở trong app
+  static Future<void> saveLastReminderPopupDate(String userId, String dateKey) async {
+    final prefs = await _getPrefs();
+    await prefs.setString('last_reminder_popup_$userId', dateKey);
+  }
 }
 
