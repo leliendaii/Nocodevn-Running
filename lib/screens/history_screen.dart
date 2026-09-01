@@ -561,8 +561,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     // Tính toán số liệu tổng kết dựa trên kết quả ĐÃ LỌC
     final double totalKm = filteredSessions.fold(0.0, (sum, s) => sum + s.distanceKm);
     final int totalSeconds = filteredSessions.fold(0, (sum, s) => sum + s.durationSeconds);
-    final int hours = totalSeconds ~/ 3600;
-    final int minutes = (totalSeconds % 3600) ~/ 60;
 
     final isFiltered = _filterType != HistoryDateFilterType.all;
 
@@ -730,19 +728,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         const Divider(height: 1, color: AppTheme.divider),
                         const SizedBox(height: 18),
 
-                        // 3 Chỉ số lớn thể thao - Căn chỉnh rộng rãi & Tự co dãn chống tràn số to
+                        // 3 Chỉ số lớn thể thao - Căn giữa 100% đối xứng & Thời gian tính bằng Giờ
                         Row(
                           children: [
-                            // 1. Tổng Cự Ly
+                            // 1. Tổng Cự Ly (KM) - Căn giữa
                             Expanded(
-                              flex: 11,
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
+                                    alignment: Alignment.center,
                                     child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       crossAxisAlignment: CrossAxisAlignment.baseline,
                                       textBaseline: TextBaseline.alphabetic,
                                       children: [
@@ -773,7 +771,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 10.5,
                                       fontWeight: FontWeight.bold,
                                       color: AppTheme.textMuted,
                                       letterSpacing: 0.3,
@@ -783,83 +781,91 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
 
-                            Container(width: 1, height: 40, color: AppTheme.divider),
+                            Container(width: 1, height: 38, color: AppTheme.divider),
 
-                            // 2. Buổi chạy
+                            // 2. Buổi chạy - Căn giữa
                             Expanded(
-                              flex: 9,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        '${filteredSessions.length}',
-                                        style: const TextStyle(
-                                          fontSize: 23,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppTheme.secondaryNeon,
-                                          height: 1.0,
-                                        ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '${filteredSessions.length}',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.secondaryNeon,
+                                        height: 1.0,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
-                                    const Text(
-                                      'BUỔI CHẠY',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.textMuted,
-                                        letterSpacing: 0.3,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'BUỔI CHẠY',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textMuted,
+                                      letterSpacing: 0.3,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
 
-                            Container(width: 1, height: 40, color: AppTheme.divider),
+                            Container(width: 1, height: 38, color: AppTheme.divider),
 
-                            // 3. Thời gian
+                            // 3. Thời gian tính bằng GIỜ (H) - Căn giữa
                             Expanded(
-                              flex: 11,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        hours > 0 ? '${hours}h ${minutes}p' : '${minutes}p',
-                                        style: const TextStyle(
-                                          fontSize: 23,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppTheme.textPrimary,
-                                          height: 1.0,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          (totalSeconds / 3600.0).toStringAsFixed(1),
+                                          style: const TextStyle(
+                                            fontSize: 25,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.textPrimary,
+                                            height: 1.0,
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 3),
+                                        const Text(
+                                          'H',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 6),
-                                    const Text(
-                                      'THỜI GIAN',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.textMuted,
-                                        letterSpacing: 0.3,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'THỜI GIAN',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textMuted,
+                                      letterSpacing: 0.3,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
