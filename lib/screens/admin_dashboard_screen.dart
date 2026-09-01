@@ -9,6 +9,8 @@ import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/user_avatar.dart';
 import 'admin_create_run_screen.dart';
+import 'session_detail_screen.dart';
+import 'route_flyover_3d_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -990,96 +992,239 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   itemCount: displaySessions.length,
                   itemBuilder: (context, index) {
                     final session = displaySessions[index];
-                    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+                    final dateFormat = DateFormat('dd/MM/yyyy • HH:mm');
                     final realName = running.getUserRealName(session.userId, session.userName);
                     final realAvatar = running.getUserRealAvatar(session.userId);
                     final isAdmin = running.isUserAdmin(session.userId);
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          children: [
-                            Row(
+                    final sessionName = session.notes.trim().isNotEmpty
+                        ? session.notes.trim()
+                        : 'Buổi chạy ${DateFormat('dd/MM/yyyy').format(session.startTime)}';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.divider),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => SessionDetailScreen(session: session),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(14.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                UserAvatar(
-                                  avatarUrl: realAvatar,
-                                  name: realName,
-                                  radius: 16,
-                                  isAdmin: isAdmin,
+                                // 1. Header: Avatar + Tên VĐV + Cự ly & Các nút Sửa/Xóa
+                                Row(
+                                  children: [
+                                    UserAvatar(
+                                      avatarUrl: realAvatar,
+                                      name: realName,
+                                      radius: 18,
+                                      isAdmin: isAdmin,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            realName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            dateFormat.format(session.startTime),
+                                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Badge Cự ly KM
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryNeon.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: AppTheme.primaryNeon.withValues(alpha: 0.4)),
+                                      ),
+                                      child: Text(
+                                        '${session.formattedDistance} KM',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.primaryNeon,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+
+                                    // Nút SỬA
+                                    IconButton(
+                                      tooltip: 'Chỉnh sửa',
+                                      visualDensity: VisualDensity.compact,
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: AppTheme.secondaryNeon.withValues(alpha: 0.15),
+                                        padding: const EdgeInsets.all(6),
+                                      ),
+                                      icon: const Icon(Icons.edit_rounded, color: AppTheme.secondaryNeon, size: 14),
+                                      onPressed: () => _showEditRunDialog(context, session),
+                                    ),
+                                    const SizedBox(width: 4),
+
+                                    // Nút XÓA
+                                    IconButton(
+                                      tooltip: 'Xóa buổi chạy',
+                                      visualDensity: VisualDensity.compact,
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: AppTheme.danger.withValues(alpha: 0.15),
+                                        padding: const EdgeInsets.all(6),
+                                      ),
+                                      icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 14),
+                                      onPressed: () => _confirmDelete(context, session),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        realName,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+
+                                const SizedBox(height: 10),
+
+                                // 2. Tên buổi chạy
+                                Row(
+                                  children: [
+                                    const Icon(Icons.edit_note_rounded, size: 16, color: AppTheme.secondaryNeon),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        sessionName,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppTheme.textPrimary,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      Text(
-                                        dateFormat.format(session.startTime),
-                                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 10),
+                                const Divider(height: 1, color: AppTheme.divider),
+                                const SizedBox(height: 10),
+
+                                // 3. 4 Chỉ số thể thao dãn cách thoáng + tự co dãn
+                                Row(
+                                  children: [
+                                    _buildAdminSessionMetric('THỜI GIAN', session.formattedDuration, AppTheme.textPrimary),
+                                    _buildAdminDivider(),
+                                    _buildAdminSessionMetric('PACE', '${session.pace} /km', AppTheme.secondaryNeon),
+                                    _buildAdminDivider(),
+                                    _buildAdminSessionMetric('CALO', '${session.calories}', AppTheme.primaryNeon),
+                                    _buildAdminDivider(),
+                                    _buildAdminSessionMetric('SỐ BƯỚC', session.formattedTotalSteps, AppTheme.textPrimary),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 10),
+
+                                // 4. Thanh nút bấm nhanh: Xem Video 3D Flyover & Xem Chi Tiết Toàn Diện
+                                Row(
+                                  children: [
+                                    // Nút 3D Flyover
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => RouteFlyover3DScreen(session: session),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 7),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.secondaryNeon.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: AppTheme.secondaryNeon.withValues(alpha: 0.35)),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: const [
+                                              Icon(Icons.threed_rotation_rounded, size: 14, color: AppTheme.secondaryNeon),
+                                              SizedBox(width: 5),
+                                              Text(
+                                                'VIDEO 3D FLYOVER',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: AppTheme.secondaryNeon,
+                                                  letterSpacing: 0.4,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                // Nút SỬA
-                                IconButton(
-                                  tooltip: 'Chỉnh sửa KM & Thời gian',
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: AppTheme.secondaryNeon.withValues(alpha: 0.15),
-                                    padding: const EdgeInsets.all(6),
-                                  ),
-                                  icon: const Icon(Icons.edit_rounded, color: AppTheme.secondaryNeon, size: 15),
-                                  onPressed: () => _showEditRunDialog(context, session),
-                                ),
-                                const SizedBox(width: 4),
-                                // Nút XÓA
-                                IconButton(
-                                  tooltip: 'Xóa buổi chạy',
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: AppTheme.danger.withValues(alpha: 0.15),
-                                    padding: const EdgeInsets.all(6),
-                                  ),
-                                  icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 15),
-                                  onPressed: () => _confirmDelete(context, session),
+                                    ),
+                                    const SizedBox(width: 8),
+
+                                    // Nút Xem Chi Tiết
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => SessionDetailScreen(session: session),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 7),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.surfaceLight,
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: AppTheme.divider),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: const [
+                                              Icon(Icons.bar_chart_rounded, size: 14, color: AppTheme.textSecondary),
+                                              SizedBox(width: 5),
+                                              Text(
+                                                'XEM CHI TIẾT',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: AppTheme.textSecondary,
+                                                  letterSpacing: 0.4,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceLight,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                children: [
-                                  _buildMiniStat('Quãng đường', '${session.formattedDistance} km', AppTheme.primaryNeon),
-                                  _buildMiniStat('Thời gian', session.formattedDuration, AppTheme.textPrimary),
-                                  _buildMiniStat('Pace', '${session.avgPace} /km', AppTheme.secondaryNeon),
-                                  _buildMiniStat('Calo', '${session.calories}', AppTheme.accentOrange),
-                                ],
-                              ),
-                            ),
-                            if (session.notes.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '📝 ${session.notes}',
-                                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ],
+                          ),
                         ),
                       ),
                     );
@@ -1151,12 +1296,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textMuted)),
-      ],
+
+  Widget _buildAdminSessionMetric(String label, String value, Color valueColor) {
+    return Expanded(
+      child: Column(
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w900,
+                color: valueColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminDivider() {
+    return Container(
+      width: 1,
+      height: 20,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      color: AppTheme.divider,
     );
   }
 
