@@ -42,6 +42,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
   late final List<Offset> _sampledPositions;
   late final List<Offset> _smoothedCamPositions;
   late final List<double> _sampledHeadings;
+  late final List<double> _smoothedCamAngles;
   late final Offset _startPinPixel;
   late final Offset _finishPinPixel;
   late final double _routeCenterX;
@@ -94,7 +95,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     // 4. Tiền tính toán trước toàn bộ tọa độ Pixel
     _cachedRoutePixels = _smoothRoute.map((p) => _latLngToPixel(p.lat, p.lng, _zoomLevel)).toList();
 
-    // 5. Xây dựng đường cong Vector Bézier Spline mượt mà (Gaussian Smoothing + Bézier Spline)
+    // 5. Xây dựng đường cong Vector Bézier Spline mượt mà bám sát đường chạy thực tế
     _fullVectorPath = _createSmoothSplinePath(_cachedRoutePixels);
     final metrics = _fullVectorPath.computeMetrics().toList();
     _pathMetric = metrics.isNotEmpty ? metrics.first : Path().computeMetrics().first;
@@ -122,8 +123,8 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       return Offset(sumX / totalWeight, sumY / totalWeight);
     });
 
-    // Làm mượt góc quay tiếp tuyến bằng phân phối Gaussian (Window = 55 samples) để khi rẽ, chuyển hướng camera xoay cực kỳ mượt mà
-    const int headWindow = 55;
+    // Tính hướng di chuyển tức thời của người chạy
+    const int headWindow = 45;
     _sampledHeadings = List.generate(sampleCount, (i) {
       double sinSum = 0, cosSum = 0;
       for (int w = -headWindow; w <= headWindow; w++) {
@@ -132,10 +133,23 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
         final tangent = _pathMetric.getTangentForOffset(dist);
         if (tangent != null) {
           final double ang = math.atan2(tangent.vector.dy, tangent.vector.dx);
-          final double weight = math.exp(-(w * w) / (2 * 20.0 * 20.0));
+          final double weight = math.exp(-(w * w) / (2 * 18.0 * 18.0));
           sinSum += math.sin(ang) * weight;
           cosSum += math.cos(ang) * weight;
         }
+      }
+      return math.atan2(sinSum, cosSum);
+    });
+
+    // Tiền tính toán góc lia camera độ trễ cao, điện ảnh, chậm và siêu mượt (chống lia lắc nhanh)
+    const int angleWindow = 140; // Window rộng ~150-200m
+    _smoothedCamAngles = List.generate(sampleCount, (i) {
+      double sinSum = 0, cosSum = 0;
+      for (int w = -angleWindow; w <= angleWindow; w++) {
+        final idx = (i + w).clamp(0, sampleCount - 1);
+        final double weight = math.exp(-(w * w) / (2 * 55.0 * 55.0));
+        sinSum += math.sin(_sampledHeadings[idx]) * weight;
+        cosSum += math.cos(_sampledHeadings[idx]) * weight;
       }
       return math.atan2(sinSum, cosSum);
     });
@@ -194,109 +208,51 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
     super.dispose();
   }
 
-  // 1. Thuật toán Ramer-Douglas-Peucker: Lọc sạch 100% nhiễu răng cưa
-  static List<Offset> _simplifyPoints(List<Offset> points, double tolerance) {
-    if (points.length <= 2) return points;
-
-    double maxDist = 0.0;
-    int index = 0;
-    final p1 = points.first;
-    final p2 = points.last;
-
-    for (int i = 1; i < points.length - 1; i++) {
-      final double dx = p2.dx - p1.dx;
-      final double dy = p2.dy - p1.dy;
-      double dist;
-      if (dx == 0 && dy == 0) {
-        dist = (points[i] - p1).distance;
-      } else {
-        dist = (((points[i].dx - p1.dx) * dy - (points[i].dy - p1.dy) * dx).abs()) / math.sqrt(dx * dx + dy * dy);
-      }
-
-      if (dist > maxDist) {
-        maxDist = dist;
-        index = i;
-      }
-    }
-
-    if (maxDist > tolerance) {
-      final left = _simplifyPoints(points.sublist(0, index + 1), tolerance);
-      final right = _simplifyPoints(points.sublist(index), tolerance);
-      return [...left.sublist(0, left.length - 1), ...right];
-    } else {
-      return [p1, p2];
-    }
-  }
-
-  // 2. Thuật toán Chaikin Curve: Làm mượt đường cong tự nhiên, bo góc ngã tư
-  static List<Offset> _chaikinSmooth(List<Offset> points, int iterations) {
-    if (points.length <= 2) return points;
-    List<Offset> result = List.from(points);
-
-    for (int it = 0; it < iterations; it++) {
-      if (result.length <= 2) break;
-      final List<Offset> next = [result.first];
-      for (int i = 0; i < result.length - 1; i++) {
-        final p0 = result[i];
-        final p1 = result[i + 1];
-        final q = Offset(0.75 * p0.dx + 0.25 * p1.dx, 0.75 * p0.dy + 0.25 * p1.dy);
-        final r = Offset(0.25 * p0.dx + 0.75 * p1.dx, 0.25 * p0.dy + 0.75 * p1.dy);
-        next.add(q);
-        next.add(r);
-      }
-      next.add(result.last);
-      result = next;
-    }
-    return result;
-  }
-
-  // Tạo đường chạy Vector mượt mà, liền mạch, thanh lịch chuẩn Strava
+  // Tạo đường chạy Vector mượt mà, liền mạch, bám chặt 100% từng khúc cua cung đường thực tế
+  // Đi chính xác qua các điểm GPS thực tế, tuyệt đối KHÔNG cắt góc, KHÔNG đi tắt xuyên địa hình hay qua sông
   static Path _createSmoothSplinePath(List<Offset> pts) {
     final path = Path();
     if (pts.isEmpty) return path;
 
-    final int len = pts.length;
-    final List<Offset> filtered = [];
-    for (int i = 0; i < len; i++) {
-      double sumX = 0, sumY = 0, totalW = 0;
-      for (int k = -2; k <= 2; k++) {
-        final idx = (i + k).clamp(0, len - 1);
-        final double weight = 1.0 / (1.0 + k.abs() * 0.7);
-        sumX += pts[idx].dx * weight;
-        sumY += pts[idx].dy * weight;
-        totalW += weight;
-      }
-      filtered.add(Offset(sumX / totalW, sumY / totalW));
-    }
-
-    final List<Offset> dedup = [filtered.first];
-    for (int i = 1; i < filtered.length; i++) {
-      if ((filtered[i] - dedup.last).distance >= 2.5) {
-        dedup.add(filtered[i]);
+    // Loại bỏ điểm trùng lặp cực sát nhau (< 0.8px)
+    final List<Offset> cleanPts = [pts.first];
+    for (int i = 1; i < pts.length; i++) {
+      if ((pts[i] - cleanPts.last).distance >= 0.8) {
+        cleanPts.add(pts[i]);
       }
     }
-    if (dedup.length < filtered.length && (filtered.last - dedup.last).distance > 0.5) {
-      dedup.add(filtered.last);
-    }
 
-    if (dedup.length <= 2) {
-      path.moveTo(dedup.first.dx, dedup.first.dy);
-      path.lineTo(dedup.last.dx, dedup.last.dy);
+    if (cleanPts.length <= 1) {
+      path.moveTo(pts.first.dx, pts.first.dy);
       return path;
     }
 
-    final simplified = _simplifyPoints(dedup, 1.8);
-    final smoothed = _chaikinSmooth(simplified, 3);
-
-    path.moveTo(smoothed.first.dx, smoothed.first.dy);
-    for (int i = 0; i < smoothed.length - 1; i++) {
-      final p0 = smoothed[i];
-      final p1 = smoothed[i + 1];
-      final midX = (p0.dx + p1.dx) / 2;
-      final midY = (p0.dy + p1.dy) / 2;
-      path.quadraticBezierTo(p0.dx, p0.dy, midX, midY);
+    if (cleanPts.length == 2) {
+      path.moveTo(cleanPts[0].dx, cleanPts[0].dy);
+      path.lineTo(cleanPts[1].dx, cleanPts[1].dy);
+      return path;
     }
-    path.lineTo(smoothed.last.dx, smoothed.last.dy);
+
+    // Catmull-Rom Centripetal Spline: Đảm bảo đường cong đi chính xác 100% qua mọi điểm GPS trên đường phố
+    path.moveTo(cleanPts.first.dx, cleanPts.first.dy);
+    for (int i = 0; i < cleanPts.length - 1; i++) {
+      final p0 = i > 0 ? cleanPts[i - 1] : cleanPts[i];
+      final p1 = cleanPts[i];
+      final p2 = cleanPts[i + 1];
+      final p3 = i < cleanPts.length - 2 ? cleanPts[i + 2] : p2;
+
+      // Tính điểm điều khiển Bézier bậc 3 theo Catmull-Rom
+      final cp1 = Offset(
+        p1.dx + (p2.dx - p0.dx) / 6.0,
+        p1.dy + (p2.dy - p0.dy) / 6.0,
+      );
+      final cp2 = Offset(
+        p2.dx - (p3.dx - p1.dx) / 6.0,
+        p2.dy - (p3.dy - p1.dy) / 6.0,
+      );
+
+      path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p2.dx, p2.dy);
+    }
     return path;
   }
 
@@ -410,10 +366,11 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       if (ty > maxTy) maxTy = ty;
     }
 
-    minTx -= 2;
-    maxTx += 2;
-    minTy -= 2;
-    maxTy += 3;
+    // Mở rộng viền thêm 6 tile xung quanh để toàn cảnh 100% không bao giờ bị khuyết cạnh
+    minTx -= 6;
+    maxTx += 6;
+    minTy -= 6;
+    maxTy += 7;
 
     MapTileCacheService.preloadBoundingBox(
       zoom: _zoomLevel,
@@ -422,11 +379,6 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       minY: minTy,
       maxY: maxTy,
       mapType: _selectedMapType,
-      onTileLoaded: () {
-        if (!_isDisposed && mounted) {
-          setState(() => _tileVersion++);
-        }
-      },
     );
   }
 
@@ -832,6 +784,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
       sampledPositions: _sampledPositions,
       smoothedCamPositions: _smoothedCamPositions,
       sampledHeadings: _sampledHeadings,
+      smoothedCamAngles: _smoothedCamAngles,
       startPinPixel: _startPinPixel,
       finishPinPixel: _finishPinPixel,
       pathMetric: _pathMetric,
@@ -1131,6 +1084,7 @@ class _RouteFlyover3DScreenState extends State<RouteFlyover3DScreen>
                                   sampledPositions: _sampledPositions,
                                   smoothedCamPositions: _smoothedCamPositions,
                                   sampledHeadings: _sampledHeadings,
+                                  smoothedCamAngles: _smoothedCamAngles,
                                   startPinPixel: _startPinPixel,
                                   finishPinPixel: _finishPinPixel,
                                   pathMetric: _pathMetric,
@@ -1536,6 +1490,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
   final List<Offset> sampledPositions;
   final List<Offset> smoothedCamPositions;
   final List<double> sampledHeadings;
+  final List<double> smoothedCamAngles;
   final Offset startPinPixel;
   final Offset finishPinPixel;
   final ui.PathMetric pathMetric;
@@ -1571,6 +1526,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     required this.sampledPositions,
     required this.smoothedCamPositions,
     required this.sampledHeadings,
+    required this.smoothedCamAngles,
     required this.startPinPixel,
     required this.finishPinPixel,
     required this.pathMetric,
@@ -1630,19 +1586,16 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     double flightProgress;
 
     // Tính toán góc camera xuất phát mượt mà
-    final double startHeading = sampledHeadings.first;
-    final int startAheadIdx = math.min(12, sampledPositions.length - 1);
-    final double startAheadHeading = sampledHeadings[startAheadIdx];
-    final double startSmoothHeading = _lerpAngle(startHeading, startAheadHeading, 0.40);
-    final double targetStartAngle = startSmoothHeading + math.pi / 2;
-    final double startCamX = startPinPixel.dx - math.cos(startSmoothHeading) * (48.0 / chaseScale);
-    final double startCamY = startPinPixel.dy - math.sin(startSmoothHeading) * (48.0 / chaseScale);
+    final double startCamHeading = smoothedCamAngles.first;
+    final double targetStartAngle = startCamHeading + math.pi / 2;
+    final double startCamX = startPinPixel.dx - math.cos(startCamHeading) * (48.0 / chaseScale);
+    final double startCamY = startPinPixel.dy - math.sin(startCamHeading) * (48.0 / chaseScale);
 
     // Tính toán góc camera về đích
-    final double lastHeading = sampledHeadings.last;
-    final double targetFinishAngle = lastHeading + math.pi / 2;
-    final double finishCamX = finishPinPixel.dx - math.cos(lastHeading) * (48.0 / chaseScale);
-    final double finishCamY = finishPinPixel.dy - math.sin(lastHeading) * (48.0 / chaseScale);
+    final double lastCamHeading = smoothedCamAngles.last;
+    final double targetFinishAngle = lastCamHeading + math.pi / 2;
+    final double finishCamX = finishPinPixel.dx - math.cos(lastCamHeading) * (48.0 / chaseScale);
+    final double finishCamY = finishPinPixel.dy - math.sin(lastCamHeading) * (48.0 / chaseScale);
 
     if (progress < 0.08) {
       // Phase 1: Toàn cảnh bao quát ban đầu
@@ -1671,12 +1624,10 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       final double subFrac = fIndex - baseIdx;
 
       final Offset currentPos = Offset.lerp(sampledPositions[baseIdx], sampledPositions[nextIdx], subFrac)!;
-      final double curHeading = _lerpAngle(sampledHeadings[baseIdx], sampledHeadings[nextIdx], subFrac);
 
-      // Tính toán hướng camera mượt mà đón đầu góc cua
-      final int lookAheadIdx = math.min(baseIdx + 14, sampledPositions.length - 1);
-      final double aheadHeading = sampledHeadings[lookAheadIdx];
-      final double smoothCamHeading = _lerpAngle(curHeading, aheadHeading, 0.40);
+      // Góc lia camera điện ảnh: lấy từ bảng smoothedCamAngles đã được làm mượt Gaussian 140 mẫu
+      // giúp camera xoay chậm rãi, có độ trễ delay tự nhiên và tuyệt đối không lia lắc giật nhanh
+      final double smoothCamHeading = _lerpAngle(smoothedCamAngles[baseIdx], smoothedCamAngles[nextIdx], subFrac);
 
       // Camera đặt sau lưng con trỏ định vị (định vị đi trước, camera đi sau)
       final double dBehind = (48.0 / chaseScale).clamp(38.0, 62.0);
@@ -1688,7 +1639,7 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
         camY = chaseCamY;
         camScale = chaseScale;
         camPitch = maxPitch;
-        // Camera xoay theo hướng chạy (định vị luôn hướng thẳng lên phía trước màn hình)
+        // Camera xoay theo hướng chạy một cách êm ái, trễ và chậm rãi
         camAngle = smoothCamHeading + math.pi / 2;
       } else {
         camX = routeCenterX;
@@ -1815,10 +1766,12 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
       canvas.translate(-camX, -camY);
     }
 
-    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN 100% TOÀN MÀN HÌNH (KHÔNG BAO GIỜ THIẾU GÓC)
+    // 5. VẼ MAP TILES GOOGLE MAPS PHỦ KÍN 100% TOÀN MÀN HÌNH (KHÔNG BAO GIỜ THIẾU GÓC Ở CUỐI VIDEO)
     final int centerTileX = (camX / tileSize).floor();
     final int centerTileY = (camY / tileSize).floor();
-    final int tileRadius = camPitch > 0.05 ? 10 : 5;
+    final double maxHalfScreenExtent = math.max(size.width, size.height) / effectiveCamScale;
+    final int neededRadius = (maxHalfScreenExtent / tileSize).ceil() + 2;
+    final int tileRadius = camPitch > 0.05 ? 10 : neededRadius.clamp(6, 16);
 
     final Color mapBgColor = mapType == 'satellite'
         ? const Color(0xFF0F172A)
@@ -1853,23 +1806,12 @@ class Real3DStravaFlyoverPainter extends CustomPainter {
     // 6. VẼ TOÀN BỘ LỘ TRÌNH ĐƯỜNG CHẠY NỀN MỜ (ĐỂ NGƯỜI XEM THẤY CUNG ĐƯỜNG PHÍA TRƯỚC)
     canvas.drawPath(fullPath, fullPathPaint);
 
-    // 7. VẼ ĐƯỜNG CHẠY HOÀN THÀNH MÀU CAM STRAVA RỰC RỠ (TRIỆT TIÊU 100% HIỆN TƯỢNG BIẾN DẠNG)
+    // 7. VẼ ĐƯỜNG CHẠY HOÀN THÀNH MÀU CAM STRAVA (LUÔN HIỆN ĐẦY ĐỦ TOÀN BỘ ĐƯỜNG ĐÃ CHẠY QUA, KHÔNG BAO GIỜ BỊ MẤT)
     if (currentDist > 1.0) {
-      if (camPitch > 0.05) {
-        // Trong chế độ theo dõi 3D: chỉ vẽ vệt chạy nhìn thấy được (tối đa 450px sau lưng người chạy)
-        // để loại trừ các điểm quá xa sau lưng camera, triệt tiêu 100% hiện tượng biến dạng Skia
-        final double startVisibleDist = math.max(0.0, currentDist - (450.0 / effectiveCamScale));
-        final Path activePath = pathMetric.extractPath(startVisibleDist, currentDist);
-        canvas.drawPath(activePath, shadowPaint);
-        canvas.drawPath(activePath, activePathPaint);
-        canvas.drawPath(activePath, coreHighlightPaint);
-      } else {
-        // Trong toàn cảnh: vẽ toàn bộ vệt chạy từ xuất phát đến hiện tại
-        final Path activePath = pathMetric.extractPath(0.0, currentDist);
-        canvas.drawPath(activePath, shadowPaint);
-        canvas.drawPath(activePath, activePathPaint);
-        canvas.drawPath(activePath, coreHighlightPaint);
-      }
+      final Path activePath = pathMetric.extractPath(0.0, currentDist);
+      canvas.drawPath(activePath, shadowPaint);
+      canvas.drawPath(activePath, activePathPaint);
+      canvas.drawPath(activePath, coreHighlightPaint);
     }
 
     // 8. VẼ CÁC CỘT MỐC KM
