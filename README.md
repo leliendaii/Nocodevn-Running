@@ -21,6 +21,8 @@
 | Tính Năng | Mô Tả Ngắn Gọn |
 | :--- | :--- |
 | 🛰️ **Đo GPS Chuẩn Xác** | Lọc chống giật lag Kalman, nhận diện 4 trạng thái (*Đứng yên, Đi bộ, Chạy bộ, Bứt tốc*). Chạy ngầm liên tục và thông báo nhảy số từng giây ngoài màn hình khóa. |
+| 🌤️ **Thời Tiết & Bụi Mịn (AQI)** | Cập nhật nhiệt độ, độ ẩm và chỉ số chất lượng không khí AQI theo vị trí GPS thực tế từ Open-Meteo kèm lời khuyên chạy bộ. |
+| 📸 **Tạo Ảnh Check-in Sống Ảo** | Chụp/chọn ảnh, chèn đè lớp đồ họa thể thao (Line GPS neon phát sáng, Cự ly, Pace, Calo) với 3 mẫu tem thời thượng, lưu máy & chia sẻ Story. |
 | 🎥 **Video Lộ Trình 3D** | Mô phỏng 3D góc nhìn *Theo dõi* & *Toàn cảnh* (Strava Style). Tải video MP4 60FPS về máy để chia sẻ mạng xã hội. |
 | 📊 **Phân Tích Từng KM** | Tự động chia chặng mỗi 1km, so sánh nhịp Pace, đánh dấu **Best Split 🔥** và bảng tổng kết rõ ràng. |
 | 🎙️ **Voice Coach Tiếng Việt** | Giọng nói truyền cảm hứng qua từng cột mốc km và nhắc nhở: *"Chào [Tên], đã đến giờ chạy rồi. Cùng xỏ giày và bứt phá hôm nay nhé!"* |

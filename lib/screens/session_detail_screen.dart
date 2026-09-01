@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/splits_breakdown_card.dart';
 import '../widgets/top_sync_toast.dart';
 import 'route_flyover_3d_screen.dart';
+import 'running_photo_share_screen.dart';
 
 /// Màn hình Xem Chi Tiết 1 Buổi Chạy (Trang riêng Navigation, Flat 2 màu Đỏ & Xanh)
 class SessionDetailScreen extends StatefulWidget {
@@ -337,69 +338,122 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
           ),
 
           // Nút 'Xem quá trình' sát xuống gần dưới, cách bottom đúng 15px
+          // Bộ đôi nút 'Tạo ảnh check-in' & 'Video tổng quan' sát xuống gần dưới, cách bottom đúng 15px
           Positioned(
             left: 0,
             right: 0,
             bottom: 15,
-            child: Center(child: _buildAnimatedProcessButton(context)),
+            child: Center(child: _buildAnimatedProcessButtons(context)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAnimatedProcessButton(BuildContext context) {
+  Widget _buildAnimatedProcessButtons(BuildContext context) {
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, child) {
         return Transform.scale(
           scale: _scaleAnimation.value,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondaryNeon, // Màu Xanh #139EFE
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shadowColor: Colors.transparent,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 11,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: const BorderSide(
-                  color: Colors.white,
-                  width: 1.5,
-                ),
-              ),
-            ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) =>
-                        RouteFlyover3DScreen(session: widget.session),
-                    transitionsBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          );
-                        },
-                    transitionDuration: const Duration(milliseconds: 240),
-                    reverseTransitionDuration: const Duration(
-                      milliseconds: 180,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Nút Tạo ảnh check-in (Màu Đỏ Neon #FF2A42)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryNeon,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: const BorderSide(
+                      color: Colors.white,
+                      width: 1.5,
                     ),
                   ),
-                );
-              },
-              child: const Text(
-                'Video tổng quan',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.4,
+                ),
+                icon: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          RunningPhotoShareScreen(session: widget.session),
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                      transitionDuration: const Duration(milliseconds: 240),
+                      reverseTransitionDuration: const Duration(milliseconds: 180),
+                    ),
+                  );
+                },
+                label: const Text(
+                  'Tạo ảnh check-in',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 10),
+
+              // 2. Nút Video tổng quan (Màu Xanh Neon #139EFE)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondaryNeon,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: const BorderSide(
+                      color: Colors.white,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          RouteFlyover3DScreen(session: widget.session),
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                      transitionDuration: const Duration(milliseconds: 240),
+                      reverseTransitionDuration: const Duration(milliseconds: 180),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Video tổng quan',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

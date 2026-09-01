@@ -115,6 +115,7 @@ class RunSession {
 
   /// Getter alias cho avgPace
   String get pace => avgPace;
+  String get formattedPace => avgPace;
 
   /// Vận tốc trung bình theo km/h
   double get avgSpeedKmh {

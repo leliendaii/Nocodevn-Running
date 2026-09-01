@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/top_sync_toast.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/splits_breakdown_card.dart';
+import '../widgets/weather_aqi_widget.dart';
 
 class RunningScreen extends StatefulWidget {
   const RunningScreen({super.key});
@@ -1027,43 +1028,49 @@ class _RunningScreenState extends State<RunningScreen>
                   final running = context.read<RunningProvider>();
 
                   if (state == TrackingState.idle || state == TrackingState.finished) {
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 58,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          VoiceCoachService.speakStart();
-                          running.startTracking(user?.id);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryNeon,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          elevation: 8,
-                          shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.play_arrow_rounded,
-                              size: 28,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'BẮT ĐẦU CHẠY',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const WeatherAqiWidget(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 58,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              VoiceCoachService.speakStart();
+                              running.startTracking(user?.id);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryNeon,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
                               ),
+                              elevation: 8,
+                              shadowColor: AppTheme.primaryNeon.withValues(alpha: 0.5),
                             ),
-                          ],
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.play_arrow_rounded,
+                                  size: 28,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'BẮT ĐẦU CHẠY',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     );
                   } else if (state == TrackingState.running) {
                     return Row(
