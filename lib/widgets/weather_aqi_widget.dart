@@ -91,114 +91,195 @@ class _WeatherAqiWidgetState extends State<WeatherAqiWidget> {
     final w = _weather!;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.surface.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: AppTheme.secondaryNeon.withValues(alpha: 0.3),
-          width: 1.0,
+          color: AppTheme.secondaryNeon.withValues(alpha: 0.35),
+          width: 1.1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 12,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Icon thời tiết & Nhiệt độ
-          Icon(
-            w.weatherIcon,
-            color: AppTheme.secondaryNeon,
-            size: 18,
-          ),
-          const SizedBox(width: 7),
-          Text(
-            '${w.temperature.round()}°C',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '•',
-            style: TextStyle(
-              color: AppTheme.textMuted.withValues(alpha: 0.5),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Tình trạng thời tiết ngắn gọn
-          Expanded(
-            child: Text(
-              w.weatherDescription,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textSecondary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          // Độ ẩm
+          // 1. Dòng tiêu đề: Tên widget & Badge AQI kèm nhãn chất lượng
           Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('💧', style: TextStyle(fontSize: 11)),
-              const SizedBox(width: 2),
-              Text(
-                '${w.humidity}%',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondary,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(w.weatherIcon, color: AppTheme.secondaryNeon, size: 16),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'THỜI TIẾT BUỔI CHẠY',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.secondaryNeon,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+              // Badge AQI đầy đủ: ● AQI 76 • Trung bình
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: w.aqiColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: w.aqiColor.withValues(alpha: 0.6), width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: w.aqiColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: w.aqiColor.withValues(alpha: 0.6),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'AQI ${w.aqi} • ${w.aqiLabel}',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: w.aqiColor,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 10),
-          // Badge AQI (Chất lượng không khí)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: w.aqiColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: w.aqiColor.withValues(alpha: 0.5), width: 0.8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: w.aqiColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: w.aqiColor.withValues(alpha: 0.6),
-                        blurRadius: 4,
+
+          const SizedBox(height: 9),
+
+          // 2. Lưới thông số đầy đủ: Nhiệt độ, Cảm giác, Tình trạng, Lời khuyên, Độ ẩm, Gió
+          Row(
+            children: [
+              // Cột 1: Nhiệt độ thực tế & Cảm giác
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${w.temperature.round()}°C',
+                    style: const TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textPrimary,
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Cảm giác ${w.apparentTemperature.round()}°C',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 12),
+
+              // Cột 2: Tình trạng bầu trời & Lời khuyên chạy bộ ngắn
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      w.weatherDescription,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      w.sportAdvice,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: AppTheme.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // Cột 3: Độ ẩm & Tốc độ gió
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '💧 Độ ẩm: ',
+                        style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                      ),
+                      Text(
+                        '${w.humidity}%',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'AQI ${w.aqi}',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: w.aqiColor,
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '💨 Gió: ',
+                        style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                      ),
+                      Text(
+                        '${w.windSpeed.toStringAsFixed(1)} km/h',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
