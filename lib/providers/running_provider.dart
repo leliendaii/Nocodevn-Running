@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/run_session.dart';
@@ -47,6 +48,11 @@ class RunningProvider with ChangeNotifier {
   String _smoothRollingPace = '0:00';
   bool _autoPauseEnabled = true;
   bool _isAutoPausedByFilter = false;
+
+  // Mô phỏng tọa độ di chuyển thực tế trên Web (do PC không có chip GPS vệ tinh chạy ngoài trời)
+  double _simLat = 21.0285;
+  double _simLng = 105.8542;
+  double _simHeading = 0.0;
 
   // PHÂN TÍCH TỪNG KM (SPLITS / LAP BREAKDOWN)
   final List<KmSplit> _currentSplits = [];
@@ -361,6 +367,10 @@ class RunningProvider with ChangeNotifier {
     if (_state == TrackingState.idle) return 'Sẵn sàng';
     if (_state == TrackingState.paused) return 'Tạm dừng';
     if (_state == TrackingState.finished) return 'Hoàn thành';
+    if (_instantSpeedKmh < 0.5) {
+      if (_durationSeconds < 5) return 'Khởi động';
+      return 'Đứng yên';
+    }
     return CalorieCalculator.getActivityType(speedKmh: _instantSpeedKmh);
   }
 
@@ -432,8 +442,9 @@ class RunningProvider with ChangeNotifier {
     final cutoffToday = DateTime(now.year, now.month, now.day, _autoEndHour, _autoEndMinute);
 
     // Điều kiện chốt:
-    // Buổi chạy được bắt đầu TRƯỚC mốc cutoff và thời gian hiện tại đã ĐẠT hoặc VƯỢT QUA mốc cutoff
-    final bool hasCrossedCutoff = _runStartTime!.isBefore(cutoffToday) &&
+    // ĐỒNG THỜI buổi chạy phải diễn ra ít nhất 30 giây để không bao giờ chốt ngay lúc vừa bấm bắt đầu!
+    final bool hasCrossedCutoff = _durationSeconds >= 30 &&
+        _runStartTime!.isBefore(cutoffToday) &&
         (now.isAfter(cutoffToday) || now.isAtSameMomentAs(cutoffToday));
 
     if (hasCrossedCutoff) {
@@ -504,36 +515,106 @@ class RunningProvider with ChangeNotifier {
     _lastPosition = null;
     _lastPositionTime = null;
     _lastMilestoneKm = 0;
+    _simHeading = 0.0;
 
-    // Lưu ngay checkpoint điểm xuất phát & Khởi tạo thông báo chạy ngầm trực tiếp
+    // 🔥 CẬP NHẬT UI TỨC THÌ: Nút bấm và Badge chuyển ngay sang "ĐANG CHẠY" không trễ 1 mili-giây
+    notifyListeners();
+
+    // Lưu ngay checkpoint điểm xuất phát
     saveActiveCheckpointNow();
-    LiveWorkoutNotificationService.updateWorkoutNotification(
-      distanceKm: 0.0,
-      durationSeconds: 0,
-      pace: '0:00',
-      calories: 0,
-      isPaused: false,
-    );
+    if (!kIsWeb) {
+      LiveWorkoutNotificationService.updateWorkoutNotification(
+        distanceKm: 0.0,
+        durationSeconds: 0,
+        pace: '0:00',
+        calories: 0,
+        isPaused: false,
+      );
+    }
 
     // Timer cập nhật thời gian theo đồng hồ thực tế (Wall-clock)
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_state == TrackingState.running && !_isAutoPausedByFilter) {
-        _updateDurationFromWallClock();
+      if (_state == TrackingState.running) {
+        // Chỉ auto-pause khi đã thực sự chạy một quãng (tránh đứng yên lúc vừa bấm Start làm đứng hình timer)
+        final bool isActivelyAutoPaused = _autoPauseEnabled &&
+            _isAutoPausedByFilter &&
+            _durationSeconds > 10 &&
+            _distanceKm > 0.02;
+
+        if (!isActivelyAutoPaused) {
+          _updateDurationFromWallClock();
+          if (kIsWeb) {
+            _stepWebRunnerSimulation();
+          }
+        }
+
         notifyListeners();
 
-        // Cập nhật thông số trực tiếp ra Trung tâm thông báo & Màn hình khóa mỗi giây (Đúng từng giây, km, calo như trong app)
-        LiveWorkoutNotificationService.updateWorkoutNotification(
-          distanceKm: _distanceKm,
-          durationSeconds: _durationSeconds,
-          pace: instantPace,
-          calories: _calories,
-          isPaused: false,
-        );
+        // Cập nhật thông số trực tiếp ra Notification trên điện thoại
+        if (!kIsWeb) {
+          LiveWorkoutNotificationService.updateWorkoutNotification(
+            distanceKm: _distanceKm,
+            durationSeconds: _durationSeconds,
+            pace: instantPace,
+            calories: _calories,
+            isPaused: isActivelyAutoPaused,
+          );
+        }
       }
     });
 
-    // Lắng nghe tín hiệu GPS thực tế và chạy ngầm trên iPhone
+    if (kIsWeb) {
+      // Khởi tạo tọa độ xuất phát trên Web (lấy GPS trình duyệt nếu được cấp quyền)
+      Geolocator.getCurrentPosition().then((pos) {
+        _simLat = pos.latitude;
+        _simLng = pos.longitude;
+        if (_currentRoute.isEmpty) {
+          _currentRoute.add(RunPoint(_simLng, _simLat));
+          notifyListeners();
+        }
+      }).catchError((_) {});
+    } else {
+      // Lắng nghe tín hiệu GPS phần cứng trên điện thoại thật
+      _startRealGpsTracking();
+    }
+  }
+
+  /// Mô phỏng di chuyển mượt mà trên nền tảng Web / Desktop để kiểm thử đầy đủ KM, Pace, Calo và Lộ trình Map
+  void _stepWebRunnerSimulation() {
+    if (_state != TrackingState.running) return;
+
+    // Tốc độ chạy ổn định 10.2 km/h (Pace ~5:53 /km)
+    const double speedKmh = 10.2;
+    const double deltaDistKm = speedKmh / 3600.0; // ~2.83 mét mỗi giây
+    _instantSpeedKmh = speedKmh;
+    _smoothRollingPace = '5:53';
+    _distanceKm += deltaDistKm;
+    _calories = CalorieCalculator.calculate(
+      distanceKm: _distanceKm,
+      durationSeconds: _durationSeconds,
+    );
+
+    // Tọa độ lượn sóng tự nhiên để vẽ lộ trình đẹp trên bản đồ
+    _simHeading += 0.035;
+    const double metersToDegrees = 1.0 / 111320.0;
+    _simLat += (deltaDistKm * 1000.0 * metersToDegrees) * math.cos(_simHeading);
+    _simLng += (deltaDistKm * 1000.0 * metersToDegrees) * math.sin(_simHeading);
+    _currentRoute.add(RunPoint(_simLng, _simLat));
+
+    // Kiểm tra và ghi nhận bảng phân tích từng KM (Lap Split)
+    _checkAndRecordSplit(_distanceKm, _durationSeconds, _calories);
+
+    // Kiểm tra mốc KM (1.0km, 2.0km...) để rung thông báo & phát giọng nói
+    final int currentKm = _distanceKm.floor();
+    if (currentKm > _lastMilestoneKm && currentKm > 0) {
+      _lastMilestoneKm = currentKm;
+      onKilometerMilestone?.call(currentKm, currentPace, _durationSeconds);
+    }
+  }
+
+  /// Lắng nghe tín hiệu GPS thực tế và chạy ngầm trên điện thoại thật (iOS & Android)
+  Future<void> _startRealGpsTracking() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -653,8 +734,6 @@ class RunningProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Lỗi GPS: $e');
     }
-
-    notifyListeners();
   }
 
   /// Kiểm tra và tự động chốt Lap Split khi vừa chạm mốc mỗi 1.0 KM
@@ -777,13 +856,15 @@ class RunningProvider with ChangeNotifier {
 
     _positionStream?.pause();
     saveActiveCheckpointNow();
-    LiveWorkoutNotificationService.updateWorkoutNotification(
-      distanceKm: _distanceKm,
-      durationSeconds: _durationSeconds,
-      pace: currentPace,
-      calories: _calories,
-      isPaused: true,
-    );
+    if (!kIsWeb) {
+      LiveWorkoutNotificationService.updateWorkoutNotification(
+        distanceKm: _distanceKm,
+        durationSeconds: _durationSeconds,
+        pace: currentPace,
+        calories: _calories,
+        isPaused: true,
+      );
+    }
     notifyListeners();
   }
 
@@ -799,13 +880,15 @@ class RunningProvider with ChangeNotifier {
     _positionStream?.resume();
     _updateDurationFromWallClock();
     saveActiveCheckpointNow();
-    LiveWorkoutNotificationService.updateWorkoutNotification(
-      distanceKm: _distanceKm,
-      durationSeconds: _durationSeconds,
-      pace: currentPace,
-      calories: _calories,
-      isPaused: false,
-    );
+    if (!kIsWeb) {
+      LiveWorkoutNotificationService.updateWorkoutNotification(
+        distanceKm: _distanceKm,
+        durationSeconds: _durationSeconds,
+        pace: currentPace,
+        calories: _calories,
+        isPaused: false,
+      );
+    }
     notifyListeners();
   }
 
